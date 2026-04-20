@@ -1,0 +1,113 @@
+{% extends 'generator/base.html' %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <h1 class="text-3xl font-bold mb-2 text-white">⚙️ Настройки системы</h1>
+    <p class="text-slate-400 mb-8">Управление API ключами, моделями и режимами работы.</p>
+
+    <form method="post" class="space-y-8">
+        {% csrf_token %}
+
+        <!-- 1. Режим работы -->
+        <div class="card p-6 rounded-lg border-l-4 border-blue-500">
+            <h2 class="text-xl font-bold text-white mb-4">🚀 Режим работы</h2>
+            <div class="flex gap-4">
+                <label class="flex items-center gap-3 p-4 rounded bg-slate-800 cursor-pointer hover:bg-slate-700 flex-1 border {% if config.operation_mode == 'manual' %}border-blue-500{% else %}border-transparent{% endif %}">
+                    <input type="radio" name="operation_mode" value="manual" class="w-5 h-5 accent-blue-500" {% if config.operation_mode == 'manual' %}checked{% endif %}>
+                    <div>
+                        <div class="font-bold text-white">🛠 Ручной</div>
+                        <div class="text-xs text-slate-400">Пошаговый контроль каждого этапа</div>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 p-4 rounded bg-slate-800 cursor-pointer hover:bg-slate-700 flex-1 border {% if config.operation_mode == 'auto' %}border-green-500{% else %}border-transparent{% endif %}">
+                    <input type="radio" name="operation_mode" value="auto" class="w-5 h-5 accent-green-500" {% if config.operation_mode == 'auto' %}checked{% endif %}>
+                    <div>
+                        <div class="font-bold text-white">🤖 Автопилот</div>
+                        <div class="text-xs text-slate-400">Полная автоматизация (требуется Celery)</div>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- 2. API Ключи -->
+        <div class="card p-6 rounded-lg border-l-4 border-purple-500">
+            <h2 class="text-xl font-bold text-white mb-4">🔑 API Ключи</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">OpenAI Key</label>
+                    <input type="password" name="openai_key" value="{{ config.openai_key }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none" placeholder="sk-...">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Google Gemini Key</label>
+                    <input type="password" name="gemini_key" value="{{ config.gemini_key }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none" placeholder="AI...">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">HuggingFace Key</label>
+                    <input type="password" name="hf_key" value="{{ config.hf_key }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none" placeholder="hf_...">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">ElevenLabs Key (Voice)</label>
+                    <input type="password" name="elevenlabs_key" value="{{ config.elevenlabs_key }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none" placeholder="...">
+                </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">💡 Ключи хранятся в базе данных. Не передавай файл базы третьим лицам.</p>
+        </div>
+
+        <!-- 3. Выбор моделей -->
+        <div class="card p-6 rounded-lg border-l-4 border-yellow-500">
+            <h2 class="text-xl font-bold text-white mb-4">🧠 Модели по умолчанию</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Статьи (LLM)</label>
+                    <select name="default_article_model" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                        {% for value, label in config.ARTICLE_MODEL_CHOICES %}
+                            <option value="{{ value }}" {% if config.default_article_model == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Картинки (Image Gen)</label>
+                    <select name="default_image_model" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                        {% for value, label in config.IMAGE_MODEL_CHOICES %}
+                            <option value="{{ value }}" {% if config.default_image_model == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Авто-настройки -->
+        <div class="card p-6 rounded-lg border-l-4 border-green-500">
+            <h2 class="text-xl font-bold text-white mb-4">⚙️ Параметры Автопилота</h2>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Языки перевода (через запятую)</label>
+                    <input type="text" name="auto_translate_languages" value="{{ config.auto_translate_languages }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" placeholder="ru,de,es">
+                </div>
+                
+                <div class="flex gap-6 pt-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="auto_generate_images" class="w-5 h-5 accent-blue-500" {% if config.auto_generate_images %}checked{% endif %}>
+                        <span class="text-slate-300">Авто-картинки</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="auto_generate_voice" class="w-5 h-5 accent-blue-500" {% if config.auto_generate_voice %}checked{% endif %}>
+                        <span class="text-slate-300">Авто-озвучка</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="auto_assemble_video" class="w-5 h-5 accent-blue-500" {% if config.auto_assemble_video %}checked{% endif %}>
+                        <span class="text-slate-300">Авто-монтаж видео</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Кнопка сохранения -->
+        <div class="flex justify-end pt-4 pb-10">
+            <button type="submit" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded shadow-lg transform active:scale-95 transition">
+                💾 Сохранить настройки
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

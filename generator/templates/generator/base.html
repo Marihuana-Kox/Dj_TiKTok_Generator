@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Generator | {{ page_title|default:"Панель управления" }}</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; }
+        .card { background-color: #1e293b; border: 1px solid #334155; }
+        .btn-primary { background-color: #3b82f6; color: white; }
+        .btn-primary:hover { background-color: #2563eb; }
+        .status-pending { color: #fbbf24; }
+        .status-processing { color: #3b82f6; }
+        .status-completed { color: #22c55e; }
+        .status-failed { color: #ef4444; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <nav class="bg-slate-800 border-b border-slate-700 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="{% url 'generator:project_list' %}" class="text-xl font-bold text-blue-400">🎬 TikTok AI Generator</a>
+            <div class="flex gap-4">
+                <a href="{% url 'config:dashboard' %}" class="text-sm text-slate-400 hover:text-white">⚙️ Настройки</a>
+                <a href="{% url 'admin:index' %}" class="text-sm text-slate-400 hover:text-white">Админка</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-6 flex-grow">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mb-4 p-4 rounded bg-slate-700 border-l-4 {% if message.tags == 'success' %}border-green-500{% elif message.tags == 'error' %}border-red-500{% else %}border-blue-500{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-slate-800 p-4 text-center text-slate-500 text-sm mt-8">
+        &copy; 2024 TikTok AI Agent. Powered by Django & Flux.
+    </footer>
+</body>
+</html>

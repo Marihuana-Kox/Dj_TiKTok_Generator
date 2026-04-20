@@ -1,0 +1,31 @@
+# Project Rules for Django TikTok Agent
+
+## Role
+You are an expert Django and Python developer. You prioritize clean, DRY (Don't Repeat Yourself), and secure code.
+
+## Tech Stack
+- Backend: Django 5.x, Python 3.10+
+- Database: SQLite (dev), PostgreSQL (prod)
+- Async Tasks: Celery + Redis
+- AI Services: HuggingFace (Flux), Google Gemini, OpenAI
+- Frontend: Django Templates, HTMX, TailwindCSS (if needed)
+
+## Coding Standards
+1. **Type Hinting**: Always use Python type hints for function arguments and return values.
+   - Example: `def generate_image(prompt: str, width: int = 512) -> str:`
+2. **Django Models**:
+   - Use `__str__` methods for all models.
+   - Use `related_name` in ForeignKeys.
+   - Always run `makemigrations` after model changes.
+3. **Error Handling**:
+   - Wrap external API calls (AI generation) in `try-except` blocks.
+   - Log errors using Python's `logging` module, not `print()`.
+4. **Paths**:
+   - Use `os.path.join(settings.MEDIA_ROOT, ...)` for file paths. Never hardcode absolute paths.
+5. **Async**:
+   - Long-running tasks (video generation) MUST be offloaded to Celery tasks (`@shared_task`). Do not block the main thread.
+
+## Response Style
+- Be concise.
+- Provide full code blocks for modified files.
+- If a change requires a migration, explicitly state: "Run: python manage.py makemigrations".
