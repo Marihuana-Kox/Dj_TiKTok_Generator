@@ -15,6 +15,7 @@ class ArticleData:
     translations: Dict[str, str]
     image_prompts: List[str]
     hashtags: str
+    structure_plan: dict = None
 
 
 class BaseProvider(ABC):
@@ -42,10 +43,40 @@ class OpenAIProvider(BaseProvider):
         except ImportError:
             raise ImportError("pip install openai")
 
-    def generate(self, topic: str, angle: str, notes: str, languages: List[str], system_instruction: str = None) -> ArticleData:
+    def _generate_structure_plan(self, topic: str, angle: str, notes: str, template_prompt: str) -> dict:
+        """
+        Отдельная функция: Генерирует только план статьи на основе шаблона.
+        Возвращает словарь (JSON).
+        """
+        # Подставляем данные пользователя в шаблон
+        final_prompt = template_prompt.format(
+            topic=topic, angle=angle, notes=notes)
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a viral video strategist. Output ONLY valid JSON."},
+                {"role": "user", "content": final_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7
+        )
+
+        return json.loads(response.choices[0].message.content)
+
+    def generate(self, topic: str, angle: str, notes: str, languages: List[str],
+                 system_instruction: str = None, structure_template: str = None) -> ArticleData:
         # Базовый системный промпт
         base_system = "You are a viral TikTok historian and scriptwriter. You output ONLY valid JSON."
+        plan_data = None
+        plan_context = ""
 
+        if structure_template:
+            # Вызываем нашу новую отдельную функцию
+            plan_data = self._generate_structure_plan(
+                topic, angle, notes, structure_template)
+            # Превращаем план в текст, чтобы скармить его следующему этапу
+            plan_context = f"\nSTRICT STRUCTURE TO FOLLOW:\n{json.dumps(plan_data)}\n"
         # Если пользователь задал свой стиль - добавляем его
         if system_instruction:
             system_prompt = f"{base_system}\n\nSTYLE INSTRUCTION: {system_instruction}"
@@ -56,9 +87,10 @@ class OpenAIProvider(BaseProvider):
         Topic: {topic}
         Angle/Paradox: {angle}
         Key Facts/Notes: {notes}
+        {plan_context}
 
         Task:
-        1. Write a dramatic 60s script in ENGLISH.
+        1. Write a dramatic 60s script in ENGLISH strictly following the structure above.
         2. Create 4 short image prompts.
         3. Create a clickbait Title.
         4. Create 5 Hashtags.
@@ -92,7 +124,14 @@ class OpenAIProvider(BaseProvider):
             translations[lang_code] = self._translate_text(
                 script_en, lang_code)
 
-        return ArticleData(title=title, script_en=script_en, translations=translations, image_prompts=prompts, hashtags=hashtags)
+        return ArticleData(
+            title=title,
+            script_en=script_en,
+            translations=translations,
+            image_prompts=prompts,
+            hashtags=hashtags,
+            structure_plan=plan_data
+        )
 
     def _translate_text(self, text: str, lang_code: str) -> str:
         lang_name = self._get_lang_name(lang_code)
@@ -119,8 +158,40 @@ class GeminiProvider(BaseProvider):
         except ImportError:
             raise ImportError("pip install google-generativeai")
 
-    def generate(self, topic: str, angle: str, notes: str, languages: List[str], system_instruction: str = None) -> ArticleData:
+    def _generate_structure_plan(self, topic: str, angle: str, notes: str, template_prompt: str) -> dict:
+        """
+        Отдельная функция: Генерирует только план статьи на основе шаблона.
+        Возвращает словарь (JSON).
+        """
+        # Подставляем данные пользователя в шаблон
+        final_prompt = template_prompt.format(
+            topic=topic, angle=angle, notes=notes)
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a viral video strategist. Output ONLY valid JSON."},
+                {"role": "user", "content": final_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7
+        )
+
+        return json.loads(response.choices[0].message.content)
+
+    def generate(self, topic: str, angle: str, notes: str, languages: List[str],
+                 system_instruction: str = None, structure_template: str = None) -> ArticleData:
+        plan_data = None
+        plan_context = ""
+
+        if structure_template:
+            # Вызываем нашу новую отдельную функцию
+            plan_data = self._generate_structure_plan(
+                topic, angle, notes, structure_template)
+            # Превращаем план в текст, чтобы скармить его следующему этапу
+            plan_context = f"\nSTRICT STRUCTURE TO FOLLOW:\n{json.dumps(plan_data)}\n"
         style_prefix = ""
+
         if system_instruction:
             style_prefix = f"**IMPORTANT STYLE INSTRUCTION**: {system_instruction}\n\n"
 
@@ -129,14 +200,21 @@ class GeminiProvider(BaseProvider):
         Topic: {topic}
         Angle: {angle}
         Facts: {notes}
+        {plan_context} 
 
-        Generate a JSON object with keys:
-        - "script_en": 60s dramatic script (English).
-        - "image_prompts": List of 4 visual descriptions.
-        - "title": Clickbait title.
-        - "hashtags": 5 tags.
-        
-        Return ONLY raw JSON.
+        Task:
+        1. Write a dramatic 60s script in ENGLISH strictly following the structure above.
+        2. Create 4 short image prompts.
+        3. Create a clickbait Title.
+        4. Create 5 Hashtags.
+
+        JSON Format:
+        {{
+            "script_en": "...",
+            "image_prompts": ["...", "...", "...", "..."],
+            "title": "...",
+            "hashtags": "..."
+        }}
         """
 
         response = self.model.generate_content(prompt)
@@ -160,7 +238,14 @@ class GeminiProvider(BaseProvider):
             translations[lang_code] = self._translate_text(
                 script_en, lang_code)
 
-        return ArticleData(title=title, script_en=script_en, translations=translations, image_prompts=prompts, hashtags=hashtags)
+        return ArticleData(
+            title=title,
+            script_en=script_en,
+            translations=translations,
+            image_prompts=prompts,
+            hashtags=hashtags,
+            structure_plan=plan_data
+        )
 
     def _translate_text(self, text: str, lang_code: str) -> str:
         lang_name = self._get_lang_name(lang_code)

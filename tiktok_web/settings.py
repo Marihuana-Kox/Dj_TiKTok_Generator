@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'generator',
     'article',
     'config',
+    'image',
 ]
 
 MIDDLEWARE = [

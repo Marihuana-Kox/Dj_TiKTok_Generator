@@ -1,0 +1,41 @@
+{% extends 'generator/base.html' %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <h1 class="text-3xl font-bold text-white mb-6">{{ title }}</h1>
+
+    <form method="post" class="card p-6 rounded-lg space-y-4">
+        {% csrf_token %}
+        
+        <div>
+            <label class="block text-sm font-bold text-blue-400 mb-1">Название схемы</label>
+            <input type="text" name="name" value="{{ template.name|default:'' }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" placeholder="Например: Classic Hook, Conspiracy Theory" required>
+        </div>
+
+        <div>
+            <label class="block text-sm font-bold text-slate-400 mb-1">Описание (для себя)</label>
+            <input type="text" name="description" value="{{ template.description|default:'' }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" placeholder="Кратко, для чего эта схема">
+        </div>
+
+        <div>
+            <label class="block text-sm font-bold text-yellow-400 mb-1">
+                Промпт структуры (на английском)
+            </label>
+            <p class="text-xs text-slate-500 mb-2">
+                Используй переменные <code>{topic}</code>, <code>{angle}</code>, <code>{notes}</code>. AI подставит туда данные автоматически.
+            </p>
+            <textarea name="structure_prompt" rows="12" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-yellow-100 font-mono text-sm focus:border-yellow-500 outline-none" required>{{ template.structure_prompt|default:'' }}</textarea>
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+            <input type="checkbox" name="is_active" id="is_active" class="w-4 h-4" {% if not template or template.is_active %}checked{% endif %}>
+            <label for="is_active" class="text-slate-300">Активный шаблон (показывать в списке выбора)</label>
+        </div>
+
+        <div class="flex justify-end gap-4 pt-6">
+            <a href="{% url 'config:template_list' %}" class="text-slate-400 hover:text-white">Отмена</a>
+            <button type="submit" class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded">💾 Сохранить</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

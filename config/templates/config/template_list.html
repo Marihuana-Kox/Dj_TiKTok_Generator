@@ -1,0 +1,38 @@
+{% extends 'generator/base.html' %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-white">🏗 Шаблоны структур статьи</h1>
+        <a href="{% url 'config:template_new' %}" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-bold">
+            + Добавить новый
+        </a>
+    </div>
+
+    <div class="grid gap-4">
+        {% for tpl in templates %}
+        <div class="card p-4 rounded-lg flex justify-between items-center border-l-4 {% if tpl.is_active %}border-blue-500{% else %}border-slate-600 opacity-60{% endif %}">
+            <div>
+                <h3 class="text-xl font-bold text-white">{{ tpl.name }}</h3>
+                <p class="text-sm text-slate-400 mt-1">{{ tpl.description|truncatechars:100 }}</p>
+                <p class="text-xs text-slate-500 mt-2 font-mono bg-slate-900 p-2 rounded inline-block">
+                    {{ tpl.structure_prompt|truncatechars:80 }}...
+                </p>
+            </div>
+            <div class="flex gap-2">
+                <a href="{% url 'config:template_edit' tpl.pk %}" class="text-blue-400 hover:text-blue-300 px-3 py-2 border border-blue-500 rounded">✏️ Ред.</a>
+                <a href="{% url 'config:template_delete' tpl.pk %}" class="text-red-400 hover:text-red-300 px-3 py-2 border border-red-500 rounded" onclick="return confirm('Удалить?')">🗑 Удалить</a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center text-slate-500 py-10">
+            Шаблонов пока нет. Создай первый, чтобы использовать его при генерации!
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="mt-8">
+        <a href="{% url 'config:dashboard' %}" class="text-slate-400 hover:text-white">← Назад к общим настройкам</a>
+    </div>
+</div>
+{% endblock %}

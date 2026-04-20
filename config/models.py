@@ -65,3 +65,28 @@ class SystemConfig(models.Model):
         """Удобный метод: возвращает настройки или создает их, если нет."""
         obj, created = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class ArticleStructureTemplate(models.Model):
+    """
+    Шаблоны структуры статьи (Prompt Engineering для плана).
+    Хранит инструкции, как строить сюжет: Hook -> Body -> Climax.
+    """
+    name = models.CharField("Название шаблона", max_length=100,
+                            help_text="Например: 'Классический хук', 'Конспирология'")
+    description = models.TextField("Описание", blank=True)
+
+    # Сам промпт, который формирует план
+    structure_prompt = models.TextField(
+        "Промпт структуры",
+        help_text="Инструкция для AI. Используй переменные {topic}, {angle}, {notes}."
+    )
+
+    is_active = models.BooleanField("Активен", default=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Шаблон структуры статьи"
+        verbose_name_plural = "Шаблоны структур статей"

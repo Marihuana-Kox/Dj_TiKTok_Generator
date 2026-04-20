@@ -1,6 +1,63 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
-from .models import SystemConfig
+from .models import ArticleStructureTemplate, SystemConfig
+
+
+def template_list(request):
+    """Список всех шаблонов структур."""
+    templates = ArticleStructureTemplate.objects.all()
+    return render(request, 'config/template_list.html', {'templates': templates})
+
+
+def template_edit(request, pk=None):
+    """Создание или редактирование шаблона."""
+    if pk:
+        template = get_object_or_404(ArticleStructureTemplate, pk=pk)
+        title = "Редактировать шаблон"
+    else:
+        template = None
+        title = "Новый шаблон"
+
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        description = request.POST.get('description')
+        structure_prompt = request.POST.get('structure_prompt')
+        is_active = request.POST.get('is_active') == 'on'
+
+        if not name or not structure_prompt:
+            messages.error(request, "Название и Промпт обязательны!")
+        else:
+            if template:
+                template.name = name
+                template.description = description
+                template.structure_prompt = structure_prompt
+                template.is_active = is_active
+                template.save()
+                messages.success(request, f"Шаблон '{name}' обновлен!")
+            else:
+                ArticleStructureTemplate.objects.create(
+                    name=name,
+                    description=description,
+                    structure_prompt=structure_prompt,
+                    is_active=is_active
+                )
+                messages.success(request, f"Шаблон '{name}' создан!")
+            return redirect('config:template_list')
+
+    context = {
+        'template': template,
+        'title': title
+    }
+    return render(request, 'config/template_form.html', context)
+
+
+def template_delete(request, pk):
+    """Удаление шаблона."""
+    template = get_object_or_404(ArticleStructureTemplate, pk=pk)
+    name = template.name
+    template.delete()
+    messages.success(request, f"Шаблон '{name}' удален.")
+    return redirect('config:template_list')
 
 
 def dashboard(request):

@@ -23,6 +23,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('generator.urls')),  # Подключаем наши URL
     path('config/', include('config.urls')),
+    path('article/', include('article.urls')),
 ]
 
 # Чтобы отдавать медиа-файлы (картинки/видео) в режиме разработки

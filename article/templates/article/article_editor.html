@@ -1,0 +1,102 @@
+{% extends 'generator/base.html' %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-white">✏️ Редактор статьи</h1>
+        <a href="{% url 'generator:project_detail' project.pk %}" class="text-slate-400 hover:text-white">← Назад к проекту</a>
+    </div>
+
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+        
+        <!-- Заголовок и Хэштеги -->
+        <div class="card p-4 rounded-lg">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-blue-400 mb-1">Заголовок</label>
+                    <input type="text" name="title" value="{{ script.title }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-purple-400 mb-1">Хэштеги</label>
+                    <input type="text" name="hashtags" value="{{ script.hashtags }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-purple-500 outline-none">
+                </div>
+            </div>
+        </div>
+
+        <!-- Текст Сценария (Две колонки) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Английский -->
+            <div class="card p-4 rounded-lg flex flex-col h-full">
+                <label class="block text-sm font-bold text-blue-400 mb-2">🇬🇧 Сценарий (EN)</label>
+                <textarea name="script_en" rows="20" class="flex-grow w-full bg-slate-900 border border-slate-700 rounded p-3 text-white font-mono text-sm focus:border-blue-500 outline-none resize-none">{{ script.script_full }}</textarea>
+            </div>
+            
+            <!-- Русский -->
+            <div class="card p-4 rounded-lg flex flex-col h-full">
+                <label class="block text-sm font-bold text-green-400 mb-2">🇷🇺 Перевод (RU)</label>
+                <textarea name="script_ru" rows="20" class="flex-grow w-full bg-slate-900 border border-slate-700 rounded p-3 text-white font-mono text-sm focus:border-green-500 outline-none resize-none">{{ script.script_ru }}</textarea>
+            </div>
+        </div>
+
+        <!-- Промпты для картинок -->
+        <div class="card p-4 rounded-lg border-l-4 border-yellow-500">
+            <label class="block text-sm font-bold text-yellow-400 mb-2">🎨 Промпты для генерации картинок</label>
+            <p class="text-xs text-slate-400 mb-2">Каждый промпт с новой строки. Отредактируй их перед генерацией изображений.</p>
+            <textarea name="image_prompts_text" rows="8" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white font-mono text-sm focus:border-yellow-500 outline-none">{{ prompts_text }}</textarea>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="flex justify-between items-center pt-4 pb-10">
+            <button type="submit" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded shadow-lg transform active:scale-95 transition">
+                💾 Сохранить изменения
+            </button>
+            
+            <!-- Кнопка следующего этапа (пока не активна) -->
+            <button type="button" onclick="alert('Следующий этап: Генерация картинок (будет реализован скоро)')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded shadow-lg opacity-50 cursor-not-allowed">
+                🎨 Далее: Генерация картинок →
+            </button>
+        </div>
+    </form>
+</div>
+<!-- Блок счетчиков -->
+<div class="fixed bottom-6 right-6 bg-slate-800 border border-slate-600 p-4 rounded-lg shadow-2xl z-50">
+    <div class="text-xs text-slate-400 uppercase font-bold mb-1">Статистика (EN)</div>
+    <div class="flex gap-4 text-sm">
+        <span id="word-count" class="text-white font-mono">Слов: 0</span>
+        <span id="char-count" class="text-white font-mono">Симв: 0</span>
+        <span id="time-estimate" class="text-blue-400 font-mono font-bold">⏱ 0 сек</span>
+    </div>
+</div>
+
+<script>
+function updateCounts() {
+    const text = document.querySelector('textarea[name="script_en"]').value;
+    // Считаем слова (разбиваем по пробелам, фильтруем пустые)
+    const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+    const chars = text.length;
+    
+    // Считаем время (средняя скорость речи для TikTok ~2.5 слова в сек)
+    const seconds = Math.ceil(words / 2.5);
+    
+    document.getElementById('word-count').innerText = `Слов: ${words}`;
+    document.getElementById('char-count').innerText = `Симв: ${chars}`;
+    document.getElementById('time-estimate').innerText = `⏱ ${seconds} сек`;
+    
+    // Если слишком длинно (>150 слов), красим в красный
+    const wordEl = document.getElementById('word-count');
+    if (words > 150) {
+        wordEl.classList.add('text-red-500');
+        wordEl.classList.remove('text-white');
+    } else {
+        wordEl.classList.remove('text-red-500');
+        wordEl.classList.add('text-white');
+    }
+}
+
+// Вешаем событие на изменение текста
+document.querySelector('textarea[name="script_en"]').addEventListener('input', updateCounts);
+// Запускаем один раз при загрузке
+updateCounts();
+</script>
+{% endblock %}

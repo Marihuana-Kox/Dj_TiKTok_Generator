@@ -1,108 +1,125 @@
-{% extends 'generator/base.html' %}
+    {% extends 'generator/base.html' %}
 
-{% block content %}
-<div class="max-w-4xl mx-auto">
-    <a href="{% url 'generator:project_detail' project.pk %}" class="text-slate-400 hover:text-white mb-6 inline-block">&larr; Назад</a>
-    
-    <h1 class="text-3xl font-bold mb-2">Настройка генерации</h1>
-    <p class="text-slate-400 mb-8">Проект: <span class="text-white font-semibold">{{ project.topic }}</span></p>
+    {% block content %}
+    <div class="max-w-4xl mx-auto">
+        <a href="{% url 'generator:project_detail' project.pk %}" class="text-slate-400 hover:text-white mb-6 inline-block">&larr; Назад</a>
+        
+        <h1 class="text-3xl font-bold mb-2">Настройка генерации</h1>
+        <p class="text-slate-400 mb-8">Проект: <span class="text-white font-semibold">{{ project.topic }}</span></p>
 
-    <form method="post" class="space-y-6">
-        {% csrf_token %}
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
 
-        <!-- 1. Выбор провайдера -->
-        <div class="card p-6 rounded-lg">
-            <h3 class="text-xl font-semibold mb-4 text-blue-400">🤖 Движок генерации</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {% for prov in providers %}
-                <label class="cursor-pointer relative">
-                    <input type="radio" name="provider" value="{{ prov.id }}" class="peer sr-only" 
-                           {% if forloop.first %}checked{% endif %}>
-                    <div class="p-4 rounded border border-slate-600 bg-slate-800 peer-checked:border-blue-500 peer-checked:bg-blue-900/20 hover:bg-slate-700 transition">
-                        <div class="font-bold text-white">{{ prov.name }}</div>
+            <!-- 1. Выбор провайдера -->
+            <div class="card p-6 rounded-lg">
+                <h3 class="text-xl font-semibold mb-4 text-blue-400">🤖 Движок генерации</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {% for prov in providers %}
+                    <label class="cursor-pointer relative">
+                        <input type="radio" name="provider" value="{{ prov.id }}" class="peer sr-only" 
+                            {% if forloop.first %}checked{% endif %}>
+                        <div class="p-4 rounded border border-slate-600 bg-slate-800 peer-checked:border-blue-500 peer-checked:bg-blue-900/20 hover:bg-slate-700 transition">
+                            <div class="font-bold text-white">{{ prov.name }}</div>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 2. Редактор стиля (System Prompt) -->
+            <div class="card p-6 rounded-lg">
+                <h3 class="text-xl font-semibold mb-2 text-purple-400">🎭 Стиль статьи (System Prompt)</h3>
+                <p class="text-sm text-slate-400 mb-4">
+                    Опишите, как должен вести себя ИИ. Например: "Строгий академик", "Безумный конспиролог", "Сторителлер для детей".
+                </p>
+                <textarea name="system_prompt" rows="5" 
+                    class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-slate-200 focus:border-blue-500 focus:outline-none font-mono text-sm"
+                >{{ default_system_prompt }}</textarea>
+                
+                <!-- Быстрые пресеты (можно добавить JS позже) -->
+                <div class="mt-2 flex gap-2 text-xs">
+                    <span class="text-slate-500">Пресеты:</span>
+                    <button type="button" onclick="setPrompt('fact')" class="text-blue-400 hover:underline">Факты</button>
+                    <button type="button" onclick="setPrompt('conspiracy')" class="text-red-400 hover:underline">Конспирология</button>
+                    <button type="button" onclick="setPrompt('mystery')" class="text-purple-400 hover:underline">Тайны</button>
+                </div>
+            </div>
+
+            <!-- 3. Проверка входных данных (можно подправить) -->
+            <div class="card p-6 rounded-lg">
+                <h3 class="text-xl font-semibold mb-4 text-green-400">📝 Входные данные</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">Тема</label>
+                        <input type="text" name="topic" value="{{ project.topic }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                     </div>
-                </label>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- 2. Редактор стиля (System Prompt) -->
-        <div class="card p-6 rounded-lg">
-            <h3 class="text-xl font-semibold mb-2 text-purple-400">🎭 Стиль статьи (System Prompt)</h3>
-            <p class="text-sm text-slate-400 mb-4">
-                Опишите, как должен вести себя ИИ. Например: "Строгий академик", "Безумный конспиролог", "Сторителлер для детей".
-            </p>
-            <textarea name="system_prompt" rows="5" 
-                class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-slate-200 focus:border-blue-500 focus:outline-none font-mono text-sm"
-            >{{ default_system_prompt }}</textarea>
-            
-            <!-- Быстрые пресеты (можно добавить JS позже) -->
-            <div class="mt-2 flex gap-2 text-xs">
-                <span class="text-slate-500">Пресеты:</span>
-                <button type="button" onclick="setPrompt('fact')" class="text-blue-400 hover:underline">Факты</button>
-                <button type="button" onclick="setPrompt('conspiracy')" class="text-red-400 hover:underline">Конспирология</button>
-                <button type="button" onclick="setPrompt('mystery')" class="text-purple-400 hover:underline">Тайны</button>
-            </div>
-        </div>
-
-        <!-- 3. Проверка входных данных (можно подправить) -->
-        <div class="card p-6 rounded-lg">
-            <h3 class="text-xl font-semibold mb-4 text-green-400">📝 Входные данные</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm text-slate-400 mb-1">Тема</label>
-                    <input type="text" name="topic" value="{{ project.topic }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-                </div>
-                <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ракурс (Angle)</label>
-                    <input type="text" name="angle" value="{{ project.angle }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-                </div>
-                <div>
-                    <label class="block text-sm text-slate-400 mb-1">Заметки</label>
-                    <textarea name="notes" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">{{ project.notes }}</textarea>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">Ракурс (Angle)</label>
+                        <input type="text" name="angle" value="{{ project.angle }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">Заметки</label>
+                        <textarea name="notes" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">{{ project.notes }}</textarea>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- 4. Языки перевода -->
-        <div class="card p-6 rounded-lg">
-            <h3 class="text-xl font-semibold mb-4 text-yellow-400">🌍 Языки перевода</h3>
-            <div class="flex gap-4">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="languages" value="ru" checked class="w-5 h-5 accent-blue-500">
-                    <span>Русский</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="languages" value="de" checked class="w-5 h-5 accent-blue-500">
-                    <span>Немецкий</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="languages" value="es" class="w-5 h-5 accent-blue-500">
-                    <span>Испанский</span>
-                </label>
+            <!-- 4. Языки перевода -->
+            <div class="card p-6 rounded-lg">
+                <h3 class="text-xl font-semibold mb-4 text-yellow-400">🌍 Языки перевода</h3>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="languages" value="ru" checked class="w-5 h-5 accent-blue-500">
+                        <span>Русский</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="languages" value="de" checked class="w-5 h-5 accent-blue-500">
+                        <span>Немецкий</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="languages" value="es" class="w-5 h-5 accent-blue-500">
+                        <span>Испанский</span>
+                    </label>
+                </div>
             </div>
-        </div>
+                    <!-- Выбор структуры статьи -->
+            <div class="card p-6 rounded-lg border-l-4 border-yellow-500 mb-6">
+                <h2 class="text-xl font-bold text-white mb-4">🏗 Структура статьи (План)</h2>
+                <label class="block text-sm text-slate-400 mb-2">Выберите шаблон построения сюжета:</label>
+                
+                <select name="structure_template_id" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white focus:border-yellow-500 outline-none">
+                    <option value="">-- Без плана (Свободный стиль) --</option>
+                    {% for tpl in structure_templates %}
+                        <option value="{{ tpl.id }}">
+                            {{ tpl.name }}{% if tpl.description %} - {{ tpl.description|truncatechars:60 }}{% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+                
+                <p class="text-xs text-slate-500 mt-2">
+                    💡 Если выбрать шаблон, AI сначала составит план (Хук, Интрига), а затем напишет текст строго по нему.
+                </p>
+            </div>
+            <!-- Кнопка запуска -->
+            <div class="flex justify-end gap-4 pt-4">
+                <a href="{% url 'generator:project_detail' project.pk %}" class="px-6 py-3 rounded text-slate-400 hover:text-white">Отмена</a>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded shadow-lg transform active:scale-95 transition">
+                    🚀 ЗАПУСТИТЬ ГЕНЕРАЦИЮ
+                </button>
+            </div>
+        </form>
+    </div>
 
-        <!-- Кнопка запуска -->
-        <div class="flex justify-end gap-4 pt-4">
-            <a href="{% url 'generator:project_detail' project.pk %}" class="px-6 py-3 rounded text-slate-400 hover:text-white">Отмена</a>
-            <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded shadow-lg transform active:scale-95 transition">
-                🚀 ЗАПУСТИТЬ ГЕНЕРАЦИЮ
-            </button>
-        </div>
-    </form>
-</div>
-
-<script>
-function setPrompt(type) {
-    const textarea = document.querySelector('textarea[name="system_prompt"]');
-    if (type === 'fact') {
-        textarea.value = "You are a strict academic historian. Focus ONLY on verified facts, dates, and archaeological evidence. No speculation. Tone: Educational and precise.";
-    } else if (type === 'conspiracy') {
-        textarea.value = "You are a conspiracy theorist. Connect unrelated events, question official narratives, and suggest hidden agendas. Use phrases like 'They don't want you to know', 'Coincidence?', 'Follow the money'. Tone: Suspicious and dramatic.";
-    } else if (type === 'mystery') {
-        textarea.value = "You are a storyteller of ancient mysteries. Focus on unexplained phenomena, lost technologies, and paradoxes. Create an atmosphere of awe and wonder. Tone: Mysterious and captivating.";
+    <script>
+    function setPrompt(type) {
+        const textarea = document.querySelector('textarea[name="system_prompt"]');
+        if (type === 'fact') {
+            textarea.value = "You are a strict academic historian. Focus ONLY on verified facts, dates, and archaeological evidence. No speculation. Tone: Educational and precise.";
+        } else if (type === 'conspiracy') {
+            textarea.value = "You are a conspiracy theorist. Connect unrelated events, question official narratives, and suggest hidden agendas. Use phrases like 'They don't want you to know', 'Coincidence?', 'Follow the money'. Tone: Suspicious and dramatic.";
+        } else if (type === 'mystery') {
+            textarea.value = "You are a storyteller of ancient mysteries. Focus on unexplained phenomena, lost technologies, and paradoxes. Create an atmosphere of awe and wonder. Tone: Mysterious and captivating.";
+        }
     }
-}
-</script>
-{% endblock %}
+    </script>
+    {% endblock %}
