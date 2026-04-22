@@ -1,0 +1,61 @@
+<script>
+    // --- МОДАЛЬНОЕ ОКНО ---
+    function openLangModal() { document.getElementById('lang-modal').classList.remove('hidden'); }
+    function closeLangModal() { document.getElementById('lang-modal').classList.add('hidden'); }
+
+    // --- УНИВЕРСАЛЬНЫЙ СЧЕТЧИК ---
+    window.initCounters = function() {
+        document.querySelectorAll('.stats-trigger').forEach(textarea => {
+            const langId = textarea.dataset.lang;
+            const wordsEl = document.getElementById(`words-${langId}`);
+            const timeEl = document.getElementById(`time-${langId}`);
+            const colorClass = textarea.dataset.color || 'text-purple-400';
+
+            const update = () => {
+                const text = textarea.value;
+                const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+                const seconds = Math.ceil(words / 2.5);
+                
+                if(wordsEl) wordsEl.innerText = words;
+                if(timeEl) {
+                    timeEl.innerText = seconds + 's';
+                    timeEl.className = `font-bold ${words > 150 ? 'text-red-400' : colorClass}`;
+                }
+            };
+            
+            textarea.addEventListener('input', update);
+            update(); // Запуск при загрузке
+        });
+    };
+
+    // --- КНОПКА ДАЛЕЕ ---
+    window.initNextButton = function() {
+        const radios = document.querySelectorAll('input[name="image_mode"]');
+        const btn = document.getElementById('btn-next-step');
+        const select = document.getElementById('num-images-select');
+        
+        const updateBtn = () => {
+            const mode = document.querySelector('input[name="image_mode"]:checked').value;
+            if (mode === 'manual') {
+                btn.innerHTML = '✍️ Написать промпты вручную →';
+                btn.classList.replace('bg-purple-600', 'bg-blue-600');
+                select.disabled = true;
+            } else {
+                const count = select.value === 'auto' ? 'авто' : select.value;
+                btn.innerHTML = `🎨 Создать сценарий (${count} сцен) →`;
+                btn.classList.replace('bg-blue-600', 'bg-purple-600');
+                select.disabled = (mode === 'auto');
+            }
+        };
+
+        radios.forEach(r => r.addEventListener('change', updateBtn));
+        select.addEventListener('change', updateBtn);
+        updateBtn();
+    };
+
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', () => {
+        initCounters();
+        initNextButton();
+    });
+</script>

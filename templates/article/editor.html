@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Редактор: {{ project.topic }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto pb-32">
+    
+    {% include 'components/_nav.html' %}
+
+    <form method="post" class="space-y-8">
+        {% csrf_token %}
+        
+        <!-- 1. АНГЛИЙСКИЙ (Всегда есть) -->
+        {% with lang_code='en' flag='🇬' color='text-blue-400' %}
+            {% include 'blocks/article_card.html' with 
+                lang_code=lang_code 
+                flag_emoji=flag 
+                color_class=color 
+                script_text=script.script_full 
+                meta_title=script.metadata.titles.en|default:script.title 
+                meta_desc=script.metadata.descriptions.en 
+                meta_tags=script.metadata.hashtags.en|default:script.hashtags 
+            %}
+        {% endwith %}
+
+        <!-- 2. РУССКИЙ (Если есть) -->
+        {% if script.script_ru %}
+            {% with lang_code='ru' flag='🇷' color='text-green-400' %}
+                {% include 'blocks/article_card.html' with 
+                    lang_code=lang_code 
+                    flag_emoji=flag 
+                    color_class=color 
+                    script_text=script.script_ru 
+                    meta_title=script.metadata.titles.ru 
+                    meta_desc=script.metadata.descriptions.ru 
+                    meta_tags=script.metadata.hashtags.ru 
+                %}
+            {% endwith %}
+        {% endif %}
+
+        <!-- 3. НЕМЕЦКИЙ (Если есть) -->
+        {% if script.script_de %}
+            {% with lang_code='de' flag='🇩' color='text-yellow-400' %}
+                {% include 'blocks/article_card.html' with 
+                    lang_code=lang_code 
+                    flag_emoji=flag 
+                    color_class=color 
+                    script_text=script.script_de 
+                    meta_title=script.metadata.titles.de 
+                    meta_desc=script.metadata.descriptions.de 
+                    meta_tags=script.metadata.hashtags.de 
+                %}
+            {% endwith %}
+        {% endif %}
+
+        <!-- 4. ДРУГИЕ ЯЗЫКИ (Цикл) -->
+        {% for lang_code, text in script.metadata.translations.items %}
+            {% with flag='🌐' color='text-purple-400' %}
+                {% include 'blocks/article_card.html' with 
+                    lang_code=lang_code 
+                    flag_emoji=flag 
+                    color_class=color 
+                    script_text=text 
+                    meta_title=script.metadata.titles|get_item:lang_code 
+                    meta_desc=script.metadata.descriptions|get_item:lang_code 
+                    meta_tags=script.metadata.hashtags|get_item:lang_code 
+                %}
+            {% endwith %}
+        {% endfor %}
+
+        <!-- 5. НАСТРОЙКИ КАРТИНОК -->
+        {% include 'blocks/image_settings.html' %}
+
+        <!-- 6. КНОПКИ -->
+        <div class="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur border-t border-slate-700 p-4 z-50">
+            <div class="max-w-5xl mx-auto flex justify-between items-center">
+                <button type="submit" name="action" value="save" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-lg shadow transition">💾 Сохранить</button>
+                <button type="submit" name="action" value="next" id="btn-next-step" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition flex items-center gap-2 text-lg">🎨 Далее: Картинки →</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Модалка добавления языка (можно вынести в components/_modals.html) -->
+<div id="lang-modal" class="fixed inset-0 z-[60] hidden">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeLangModal()"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-slate-800 rounded-xl shadow-2xl border border-slate-600 p-6">
+        <h3 class="text-xl font-bold text-white mb-4">Добавить язык</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_language">
+            <select name="new_lang_code" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white mb-4">
+                <option value="es">Español</option><option value="fr">Français</option><option value="it">Italiano</option>
+            </select>
+            <textarea name="new_lang_text" rows="5" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white mb-4"></textarea>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeLangModal()" class="px-4 py-2 text-slate-400">Отмена</button>
+                <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

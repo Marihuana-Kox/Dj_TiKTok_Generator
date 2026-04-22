@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактор: {{ project.topic }}{% endblock %}
+
+{% block content %}
+<div class="editor-wrapper">
+    
+    <!-- Хедер -->
+    <div class="flex flex-between mb-2">
+        <a href="{% url 'topics:dashboard' %}" class="text-muted">&larr; НАЗАД</a>
+        <span class="text-muted">ID: {{ project.id }}</span>
+    </div>
+
+    <h1>Редактирование идеи</h1>
+    <p class="text-muted mb-2">Быстрое изменение параметров.</p>
+
+    <form method="post" class="card">
+        {% csrf_token %}
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Поля -->
+        <div class="form-group">
+            <label class="form-label">{{ form.topic.label }}</label>
+            {{ form.topic }}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.angle.label }}</label>
+            {{ form.angle }}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.notes.label }}</label>
+            {{ form.notes }}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.status.label }}</label>
+            {{ form.status }}
+        </div>
+
+        <!-- Кнопки -->
+        <div class="flex mt-2 border-top pt-2">
+            <button type="submit" class="btn btn-success">💾 Сохранить</button>
+            <a href="{% url 'topics:dashboard' %}" class="btn btn-outline">Отмена</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

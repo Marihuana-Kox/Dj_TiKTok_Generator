@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}Генерация идей{% endblock %}
+
+{% block content %}
+<div class="editor-wrapper">
+    <div class="flex flex-between mb-2">
+        <a href="{% url 'topics:dashboard' %}" class="text-muted">&larr; НАЗАД</a>
+        <h1>Генератор идей</h1>
+    </div>
+
+    <form method="post" class="card">
+        {% csrf_token %}
+
+        <!-- Основной блок -->
+        <div class="form-group">
+            <label class="form-label">{{ form.count.label }}</label>
+            {{ form.count }}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.topics_input.label }}</label>
+            {{ form.topics_input }}
+            <small class="text-muted">{{ form.topics_input.help_text }}</small>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
+
+        <!-- Настройки обновления -->
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                {{ form.refresh_old }} 
+                <span class="form-label" style="margin:0;">{{ form.refresh_old.label }}</span>
+            </label>
+            <div id="refresh-options" style="display: none; margin-top: 10px; padding-left: 25px;">
+                <label class="form-label">{{ form.refresh_period.label }}</label>
+                {{ form.refresh_period }}
+            </div>
+        </div>
+
+        <!-- Настройки повторов -->
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                {{ form.allow_duplicates }} 
+                <span class="form-label" style="margin:0;">{{ form.allow_duplicates.label }}</span>
+            </label>
+            <small class="text-muted" style="display:block; margin-top:5px; padding-left: 25px;">{{ form.allow_duplicates.help_text }}</small>
+            
+            <div id="duplicate-options" style="display: none; margin-top: 10px; padding-left: 25px;">
+                <label class="form-label">{{ form.duplicate_period.label }}</label>
+                {{ form.duplicate_period }}
+            </div>
+            </div>
+                <!-- ВЫБОР СЕРВИСА -->
+                <div class="form-group" style="border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px;">
+                    <label class="form-label">{{ form.ai_provider.label }}</label>
+                    {% if form.ai_provider.field.choices %}
+                        {{ form.ai_provider }}
+                        <small class="text-muted">Доступны только настроенные и активные сервисы.</small>
+                    {% else %}
+                        <div class="alert alert-error">
+                            ⚠️ В системе нет активных AI-сервисов. Зайдите в админку и активируйте нужный провайдер.
+                        </div>
+                    {% endif %}
+                </div>
+            <div class="flex mt-2 border-top pt-2">
+                <button type="submit" class="btn btn-success">🚀 Запустить генерацию</button>
+            <a href="{% url 'topics:dashboard' %}" class="btn btn-outline">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Простой скрипт для показа/скрытия опций
+    document.addEventListener('DOMContentLoaded', function() {
+        const refreshCheck = document.getElementById('{{ form.refresh_old.id_for_label }}');
+        const refreshOpts = document.getElementById('refresh-options');
+        
+        const dupCheck = document.getElementById('{{ form.allow_duplicates.id_for_label }}');
+        const dupOpts = document.getElementById('duplicate-options');
+
+        function toggle(element, targetId) {
+            targetId.style.display = element.checked ? 'block' : 'none';
+        }
+
+        refreshCheck.addEventListener('change', () => toggle(refreshCheck, refreshOpts));
+        dupCheck.addEventListener('change', () => {
+            // Если разрешаем дубликаты, то настройки запрета не нужны
+            toggle(!dupCheck, dupOpts); 
+        });
+        
+        // Инициализация при загрузке
+        toggle(refreshCheck, refreshOpts);
+        toggle(!dupCheck, dupOpts);
+    });
+</script>
+{% endblock %}

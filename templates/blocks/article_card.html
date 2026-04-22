@@ -1,0 +1,44 @@
+{% comment %}
+Ожидает контекст:
+- lang_code: 'en', 'ru', 'de' и т.д.
+- script_text: сам текст статьи
+- meta_title: заголовок из metadata
+- meta_desc: описание из metadata
+- meta_tags: хэштеги из metadata
+- color_class: цвет акцента (text-blue-400, text-green-400...)
+- flag_emoji: 🇬, 🇷, 🇩...
+{% endcomment %}
+
+<div class="card group focus-within:ring-2 focus-within:ring-opacity-50 transition ring-{{ color_class|slice:'5:' }}">
+    <!-- Шапка с мета-данными -->
+    <div class="bg-slate-900/80 p-4 border-b border-slate-700 space-y-3">
+        <div class="flex justify-between items-start gap-4">
+            <label class="font-bold {{ color_class }} flex items-center gap-2 text-lg shrink-0">
+                {{ flag_emoji }} {{ lang_code|upper }}
+            </label>
+            <div class="stats-badge bg-slate-900 px-3 py-1.5 rounded-full border border-slate-700 shadow-inner flex items-center gap-3 text-xs font-mono shrink-0">
+                <span class="text-slate-400">📝 <span id="words-{{ lang_code }}" class="text-white font-bold">0</span></span>
+                <span class="w-px h-3 bg-slate-700"></span>
+                <span class="text-slate-400">⏱ <span id="time-{{ lang_code }}" class="{{ color_class }} font-bold">0s</span></span>
+            </div>
+        </div>
+        
+        <!-- Поля ввода Мета-данных -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input type="text" name="title_{{ lang_code }}" value="{{ meta_title }}" 
+                class="md:col-span-3 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-{{ color_class|slice:'5:' }}-500 outline-none"
+                placeholder="Title for publication">
+            <input type="text" name="hashtags_{{ lang_code }}" value="{{ meta_tags }}" 
+                class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-{{ color_class|slice:'5:' }}-400 text-xs font-mono focus:border-{{ color_class|slice:'5:' }}-500 outline-none"
+                placeholder="#tags">
+        </div>
+        <textarea name="desc_{{ lang_code }}" rows="2" 
+            class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-300 text-xs focus:border-{{ color_class|slice:'5:' }}-500 outline-none resize-none"
+            placeholder="Description for publication...">{{ meta_desc }}</textarea>
+    </div>
+
+    <!-- Текст статьи -->
+    <textarea name="script_{{ lang_code }}" id="text-{{ lang_code }}" data-lang="{{ lang_code }}" data-color="{{ color_class }}"
+        class="stats-trigger w-full bg-slate-800 p-5 text-slate-200 focus:bg-slate-900/80 outline-none font-mono text-sm leading-relaxed resize-y transition border-t border-transparent"
+        rows="10" placeholder="Script text...">{{ script_text }}</textarea>
+</div>

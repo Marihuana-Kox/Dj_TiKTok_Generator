@@ -1,0 +1,342 @@
+/* --- Переменные --- */
+:root {
+    --bg-dark: #0f172a;
+    --bg-card: #1e293b;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent-blue: #3b82f6;
+    --accent-green: #10b981;
+    --accent-orange: #f59e0b;
+    --border-color: #334155;
+}
+
+/* --- Базовые настройки --- */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    margin: 0;
+    padding: 0;
+    line-height: 1.5;
+    
+    /* ИЗМЕНЕНИЕ: Базовый размер шрифта теперь 12px (было 8px) */
+    font-size: 12px; 
+}
+
+a { text-decoration: none; transition: color 0.2s; }
+ul { list-style: none; padding: 0; margin: 0; }
+
+/* --- Контейнер --- */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* --- Навигация --- */
+.navbar {
+    background-color: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 0; /* Чуть больше отступ для комфорта */
+}
+.nav-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+.nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 800;
+    /* Логотип пропорционально больше базы */
+    font-size: 18px; 
+    background: linear-gradient(90deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: #fff;
+}
+.nav-links {
+    display: flex;
+    gap: 20px;
+}
+.nav-links a {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 12px; /* Теперь равен базе */
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.nav-links a:hover { color: var(--accent-blue); }
+
+/* --- Карточки --- */
+.card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px; /* Чуть скругленнее */
+    padding: 20px; /* Больше воздуха внутри */
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+}
+
+/* --- Типографика --- */
+h1 { 
+    font-size: 22px; /* Пропорционально увеличен */
+    font-weight: 700; 
+    margin: 0 0 8px 0; 
+    text-transform: uppercase; 
+    letter-spacing: 0.5px; 
+}
+h2 { 
+    font-size: px; 
+    font-weight: 600; 
+    margin: 0 0 12px 0; 
+    text-transform: uppercase; 
+}
+.text-muted { color: var(--text-muted); }
+.text-small { font-size: 11px; } /* Чуть меньше базы для второстепенного текста */
+.text-bold { font-weight: 700; }
+
+/* --- Формы --- */
+.form-group { margin-bottom: 15px; }
+.form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: var(--text-main);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.form-control {
+    width: 100%;
+    padding: 8px 12px; /* Поля ввода стали выше и удобнее */
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    color: #fff;
+    border-radius: 6px;
+    font-size: 15px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+.form-control:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+textarea.form-control {
+    line-height: 1.4;
+    resize: vertical;
+}
+
+/* --- Кнопки --- */
+.btn {
+    display: inline-block;
+    padding: 8px 16px; /* Кнопки стали крупнее */
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: none;
+    text-align: center;
+    letter-spacing: 0.5px;
+}
+.btn-primary { background-color: var(--accent-blue); color: #fff; }
+.btn-primary:hover { background-color: #2563eb; }
+.btn-success { background-color: var(--accent-green); color: #fff; }
+.btn-success:hover { background-color: #059669; }
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+}
+.btn-outline:hover { border-color: var(--text-main); color: var(--text-main); }
+
+/* --- Таблицы --- */
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+    text-align: left;
+    padding: 10px;
+    color: var(--text-muted);
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    text-transform: uppercase;
+    font-size: 11px; /* Заголовки таблицы чуть мельче */
+    letter-spacing: 0.5px;
+}
+.table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
+    font-size: 15px;
+}
+.table tr:last-child td { border-bottom: none; }
+
+/* --- Статусы (бейджи) --- */
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    display: inline-block;
+    letter-spacing: 0.5px;
+}
+.badge-new { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+.badge-done { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.badge-work { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+.badge-err { background: rgba(245, 158, 11, 0.2); color: #e9340f; }
+
+/* --- Утилиты --- */
+.flex { display: flex; gap: 20px; }
+.flex-between { justify-content: space-between; align-items: center; }
+.flex-center { justify-content: center; align-items: center; }
+.mb-1 { margin-bottom: 8px; }
+.mb-2 { margin-bottom: 16px; }
+.mt-1 { margin-top: 8px; }
+.mt-2 { margin-top: 16px; }
+.w-full { width: 100%; }
+.text-right { text-align: right; }
+.border-top { border-top: 1px solid var(--border-color); }
+.pt-2 { padding-top: 16px; }
+
+/* --- Статистика --- */
+.stat-card {
+    flex: 1;
+    padding: 15px;
+    border-left-width: 4px;
+    border-left-style: solid;
+}
+.stat-card.blue { border-left-color: var(--accent-blue); }
+.stat-card.orange { border-left-color: var(--accent-orange); }
+.stat-card.green { border-left-color: var(--accent-green); }
+
+.stat-value {
+    font-size: 24px; /* Цифры статистики крупные */
+    font-weight: 700;
+    display: block;
+    margin-bottom: 4px;
+}
+.stat-label {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+/* --- Сообщения --- */
+.alert {
+    padding: 8px 12px;
+    margin-bottom: 15px;
+    border-radius: 6px;
+    font-size: 12px;
+    border: 1px solid currentColor;
+}
+.alert-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.alert-error { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+/* --- Редактор --- */
+.editor-wrapper {
+    max-width: 700px;
+    margin: 0 auto;
+}
+/* --- Футер (Представительный) --- */
+.site-footer {
+    background-color: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    padding: 40px 0 20px;
+    margin-top: 60px;
+    font-size: 12px;
+}
+
+.footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr; /* 4 колонки: лого + 3 меню */
+    gap: 40px;
+    margin-bottom: 30px;
+}
+
+/* Колонка с брендом */
+.footer-brand h3 {
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0 0 10px 0;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.footer-brand p {
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0;
+    max-width: 300px;
+}
+
+/* Колонки меню */
+.footer-col h4 {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 15px 0;
+    opacity: 0.8;
+}
+.footer-col ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.footer-col li {
+    margin-bottom: 8px;
+}
+.footer-col a {
+    color: var(--text-muted);
+    transition: color 0.2s, padding-left 0.2s;
+    font-size: 12px;
+}
+.footer-col a:hover {
+    color: var(--accent-blue);
+    padding-left: 4px; /* Эффект сдвига при наведении */
+}
+
+/* Нижняя полоса футера */
+.footer-bottom {
+    border-top: 1px solid var(--border-color);
+    padding-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.footer-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background-color: var(--accent-green);
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 8px var(--accent-green);
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 768px) {
+    .footer-grid {
+        grid-template-columns: 1fr; /* Одна колонка на телефоне */
+        gap: 20px;
+    }
+    .footer-bottom {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+}

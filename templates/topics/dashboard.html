@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Управление идеями{% endblock %}
+
+{% block content %}
+<div class="flex flex-between mb-2">
+    <div>
+        <h1>Панель идей</h1>
+        <p class="text-muted">Генерация и управление контентом.</p>
+    </div>
+    <a href="{% url 'topics:generate' %}" class="btn btn-success">✨ Генерировать</a>
+</div>
+
+<!-- Статистика -->
+<div class="flex mb-2">
+    <div class="card stat-card blue">
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-label">Всего</span>
+    </div>
+    <div class="card stat-card orange">
+        <span class="stat-value">{{ stats.new }}</span>
+        <span class="stat-label">Новые</span>
+    </div>
+    <div class="card stat-card green">
+        <span class="stat-value">{{ stats.done }}</span>
+        <span class="stat-label">Готово</span>
+    </div>
+</div>
+
+<!-- Таблица -->
+<div class="card">
+    <h2>Список идей</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Тема</th>
+                <th>Идея</th>
+                <th>Статус</th>
+                <th>Дата</th>
+                <th>Действие</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for idea in ideas %}
+            <tr>
+                <td>{{ idea.id }}</td>
+                <td class="text-bold">{{ idea.topic }}</td>
+                <td>{{ idea.angle|truncatechars:40 }}</td>
+                <td>
+                    {% if idea.status == 'pending' %}
+                        <span class="badge badge-new">В очереди</span>
+                    {% elif idea.status == 'completed' %}
+                        <span class="badge badge-done">Готово</span>
+                    {% elif idea.status == 'processing' %}
+                        <span class="badge badge-work">Генерируется</span>
+                    {% else %}
+                        <span class="badge badge-err">Ошибка</span>
+                    {% endif %}
+                </td>
+                <td class="text-muted">{{ idea.created_at|date:"d.m" }}</td>
+                <td><a href="{% url 'topics:project_edit' idea.id %}" style="color: var(--accent-blue);">Ред.</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-muted" style="text-align: center;">Список пуст</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

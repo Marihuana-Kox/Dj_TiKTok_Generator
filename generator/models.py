@@ -1,35 +1,5 @@
 from django.db import models
-
-
-class VideoProject(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'В очереди'),
-        ('processing', 'Генерируется'),
-        ('completed', 'Готово'),
-        ('failed', 'Ошибка'),
-    ]
-
-    topic = models.CharField("Тема видео", max_length=255)
-    angle = models.TextField(
-        "Ракурс / Парадокс", help_text="Основная идея или технологический парадокс")
-    notes = models.TextField(
-        "Заметки / Факты", help_text="Детальные факты, даты, имена, вопросы для исследования")
-
-    status = models.CharField("Статус", max_length=20,
-                              choices=STATUS_CHOICES, default='pending')
-    output_file = models.FileField(
-        "Готовое видео", upload_to='videos/', null=True, blank=True)
-
-    created_at = models.DateTimeField("Дата создания", auto_now_add=True)
-    updated_at = models.DateTimeField("Дата обновления", auto_now=True)
-
-    def __str__(self):
-        return f"{self.topic} ({self.status})"
-
-    class Meta:
-        verbose_name = "Видеопроект"          # Название в единственном числе
-        verbose_name_plural = "Видеопроекты"  # Название во множественном числе
-        ordering = ['-created_at']
+from topics.models import VideoProject
 
 
 class MediaAsset(models.Model):
@@ -73,7 +43,9 @@ class ScriptData(models.Model):
     title = models.CharField(
         "Заголовок видео", max_length=255, blank=True, default="")
     hashtags = models.TextField("Хэштеги", blank=True, default="")
-
+    scene_breakdown = models.JSONField(
+        "Разбивка на сцены", default=list, blank=True)
+    # Пример данных: [{"title": "Hook", "text": "..."}, {"title": "Fact 1", "text": "..."}]
     # Можно хранить дополнительные данные в JSON (например, исходные промпты)
     metadata = models.JSONField("Доп. данные", default=dict, blank=True)
 

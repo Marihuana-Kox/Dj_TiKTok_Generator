@@ -10,11 +10,54 @@ def article_editor(request, pk):
     script, created = ScriptData.objects.get_or_create(project=project)
 
     if request.method == 'POST':
-        # Сохраняем все изменения из формы
-        script.script_full = request.POST.get('script_en')
-        script.script_ru = request.POST.get('script_ru')
-        script.title = request.POST.get('title')
-        script.hashtags = request.POST.get('hashtags')
+        action = request.POST.get('action')
+        # --- ДЕЙСТВИЕ: ДОБАВЛЕНИЕ НОВОГО ЯЗЫКА ---
+        if action == 'add_language':
+            lang_code = request.POST.get('new_lang_code')
+            new_text = request.POST.get('new_lang_text')
+
+            if lang_code and new_text:
+                # Маппинг кодов языков на имена полей в модели ScriptData
+                # Если у тебя в модели нет полей script_es, script_fr и т.д.,
+                # нам придется использовать JSONField или добавить поля динамически.
+                # ДЛЯ ПРОСТОТЫ сейчас мы будем сохранять новые языки в metadata['translations']
+
+                translations = script.metadata.get('translations', {})
+                translations[lang_code] = new_text
+                script.metadata['translations'] = translations
+                script.save()
+
+                messages.success(
+                    request, f"✅ Перевод на {lang_code.upper()} добавлен!")
+            else:
+                messages.error(request, "❌ Заполните все поля!")
+
+            return redirect('article:article_editor', pk=pk)
+
+        if action in ['save_text_only', 'go_to_images']:
+            # Сохраняем основные тексты
+            script.script_full = request.POST.get('script_en')
+            script.script_ru = request.POST.get('script_ru')
+            script.script_de = request.POST.get('script_de', '')
+
+            # Сохраняем Мета-данные
+            script.title = request.POST.get('title', '')
+            script.hashtags = request.POST.get('hashtags', '')
+
+            # Сохраняем описание в metadata
+            metadata = script.metadata or {}
+            metadata['description'] = request.POST.get('description', '')
+            script.metadata = metadata
+
+            script.save()
+
+            if action == 'save_text_only':
+                messages.success(request, "✅ Все данные сохранены!")
+                return redirect('article:article_editor', pk=pk)
+
+            elif action == 'go_to_images':
+                # Тут логика перехода к картинкам...
+                return redirect('image:image_prompt_editor', pk=pk)
 
         # Сохраняем отредактированные промпты (они приходят как JSON строка или список, тут упростим до текста)
         # Для удобства сделаем отдельное поле или будем парсить из textarea.

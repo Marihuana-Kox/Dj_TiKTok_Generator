@@ -1,0 +1,60 @@
+   <!-- Футер -->
+    <footer class="site-footer">
+        <div class="container">
+            
+            <!-- Верхняя часть: Сетка из 4 колонок -->
+            <div class="footer-grid">
+                
+                <!-- 1. Бренд -->
+                <div class="footer-brand">
+                    <h3>🎬 TikTok AI Generator</h3>
+                    <p>Автоматизированная платформа для создания вирусного контента. Генерация идей, сценариев и визуала на базе нейросетей.</p>
+                </div>
+
+                <!-- 2. Навигация -->
+                <div class="footer-col">
+                    <h4>Разделы</h4>
+                    <ul>
+                        <li><a href="{% url 'topics:dashboard' %}">Идеи видео</a></li>
+                        <li><a href="#">Статьи (скоро)</a></li>
+                        <li><a href="#">Библиотека ассетов</a></li>
+                        <li><a href="#">Настройки</a></li>
+                    </ul>
+                </div>
+
+                <!-- 3. Инструменты -->
+                <div class="footer-col">
+                    <h4>Инструменты</h4>
+                    <ul>
+                        <li><a href="#">Генератор промптов</a></li>
+                        <li><a href="#">Редактор сценариев</a></li>
+                        <li><a href="#">Аналитика канала</a></li>
+                    </ul>
+                </div>
+
+                <!-- 4. Система -->
+                <div class="footer-col">
+                    <h4>Система</h4>
+                    <ul>
+                        <li><a href="{% url 'admin:index' %}">Админ-панель</a></li>
+                        <li><a href="#">Документация API</a></li>
+                        <li><a href="#">Статус сервера</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Нижняя часть: Копирайт и статус -->
+            <div class="footer-bottom">
+                <div>
+                    &copy; {% now "Y" %} <strong>AI Content Studio</strong>. Все права защищены.
+                </div>
+                
+                <div class="footer-status">
+                    <span class="status-dot"></span>
+                    <span>Система работает нормально</span>
+                    <span style="margin-left: 10px; opacity: 0.5;">v1.0.4</span>
+                </div>
+            </div>
+
+        </div>
+    </footer>

@@ -12,13 +12,23 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 import os
 from pathlib import Path
+# Настройки шифрования для AI ключей
+from cryptography.fernet import Fernet
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Ключ шифрования. В продакшене хранить в .env!
+AI_ENCRYPTION_KEY = os.getenv(
+    'AI_ENCRYPTION_KEY', 'J-DK-FrYzOLFhxNNPF0ARjhVBVTnfwJNx9Tl_r674BU=.env')
+# Helper для шифрования/дешифрования
 
+
+def get_fernet():
+    return Fernet(AI_ENCRYPTION_KEY.encode())
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-c-%sgjm_i1(35t7$67&^*uvncqq1$gknh%7$bmtj!ygn1+&f-z'
@@ -42,6 +52,8 @@ INSTALLED_APPS = [
     'article',
     'config',
     'image',
+    'ai_inspector',
+    'topics',
 ]
 
 MIDDLEWARE = [
@@ -59,7 +71,7 @@ ROOT_URLCONF = 'tiktok_web.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],  # Глобальные шаблоны,
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -123,6 +135,9 @@ USE_TZ = True
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

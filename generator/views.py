@@ -132,7 +132,7 @@ def generate_config(request, pk):
                 ],
                 'structure_templates': ArticleStructureTemplate.objects.filter(is_active=True),
             }
-            return render(request, 'generator/generate_config.html', context),
+            return render(request, 'generator/generate_config.html', context)
 
     # 🔥 ВАЖНО: Обработка GET запроса (когда просто открываем страницу)
     # Этот блок должен быть ВНЕ блока if request.method == 'POST'

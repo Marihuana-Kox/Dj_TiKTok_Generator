@@ -24,6 +24,8 @@ urlpatterns = [
     path('', include('generator.urls')),  # Подключаем наши URL
     path('config/', include('config.urls')),
     path('article/', include('article.urls')),
+    path('image/', include('image.urls')),
+    path('topics/', include('topics.urls'))
 ]
 
 # Чтобы отдавать медиа-файлы (картинки/видео) в режиме разработки

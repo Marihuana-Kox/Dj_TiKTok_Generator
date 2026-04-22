@@ -1,102 +1,316 @@
 {% extends 'generator/base.html' %}
-
 {% block content %}
-<div class="max-w-6xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-white">✏️ Редактор статьи</h1>
-        <a href="{% url 'generator:project_detail' project.pk %}" class="text-slate-400 hover:text-white">← Назад к проекту</a>
+<div class="max-w-5xl mx-auto pb-32">
+    
+    <!-- ВЕРХНИЙ БЛОК: Заголовок и Кнопки -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <h1 class="text-3xl font-bold text-white">✏️ Редактор Сценария</h1>
+        
+        <div class="flex items-center gap-3">
+            <button type="button" onclick="openLangModal()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg font-bold shadow transition flex items-center gap-2 border border-slate-600 text-sm">
+                <span>🌍</span> Добавить язык
+            </button>
+            
+            <a href="{% url 'generator:project_detail' project.pk %}" class="text-slate-400 hover:text-white transition flex items-center gap-2 text-sm">
+                ← Назад
+            </a>
+        </div>
     </div>
 
-    <form method="post" class="space-y-6">
+    <form method="post" id="main-form" class="space-y-8">
         {% csrf_token %}
         
-        <!-- Заголовок и Хэштеги -->
-        <div class="card p-4 rounded-lg">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-bold text-blue-400 mb-1">Заголовок</label>
-                    <input type="text" name="title" value="{{ script.title }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-purple-400 mb-1">Хэштеги</label>
-                    <input type="text" name="hashtags" value="{{ script.hashtags }}" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-purple-500 outline-none">
-                </div>
-            </div>
-        </div>
-
-        <!-- Текст Сценария (Две колонки) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Английский -->
-            <div class="card p-4 rounded-lg flex flex-col h-full">
-                <label class="block text-sm font-bold text-blue-400 mb-2">🇬🇧 Сценарий (EN)</label>
-                <textarea name="script_en" rows="20" class="flex-grow w-full bg-slate-900 border border-slate-700 rounded p-3 text-white font-mono text-sm focus:border-blue-500 outline-none resize-none">{{ script.script_full }}</textarea>
-            </div>
+        <!-- === НОВЫЙ БЛОК: МЕТА-ДАННЫЕ СТАТЬИ === -->
+        <div class="card p-6 rounded-xl border-l-4 border-indigo-500 bg-slate-800 shadow-lg">
+            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                📋 Мета-данные публикации
+            </h3>
             
-            <!-- Русский -->
-            <div class="card p-4 rounded-lg flex flex-col h-full">
-                <label class="block text-sm font-bold text-green-400 mb-2">🇷🇺 Перевод (RU)</label>
-                <textarea name="script_ru" rows="20" class="flex-grow w-full bg-slate-900 border border-slate-700 rounded p-3 text-white font-mono text-sm focus:border-green-500 outline-none resize-none">{{ script.script_ru }}</textarea>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- Заголовок (8 колонок) -->
+                <div class="md:col-span-8">
+                    <label class="block text-sm font-bold text-indigo-400 mb-2">Заголовок видео (Title)</label>
+                    <input type="text" name="title" value="{{ script.title }}" 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none font-bold text-lg placeholder-slate-600"
+                        placeholder="Например: Тайны Египта: Кто построил пирамиды?">
+                </div>
+                
+                <!-- Хэштеги (4 колонки) -->
+                <div class="md:col-span-4">
+                    <label class="block text-sm font-bold text-indigo-400 mb-2">Хэштеги</label>
+                    <input type="text" name="hashtags" value="{{ script.hashtags }}" 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-blue-400 focus:border-indigo-500 outline-none font-mono text-sm"
+                        placeholder="#history #mystery #tiktok">
+                </div>
+                
+                <!-- Описание / Заметки (на всю ширину) -->
+                <div class="md:col-span-12">
+                    <label class="block text-sm font-bold text-slate-400 mb-2">Описание / Заметки (для себя)</label>
+                    <textarea name="description" rows="2" 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-300 focus:border-indigo-500 outline-none text-sm resize-none"
+                        placeholder="Краткое содержание или дополнительные заметки...">{{ script.metadata.description|default:'' }}</textarea>
+                </div>
             </div>
         </div>
 
-        <!-- Промпты для картинок -->
-        <div class="card p-4 rounded-lg border-l-4 border-yellow-500">
-            <label class="block text-sm font-bold text-yellow-400 mb-2">🎨 Промпты для генерации картинок</label>
-            <p class="text-xs text-slate-400 mb-2">Каждый промпт с новой строки. Отредактируй их перед генерацией изображений.</p>
-            <textarea name="image_prompts_text" rows="8" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white font-mono text-sm focus:border-yellow-500 outline-none">{{ prompts_text }}</textarea>
+        <!-- === ДИНАМИЧЕСКИЕ БЛОКИ СТАТЕЙ (Языки) === -->
+        
+        <!-- Английский (Original) -->
+        <div class="card p-0 rounded-xl overflow-hidden border border-slate-700 shadow-lg bg-slate-800 group focus-within:ring-2 focus-within:ring-blue-500/50 transition">
+            <div class="bg-slate-900/50 p-4 border-b border-slate-700 flex justify-between items-center">
+                <label class="font-bold text-blue-400 flex items-center gap-2 text-lg">🇬 English (Original)</label>
+                <div class="stats-badge bg-slate-900 px-3 py-1.5 rounded-full border border-slate-700 shadow-inner flex items-center gap-3 text-xs font-mono">
+                    <span class="text-slate-400">📝 <span id="words-en" class="text-white font-bold">0</span></span>
+                    <span class="w-px h-3 bg-slate-700"></span>
+                    <span class="text-slate-400">⏱ <span id="time-en" class="text-blue-400 font-bold">0s</span></span>
+                </div>
+            </div>
+            <textarea name="script_en" id="text-en" rows="12" 
+                class="w-full bg-slate-800 p-5 text-slate-200 focus:bg-slate-900/80 outline-none font-mono text-sm leading-relaxed resize-y transition"
+                placeholder="Original script...">{{ script.script_full }}</textarea>
         </div>
 
-        <!-- Кнопки -->
-        <div class="flex justify-between items-center pt-4 pb-10">
-            <button type="submit" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded shadow-lg transform active:scale-95 transition">
-                💾 Сохранить изменения
-            </button>
+        <!-- Русский -->
+        {% if script.script_ru %}
+        <div class="card p-0 rounded-xl overflow-hidden border border-slate-700 shadow-lg bg-slate-800 group focus-within:ring-2 focus-within:ring-green-500/50 transition">
+            <div class="bg-slate-900/50 p-4 border-b border-slate-700 flex justify-between items-center">
+                <label class="font-bold text-green-400 flex items-center gap-2 text-lg">🇷🇺 Russian</label>
+                <div class="stats-badge bg-slate-900 px-3 py-1.5 rounded-full border border-slate-700 shadow-inner flex items-center gap-3 text-xs font-mono">
+                    <span class="text-slate-400">📝 <span id="words-ru" class="text-white font-bold">0</span></span>
+                    <span class="w-px h-3 bg-slate-700"></span>
+                    <span class="text-slate-400">⏱ <span id="time-ru" class="text-green-400 font-bold">0s</span></span>
+                </div>
+            </div>
+            <textarea name="script_ru" id="text-ru" rows="12" 
+                class="w-full bg-slate-800 p-5 text-slate-200 focus:bg-slate-900/80 outline-none font-mono text-sm leading-relaxed resize-y transition"
+                placeholder="Russian translation...">{{ script.script_ru }}</textarea>
+        </div>
+        {% endif %}
+
+        <!-- Немецкий -->
+        {% if script.script_de %}
+        <div class="card p-0 rounded-xl overflow-hidden border border-slate-700 shadow-lg bg-slate-800 group focus-within:ring-2 focus-within:ring-yellow-500/50 transition">
+            <div class="bg-slate-900/50 p-4 border-b border-slate-700 flex justify-between items-center">
+                <label class="font-bold text-yellow-400 flex items-center gap-2 text-lg">🇩 German</label>
+                <div class="stats-badge bg-slate-900 px-3 py-1.5 rounded-full border border-slate-700 shadow-inner flex items-center gap-3 text-xs font-mono">
+                    <span class="text-slate-400">📝 <span id="words-de" class="text-white font-bold">0</span></span>
+                    <span class="w-px h-3 bg-slate-700"></span>
+                    <span class="text-slate-400">⏱ <span id="time-de" class="text-yellow-400 font-bold">0s</span></span>
+                </div>
+            </div>
+            <textarea name="script_de" id="text-de" rows="12" 
+                class="w-full bg-slate-800 p-5 text-slate-200 focus:bg-slate-900/80 outline-none font-mono text-sm leading-relaxed resize-y transition"
+                placeholder="German translation...">{{ script.script_de }}</textarea>
+        </div>
+        {% endif %}
+
+        <!-- Цикл для остальных языков из Metadata -->
+        {% for lang_code, lang_text in script.metadata.translations.items %}
+        <div class="card p-0 rounded-xl overflow-hidden border border-slate-700 shadow-lg bg-slate-800 group focus-within:ring-2 focus-within:ring-purple-500/50 transition mt-8">
+            <div class="bg-slate-900/50 p-4 border-b border-slate-700 flex justify-between items-center">
+                <label class="font-bold text-purple-400 flex items-center gap-2 text-lg uppercase">🌐 {{ lang_code }} Translation</label>
+                <div class="stats-badge bg-slate-900 px-3 py-1.5 rounded-full border border-slate-700 shadow-inner flex items-center gap-3 text-xs font-mono">
+                    <span class="text-slate-400">📝 <span id="words-{{ lang_code }}" class="text-white font-bold">0</span></span>
+                    <span class="w-px h-3 bg-slate-700"></span>
+                    <span class="text-slate-400">⏱ <span id="time-{{ lang_code }}" class="text-purple-400 font-bold">0s</span></span>
+                </div>
+            </div>
+            <textarea name="translation_{{ lang_code }}" id="text-{{ lang_code }}" rows="12" 
+                class="w-full bg-slate-800 p-5 text-slate-200 focus:bg-slate-900/80 outline-none font-mono text-sm leading-relaxed resize-y transition"
+                placeholder="{{ lang_code }} translation...">{{ lang_text }}</textarea>
+        </div>
+        {% endfor %}
+
+        <!-- БЛОК НАСТРОЙКИ ПРОМПТОВ КАРТИНОК -->
+        <div class="card p-6 rounded-xl border-l-4 border-purple-600 bg-slate-800 mt-12 shadow-xl">
+            <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                🎨 Настройка визуального ряда
+            </h3>
             
-            <!-- Кнопка следующего этапа (пока не активна) -->
-            <button type="button" onclick="alert('Следующий этап: Генерация картинок (будет реализован скоро)')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded shadow-lg opacity-50 cursor-not-allowed">
-                🎨 Далее: Генерация картинок →
-            </button>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Режимы -->
+                <div class="lg:col-span-5 space-y-3">
+                    <label class="group flex items-start gap-3 p-4 rounded-lg bg-slate-900/50 cursor-pointer border border-transparent hover:border-purple-500/50 hover:bg-slate-900 transition">
+                        <input type="radio" name="image_mode" value="auto" class="mt-1 w-5 h-5 accent-purple-600">
+                        <div>
+                            <span class="font-bold text-slate-200 group-hover:text-white">✨ Авто-разбивка</span>
+                            <p class="text-xs text-slate-500 mt-1">AI сам определит лучшее количество сцен.</p>
+                        </div>
+                    </label>
+
+                    <label class="group flex items-start gap-3 p-4 rounded-lg bg-slate-900 cursor-pointer border border-purple-600 shadow-[0_0_15px_rgba(147,51,234,0.1)] transition">
+                        <input type="radio" name="image_mode" value="semi_auto" checked class="mt-1 w-5 h-5 accent-purple-600">
+                        <div>
+                            <span class="font-bold text-white">⚖️ Полу-авто (Рекомендуется)</span>
+                            <p class="text-xs text-slate-400 mt-1">Использовать рекомендуемое число сцен из структуры статьи.</p>
+                        </div>
+                    </label>
+
+                    <label class="group flex items-start gap-3 p-4 rounded-lg bg-slate-900/50 cursor-pointer border border-transparent hover:border-purple-500/50 hover:bg-slate-900 transition">
+                        <input type="radio" name="image_mode" value="manual" class="mt-1 w-5 h-5 accent-purple-600">
+                        <div>
+                            <span class="font-bold text-slate-200 group-hover:text-white">🛠 Ручной режим</span>
+                            <p class="text-xs text-slate-500 mt-1">Я сам напишу промпты или укажу точное число кадров.</p>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Параметры -->
+                <div class="lg:col-span-7 bg-slate-900/80 p-5 rounded-xl border border-slate-700 flex flex-col justify-center">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-400 mb-2">Количество сцен</label>
+                            <select name="num_images" id="num-images-select" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-purple-500 outline-none transition disabled:opacity-50">
+                                <option value="4">4 сцены</option>
+                                <option value="5">5 сцен</option>
+                                <option value="6" selected>6 сцен (Рекомендуется)</option>
+                                <option value="8">8 сцен</option>
+                                <option value="10">10 сцен</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-400 mb-2">Формат изображения</label>
+                            <select name="aspect_ratio" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-purple-500 outline-none transition">
+                                <option value="9:16">9:16 (TikTok / Reels)</option>
+                                <option value="16:9">16:9 (YouTube / Wide)</option>
+                                <option value="1:1">1:1 (Square)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ФИКСИРОВАННАЯ ПАНЕЛЬ КНОПОК -->
+        <div class="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur border-t border-slate-700 p-4 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.3)]">
+            <div class="max-w-5xl mx-auto flex justify-between items-center">
+                <button type="submit" name="action" value="save_text_only" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-lg shadow transition flex items-center gap-2 transform active:scale-95">
+                    💾 Сохранить всё
+                </button>
+                <button type="submit" name="action" value="go_to_images" id="btn-next-step" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg transform active:scale-95 transition flex items-center gap-2 text-lg">
+                    🎨 Далее: Картинки →
+                </button>
+            </div>
         </div>
     </form>
 </div>
-<!-- Блок счетчиков -->
-<div class="fixed bottom-6 right-6 bg-slate-800 border border-slate-600 p-4 rounded-lg shadow-2xl z-50">
-    <div class="text-xs text-slate-400 uppercase font-bold mb-1">Статистика (EN)</div>
-    <div class="flex gap-4 text-sm">
-        <span id="word-count" class="text-white font-mono">Слов: 0</span>
-        <span id="char-count" class="text-white font-mono">Симв: 0</span>
-        <span id="time-estimate" class="text-blue-400 font-mono font-bold">⏱ 0 сек</span>
+
+<!-- === МОДАЛЬНОЕ ОКНО ДОБАВЛЕНИЯ ЯЗЫКА === -->
+<div id="lang-modal" class="fixed inset-0 z-[60] hidden">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeLangModal()"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-slate-800 rounded-xl shadow-2xl border border-slate-600 p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-white">🌍 Добавить перевод</h3>
+            <button onclick="closeLangModal()" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_language">
+            
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-slate-300 mb-2">Код языка</label>
+                <select name="new_lang_code" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none">
+                    <option value="de">Deutsch (de)</option>
+                    <option value="es">Español (es)</option>
+                    <option value="fr">Français (fr)</option>
+                    <option value="it">Italiano (it)</option>
+                    <option value="pt">Português (pt)</option>
+                    <option value="zh">Chinese (zh)</option>
+                    <option value="ja">Japanese (ja)</option>
+                </select>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-bold text-slate-300 mb-2">Текст статьи</label>
+                <textarea name="new_lang_text" rows="10" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none font-mono text-sm" placeholder="Вставьте переведенный текст сюда..."></textarea>
+            </div>
+            
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="closeLangModal()" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">Отмена</button>
+                <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-lg shadow transition">💾 Сохранить</button>
+            </div>
+        </form>
     </div>
 </div>
 
 <script>
-function updateCounts() {
-    const text = document.querySelector('textarea[name="script_en"]').value;
-    // Считаем слова (разбиваем по пробелам, фильтруем пустые)
-    const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
-    const chars = text.length;
-    
-    // Считаем время (средняя скорость речи для TikTok ~2.5 слова в сек)
-    const seconds = Math.ceil(words / 2.5);
-    
-    document.getElementById('word-count').innerText = `Слов: ${words}`;
-    document.getElementById('char-count').innerText = `Симв: ${chars}`;
-    document.getElementById('time-estimate').innerText = `⏱ ${seconds} сек`;
-    
-    // Если слишком длинно (>150 слов), красим в красный
-    const wordEl = document.getElementById('word-count');
-    if (words > 150) {
-        wordEl.classList.add('text-red-500');
-        wordEl.classList.remove('text-white');
-    } else {
-        wordEl.classList.remove('text-red-500');
-        wordEl.classList.add('text-white');
-    }
-}
+    // --- ЛОГИКА МОДАЛЬНОГО ОКНА ---
+    function openLangModal() { document.getElementById('lang-modal').classList.remove('hidden'); }
+    function closeLangModal() { document.getElementById('lang-modal').classList.add('hidden'); }
 
-// Вешаем событие на изменение текста
-document.querySelector('textarea[name="script_en"]').addEventListener('input', updateCounts);
-// Запускаем один раз при загрузке
-updateCounts();
+    // --- ЛОГИКА СЧЕТЧИКОВ ---
+    function updateCounter(textId, wordsId, timeId, colorClass) {
+        const text = document.getElementById(textId).value;
+        const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+        const seconds = Math.ceil(words / 2.5); 
+        
+        const wEl = document.getElementById(wordsId);
+        const tEl = document.getElementById(timeId);
+        
+        if(wEl) wEl.innerText = words;
+        if(tEl) {
+            tEl.innerText = seconds + 's';
+            tEl.classList.remove('text-red-400', 'text-blue-400', 'text-green-400', 'text-yellow-400', 'text-purple-400');
+            if (words > 150) {
+                tEl.classList.add('text-red-400');
+            } else {
+                tEl.classList.add(colorClass);
+            }
+        }
+    }
+
+    // Инициализация стандартных языков
+    const standardLangs = [
+        {id: 'en', color: 'text-blue-400'},
+        {id: 'ru', color: 'text-green-400'},
+        {id: 'de', color: 'text-yellow-400'}
+    ];
+
+    standardLangs.forEach(lang => {
+        const el = document.getElementById(`text-${lang.id}`);
+        if(el) {
+            el.addEventListener('input', () => updateCounter(`text-${lang.id}`, `words-${lang.id}`, `time-${lang.id}`, lang.color));
+            updateCounter(`text-${lang.id}`, `words-${lang.id}`, `time-${lang.id}`, lang.color);
+        }
+    });
+
+    // Инициализация динамических языков
+    document.querySelectorAll('textarea[id^="text-"]').forEach(textarea => {
+        if(['text-en', 'text-ru', 'text-de'].includes(textarea.id)) return;
+        const langCode = textarea.id.replace('text-', '');
+        textarea.addEventListener('input', () => updateCounter(`text-${langCode}`, `words-${langCode}`, `time-${langCode}`, 'text-purple-400'));
+        updateCounter(`text-${langCode}`, `words-${langCode}`, `time-${langCode}`, 'text-purple-400');
+    });
+
+    // --- ЛОГИКА КНОПКИ ПЕРЕХОДА ---
+    const radios = document.querySelectorAll('input[name="image_mode"]');
+    const btnNext = document.getElementById('btn-next-step');
+    const selectNum = document.getElementById('num-images-select');
+
+    function updateButtonLabel() {
+        const selectedMode = document.querySelector('input[name="image_mode"]:checked').value;
+        if (selectedMode === 'manual') {
+            btnNext.innerHTML = '✍️ Написать промпты вручную →';
+            btnNext.classList.remove('bg-purple-600', 'hover:bg-purple-500');
+            btnNext.classList.add('bg-blue-600', 'hover:bg-blue-500');
+            selectNum.disabled = true;
+        } else {
+            const count = selectNum.value === 'auto' ? 'авто' : selectNum.value;
+            btnNext.innerHTML = `🎨 Создать сценарий (${count} сцен) →`;
+            btnNext.classList.remove('bg-blue-600', 'hover:bg-blue-500');
+            btnNext.classList.add('bg-purple-600', 'hover:bg-purple-500');
+            if (selectedMode === 'auto') {
+                selectNum.disabled = true;
+                selectNum.value = 'auto';
+            } else {
+                selectNum.disabled = false;
+            }
+        }
+    }
+
+    radios.forEach(r => r.addEventListener('change', updateButtonLabel));
+    selectNum.addEventListener('change', updateButtonLabel);
+    updateButtonLabel();
 </script>
 {% endblock %}

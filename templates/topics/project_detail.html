@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ project.topic }} - Детали{% endblock %}
+
+{% block content %}
+<div class="card">
+    <a href="{% url 'topics:dashboard' %}" style="text-decoration: none; color: #007bff;">&larr; Назад к списку</a>
+    
+    <h1 style="margin-top: 20px;">{{ project.topic }}</h1>
+    
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3>Идея (Angle):</h3>
+        <p style="font-size: 1.2rem; font-weight: bold;">{{ project.angle }}</p>
+    </div>
+
+    <div>
+        <h3>Статус:</h3>
+        <span style="padding: 5px 10px; background: #e2e6ea; border-radius: 4px;">{{ project.get_status_display }}</span>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <h3>Заметки / Сценарий:</h3>
+        <p style="white-space: pre-wrap;">{{ project.notes }}</p>
+    </div>
+    
+    <div style="margin-top: 20px; font-size: 0.9rem; color: #666;">
+        Создано: {{ project.created_at|date:"d.m.Y H:i" }}
+    </div>
+</div>
+{% endblock %}
