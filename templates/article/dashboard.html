@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+
+{% block title %}Управление статьями{% endblock %}
+
+{% block content %}
+<div class="flex flex-between mb-2">
+    <div>
+        <h1>Панель статей</h1>
+        <p class="text-muted">Написание и редактирование контента.</p>
+    </div>
+    <!-- Кнопка создания новой (если нужна отдельная) -->
+    {% comment %} <a href="{% url 'admin:article_article_add' %}" class="btn btn-success">✨ Новая статья</a> {% endcomment %}
+    <button type="button" class="btn btn-primary" id="open-gen-modal">✨ Генерация статей</button>
+</div>
+<div id="gen-modal" class="modal-overlay">
+    <div class="modal-content">
+        <button type="button" class="modal-close" id="close-gen-modal">&times;</button>
+        <h2 class="mb-3">Генерация статей</h2>
+        <div id="modal-form-container">
+            <!-- Сюда загрузится форма -->
+            <p class="text-muted">Загрузка...</p>
+        </div>
+    </div>
+</div>
+<!-- Статистика -->
+<div class="flex mb-2">
+    <div class="card stat-card blue">
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-label">Всего</span>
+    </div>
+    <div class="card stat-card orange">
+        <span class="stat-value">{{ stats.draft }}</span>
+        <span class="stat-label">Черновики</span>
+    </div>
+    <div class="card stat-card green">
+        <span class="stat-value">{{ stats.published }}</span>
+        <span class="stat-label">Опубликовано</span>
+    </div>
+</div>
+
+<form method="post" id="bulk-action-form">
+    {% csrf_token %}
+    <div class="card" style="padding: 0;">
+        <div class="flex flex-between mb-2 pt-2" style="padding: 0 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 0;">
+            <div class="flex items-center">
+                <input type="checkbox" id="select-all" class="form-control checkbox-fix">
+                <label for="select-all" class="text-bold ml-1">Выбрать все</label>
+            </div>
+            <button type="submit" name="action" value="delete_selected" class="btn btn-outline ml-2" onclick="return confirm('Удалить выбранные статьи?');">
+                🗑️ Удалить
+            </button>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th></th>
+                    <th>ID</th>
+                    <th>Заголовок</th>
+                    <th>Статус</th>
+                    <th>Обновлено</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for article in articles %}
+                <tr class="idea-row">
+                    <td class="text-muted">{{ forloop.counter }}</td>
+                    <td class="text-center">
+                        <input type="checkbox" name="selected_articles" value="{{ article.id }}" class="idea-checkbox form-control checkbox-fix">
+                    </td>
+                    <td class="text-muted text-small">#{{ article.id }}</td>
+                    <td class="text-bold">{{ article.title|truncatechars:50 }}</td>
+                    <td>
+                        {% if article.status == 'draft' %}
+                            <span class="badge badge-work">Черновик</span>
+                        {% elif article.status == 'in_progress' %}
+                            <span class="badge badge-new">В работе</span>
+                        {% elif article.status == 'published' %}
+                            <span class="badge badge-done">Опубликовано</span>
+                        {% else %}
+                            <span class="badge">{{ article.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted">{{ article.updated_at|date:"d.m.Y H:i" }}</td>
+                    <td><a href="{% url 'article:edit' article.id %}" class="text-bold link-blue">✏️ Ред.</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-muted text-center">Список статей пуст</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</form>
+
+<script>
+    // Тот же скрипт, что и для идей (копируешь из dashboard.html topics)
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAll = document.getElementById('select-all');
+        const checkboxes = document.querySelectorAll('.idea-checkbox');
+        const rows = document.querySelectorAll('.idea-row');
+        // ... (вставь код скрипта из предыдущего ответа) ...
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                checkboxes.forEach((cb, index) => {
+                    cb.checked = selectAll.checked;
+                    if(rows[index]) rows[index].classList.toggle('bg-selected', selectAll.checked);
+                });
+            });
+        }
+        checkboxes.forEach((cb, index) => {
+            cb.addEventListener('change', function() {
+                if(rows[index]) rows[index].classList.toggle('bg-selected', cb.checked);
+                if (!cb.checked && selectAll) selectAll.checked = false;
+            });
+        });
+    });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById('gen-modal');
+        const container = document.getElementById('modal-form-container');
+        const progressBox = document.getElementById('gen-progress');
+        const progressMsg = document.getElementById('gen-msg');
+        const progressBar = document.getElementById('gen-bar');
+        const progressPerc = document.getElementById('gen-percent');
+        let evtSource = null;
+    
+        // Открытие модалки
+        document.getElementById('open-gen-modal').onclick = function() {
+            fetch("{% url 'article:gen_modal' %}")
+            .then(r => r.text()).then(html => {
+                container.innerHTML = html;
+                modal.classList.add('active');
+                if(progressBox) progressBox.style.display = 'none';
+                initForm();
+            });
+        };
+        
+        // Закрытие по крестику
+        document.getElementById('close-gen-modal').onclick = () => modal.classList.remove('active');
+        
+        // Закрытие по клику вне окна
+        modal.addEventListener('click', e => { if(e.target === modal) modal.classList.remove('active'); });
+    
+        // Инициализация формы внутри модалки
+        function initForm() {
+            const form = document.getElementById('article-gen-form');
+            const btn = form ? form.querySelector('button[type="submit"]') : null;
+            if(!form || !btn) return;
+    
+            form.onsubmit = function(e) {
+                e.preventDefault();
+                btn.disabled = true;
+                btn.textContent = '⏳ Генерация...';
+                if(progressBox) progressBox.style.display = 'block';
+                progressMsg.style.color = 'var(--text-muted)';
+                progressMsg.textContent = 'Подготовка очереди...';
+    
+                fetch("{% url 'article:gen_start' %}", {
+                    method: 'POST', 
+                    body: new FormData(form), 
+                    headers: {'X-Requested-With': 'XMLHttpRequest'}
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if(data.status === 'started') {
+                        connectStream();
+                    } else {
+                        btn.disabled = false; 
+                        btn.textContent = 'Ошибка'; 
+                        progressMsg.textContent = data.message || 'Ошибка запуска';
+                        progressMsg.style.color = 'var(--accent-red)';
+                    }
+                });
+            };
+        }
+    
+        // Подключение к SSE потоку
+        function connectStream() {
+            evtSource = new EventSource("{% url 'article:gen_stream' %}");
+            evtSource.onmessage = function(e) {
+                const d = JSON.parse(e.data);
+                if(progressBar) progressBar.style.width = d.percent + '%';
+                if(progressPerc) progressPerc.textContent = d.percent + '%';
+                if(progressMsg) progressMsg.textContent = d.message;
+                
+                if(d.status === 'done') { 
+                    evtSource.close(); 
+                    progressMsg.textContent = 'Готово! Перезагрузка...';
+                    progressMsg.style.color = 'var(--accent-green)';
+                    setTimeout(() => window.location.reload(), 1500); 
+                }
+                if(d.status === 'error') { 
+                    evtSource.close(); 
+                    progressMsg.style.color = 'var(--accent-red)'; 
+                }
+            };
+        }
+        
+        // Обработка кнопки отмены внутри формы
+        document.addEventListener('click', function(e) {
+            if(e.target && e.target.classList.contains('modal-cancel-btn')) {
+                modal.classList.remove('active');
+            }
+        });
+    });
+    </script>
+{% endblock %}

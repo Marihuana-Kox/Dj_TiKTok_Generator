@@ -27,44 +27,125 @@
     </div>
 </div>
 
-<!-- Таблица -->
-<div class="card">
-    <h2>Список идей</h2>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Тема</th>
-                <th>Идея</th>
-                <th>Статус</th>
-                <th>Дата</th>
-                <th>Действие</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for idea in ideas %}
-            <tr>
-                <td>{{ idea.id }}</td>
-                <td class="text-bold">{{ idea.topic }}</td>
-                <td>{{ idea.angle|truncatechars:40 }}</td>
-                <td>
-                    {% if idea.status == 'pending' %}
-                        <span class="badge badge-new">В очереди</span>
-                    {% elif idea.status == 'completed' %}
-                        <span class="badge badge-done">Готово</span>
-                    {% elif idea.status == 'processing' %}
-                        <span class="badge badge-work">Генерируется</span>
-                    {% else %}
-                        <span class="badge badge-err">Ошибка</span>
-                    {% endif %}
-                </td>
-                <td class="text-muted">{{ idea.created_at|date:"d.m" }}</td>
-                <td><a href="{% url 'topics:project_edit' idea.id %}" style="color: var(--accent-blue);">Ред.</a></td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="6" class="text-muted" style="text-align: center;">Список пуст</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+<!-- Таблица с формой удаления -->
+<form method="post" id="bulk-action-form">
+    {% csrf_token %}
+    
+    <div class="card" style="padding: 0;"> <!-- Убрали padding у карточки, чтобы панель прилегала -->
+        
+        <!-- Панель управления -->
+        <div class="flex flex-between mb-2">
+            <div class="flex items-center">
+                <input type="checkbox" id="select-all" class="form-control checkbox-fix">
+                <label for="select-all" class="text-bold ml-1">Выбрать все</label>
+            </div>
+            <!-- ДОБАВЛЕН КЛАСС ml-2 ДЛЯ ОТСТУПА -->
+            <button type="submit" name="action" value="delete_selected" class="btn btn-outline ml-2" onclick="return confirm('Удалить выбранные?');">
+                🗑️ Удалить
+            </button>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">#</th> <!-- Порядковый номер -->
+                    <th style="width: 40px;"></th> <!-- Чекбокс -->
+                    <th>ID</th>
+                    <th>Тема</th>
+                    <th>Идея</th>
+                    <th>Статус</th>
+                    <th>Дата</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for idea in ideas %}
+                <tr class="idea-row">
+                    <!-- 1. Порядковый номер (сквозная нумерация) -->
+                    <td class="text-muted">{{ forloop.counter }}</td>
+                    
+                    <!-- 2. Чекбокс выбора -->
+                    <td style="text-align: center;">
+                        <input type="checkbox" name="selected_ideas" value="{{ idea.id }}" class="idea-checkbox form-control">
+                    </td>
+                    
+                    <!-- 3. ID (настоящий ID БД) -->
+                    <td class="text-muted" style="font-size: 10px;">{{ idea.id }}</td>
+                    
+                    <td class="text-bold">{{ idea.topic }}</td>
+                    <td>{{ idea.angle|truncatechars:40 }}</td>
+                    
+                    <!-- 4. Статус (СТРОГО ПО ТВОЕМУ СПИСКУ) -->
+                    <td>
+                        {% if idea.status == 'pending' %}
+                            <span class="badge badge-work">Очередь</span>
+                        {% elif idea.status == 'processing' %}
+                            <span class="badge badge-work">Генерируется</span>
+                        {% elif idea.status == 'completed' %}
+                            <span class="badge badge-done">Готово</span>
+                        {% elif idea.status == 'failed' %}
+                            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Ошибка</span>
+                        {% else %}
+                            <span class="text-muted">{{ idea.status }}</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td class="text-muted">{{ idea.created_at|date:"d.m" }}</td>
+                    <td><a href="{% url 'topics:project_edit' idea.id %}" class="text-bold" style="color: var(--accent-blue);">Ред.</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-muted" style="text-align: center;">Список пуст</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAll = document.getElementById('select-all');
+        const checkboxes = document.querySelectorAll('.idea-checkbox');
+        const rows = document.querySelectorAll('.idea-row');
+
+        // Логика "Выбрать все"
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                checkboxes.forEach((cb, index) => {
+                    cb.checked = selectAll.checked;
+                    // Подсветка строки
+                    if(rows[index]) {
+                        rows[index].style.background = selectAll.checked ? 'rgba(59, 130, 246, 0.1)' : 'transparent';
+                    }
+                });
+            });
+        }
+
+        // Логика одиночного выбора
+        checkboxes.forEach((cb, index) => {
+            cb.addEventListener('change', function() {
+                // Подсветка конкретной строки
+                if(rows[index]) {
+                    rows[index].style.background = cb.checked ? 'rgba(59, 130, 246, 0.1)' : 'transparent';
+                }
+                
+                // Снять галочку с "Выбрать все", если отменили выбор
+                if (!cb.checked && selectAll) {
+                    selectAll.checked = false;
+                }
+            });
+        });
+         // Логика одиночного выбора (ПОДСВЕЧКА ПРИ ПЕРВОМ КЛИКЕ)
+         checkboxes.forEach((cb, index) => {
+            cb.addEventListener('change', function() {
+                // Сразу красим строку
+                toggleHighlight(rows[index], cb.checked);
+                
+                // Снимаем галочку с "Выбрать все", если отменили выбор
+                if (!cb.checked && selectAll) {
+                    selectAll.checked = false;
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}

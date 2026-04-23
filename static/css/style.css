@@ -340,3 +340,148 @@ textarea.form-control {
         text-align: center;
     }
 }
+/* --- Прогресс бар генерации --- */
+.progress-wrapper {
+    display: none; /* Скрыт по умолчанию, включаем через JS класс .active */
+    margin-bottom: 20px;
+}
+.progress-wrapper.active {
+    display: block;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.progress-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.progress-percent {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--accent-blue);
+}
+
+.progress-track {
+    background: #334155;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+    border-radius: 6px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+.progress-status {
+    margin-top: 8px;
+    font-size: 11px;
+    font-family: 'Courier New', monospace; /* Моноширинный для эффекта консоли */
+    color: var(--text-muted);
+    min-height: 14px;
+}
+
+.progress-log {
+    margin-top: 5px;
+    font-size: 10px;
+    color: var(--text-muted);
+    opacity: 0.7;
+    font-style: italic;
+}
+
+/* --- Состояния кнопок --- */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* --- Анимация появления --- */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+/* Для дашборда */
+.text-center { text-align: center; }
+.link-blue { color: var(--accent-blue); }
+.bg-selected { background-color: rgba(59, 130, 246, 0.1); }
+.text-small { font-size: 10px; }
+
+/* --- Утилиты для дашборда --- */
+.ml-1 { margin: 5px; }
+.ml-2 { margin: 15px; } /* Отступ для кнопки удалить */
+.text-center { text-align: center; }
+.text-small { font-size: 10px; }
+.link-blue { color: var(--accent-blue); }
+
+/* Подсветка выбранной строки */
+.bg-selected {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    transition: background-color 0.2s;
+}
+
+/* Исправление размера чекбокса, чтобы не растягивался */
+.checkbox-fix {
+    width: auto !important;
+    height: 16px;
+    margin: 15px;
+    cursor: pointer;
+}
+/* --- Модальное окно --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s;
+}
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+.modal-content {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    position: relative;
+}
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+}
+.modal-close:hover { color: #fff; }

@@ -34,7 +34,6 @@ class VideoProjectAdmin(admin.ModelAdmin):
     list_editable = ('status',)
     ordering = ('-created_at',)
     readonly_fields = ('created_at', 'updated_at')
-    change_list_template = "admin/topics/videoproject_change_list.html"
 
     def title_preview(self, obj):
         text = obj.angle if obj.angle else obj.topic

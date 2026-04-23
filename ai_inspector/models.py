@@ -27,8 +27,8 @@ class AIProvider(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "AI Провайдер"
-        verbose_name_plural = "AI Провайдеры"
+        verbose_name = "Провайдер ИИ"
+        verbose_name_plural = "Провайдеры ИИ"
         ordering = ['provider_type', 'name']
 
     def __str__(self):

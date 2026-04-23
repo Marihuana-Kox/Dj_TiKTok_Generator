@@ -6,5 +6,6 @@ app_name = 'topics'
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('generate/', views.generate_idea_view, name='generate'),
+    path('generate-stream/', views.generate_stream, name='generate_stream'),
     path('<int:pk>/edit/', views.project_edit, name='project_edit'),
 ]

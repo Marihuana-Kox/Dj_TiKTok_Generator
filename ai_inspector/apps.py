@@ -4,6 +4,7 @@ from django.apps import AppConfig
 class AiInspectorConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'ai_inspector'
+    verbose_name = "Провайдеры ИИ"
 
     def ready(self):
         # Импортируем бэкенды ТОЛЬКО для регистрации классов.

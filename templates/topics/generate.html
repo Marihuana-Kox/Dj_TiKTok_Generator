@@ -9,15 +9,50 @@
         <h1>Генератор идей</h1>
     </div>
 
-    <form method="post" class="card">
+    <!-- Блок Прогресс-бара -->
+    <div id="progress-container" class="card progress-wrapper">
+        <div class="progress-header">
+            <span class="progress-title">🚀 Процесс генерации</span>
+            <span id="percent-text" class="progress-percent">0%</span>
+        </div>
+        
+        <div class="progress-track">
+            <div id="progress-bar" class="progress-fill"></div>
+        </div>
+        
+        <div id="status-text" class="progress-status">Ожидание запуска...</div>
+        <div id="detail-log" class="progress-log"></div>
+    </div>
+
+    <form method="post" class="card" id="generate-form">
         {% csrf_token %}
 
-        <!-- Основной блок -->
+        <!-- Выбор сервиса -->
+        <div class="form-group" style="border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px;">
+            <label class="form-label">{{ form.ai_provider.label }}</label>
+            {% if form.ai_provider.field.choices %}
+                {{ form.ai_provider }}
+                <small class="text-muted">Активные провайдеры из базы.</small>
+            {% else %}
+                <div class="alert alert-error">
+                    ⚠️ Нет активных сервисов. Проверьте админку.
+                </div>
+            {% endif %}
+        </div>
+            <!-- НОВЫЙ БЛОК: Выбор стиля промпта -->
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label class="form-label">{{ form.idea_style.label }}</label>
+                {{ form.idea_style }}
+                <small class="text-muted">Выбери конкретную подачу или доверься случаю.</small>
+            </div>
+
+        <!-- Количество -->
         <div class="form-group">
             <label class="form-label">{{ form.count.label }}</label>
             {{ form.count }}
         </div>
 
+        <!-- Темы -->
         <div class="form-group">
             <label class="form-label">{{ form.topics_input.label }}</label>
             {{ form.topics_input }}
@@ -50,48 +85,132 @@
                 <label class="form-label">{{ form.duplicate_period.label }}</label>
                 {{ form.duplicate_period }}
             </div>
-            </div>
-                <!-- ВЫБОР СЕРВИСА -->
-                <div class="form-group" style="border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px;">
-                    <label class="form-label">{{ form.ai_provider.label }}</label>
-                    {% if form.ai_provider.field.choices %}
-                        {{ form.ai_provider }}
-                        <small class="text-muted">Доступны только настроенные и активные сервисы.</small>
-                    {% else %}
-                        <div class="alert alert-error">
-                            ⚠️ В системе нет активных AI-сервисов. Зайдите в админку и активируйте нужный провайдер.
-                        </div>
-                    {% endif %}
-                </div>
-            <div class="flex mt-2 border-top pt-2">
-                <button type="submit" class="btn btn-success">🚀 Запустить генерацию</button>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="flex mt-2 border-top pt-2">
+            <button type="submit" id="submit-btn" class="btn btn-success">🚀 Запустить генерацию</button>
             <a href="{% url 'topics:dashboard' %}" class="btn btn-outline">Отмена</a>
         </div>
     </form>
 </div>
 
 <script>
-    // Простой скрипт для показа/скрытия опций
     document.addEventListener('DOMContentLoaded', function() {
+        // Логика UI (показать/скрыть опции)
         const refreshCheck = document.getElementById('{{ form.refresh_old.id_for_label }}');
         const refreshOpts = document.getElementById('refresh-options');
-        
         const dupCheck = document.getElementById('{{ form.allow_duplicates.id_for_label }}');
         const dupOpts = document.getElementById('duplicate-options');
 
-        function toggle(element, targetId) {
-            targetId.style.display = element.checked ? 'block' : 'none';
+        function toggle(element, targetId, invert = false) {
+            if(!element || !targetId) return;
+            targetId.style.display = (invert ? !element.checked : element.checked) ? 'block' : 'none';
         }
 
-        refreshCheck.addEventListener('change', () => toggle(refreshCheck, refreshOpts));
-        dupCheck.addEventListener('change', () => {
-            // Если разрешаем дубликаты, то настройки запрета не нужны
-            toggle(!dupCheck, dupOpts); 
-        });
-        
-        // Инициализация при загрузке
+        if(refreshCheck) refreshCheck.addEventListener('change', () => toggle(refreshCheck, refreshOpts));
+        if(dupCheck) dupCheck.addEventListener('change', () => toggle(dupCheck, dupOpts, true));
         toggle(refreshCheck, refreshOpts);
-        toggle(!dupCheck, dupOpts);
+        toggle(dupCheck, dupOpts, true);
+
+        // --- ЛОГИКА ПРОГРЕСС-БАРА (SSE) ---
+        const form = document.getElementById('generate-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const percentText = document.getElementById('percent-text');
+        const statusText = document.getElementById('status-text');
+        const detailLog = document.getElementById('detail-log');
+        let eventSource = null;
+
+        form.addEventListener('submit', function(e) {
+            // Показываем прогресс бар
+            progressContainer.classList.add('active');
+            
+            // Блокируем кнопку
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '⏳ Генерация...';
+            
+            // Сброс значений
+            progressBar.style.width = '0%';
+            percentText.innerText = '0%';
+            statusText.innerText = 'Подготовка очереди...';
+            detailLog.innerText = '';
+
+            // Подключаемся к SSE потоку
+            connectSSE();
+        });
+
+        function connectSSE() {
+            const streamUrl = "{% url 'topics:generate_stream' %}";
+            
+            if (!streamUrl) {
+                statusText.innerText = "Ошибка: URL потока не найден";
+                return;
+            }
+
+            eventSource = new EventSource(streamUrl);
+
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Обновление UI
+                    progressBar.style.width = data.percent + '%';
+                    percentText.innerText = data.percent + '%';
+                    statusText.innerText = data.message;
+                    
+                    // Логирование шагов
+                    if (data.step === 'saved') {
+                        detailLog.innerText = "✅ " + data.message;
+                        detailLog.style.color = "var(--accent-green)";
+                    } else if (data.step === 'error') {
+                        detailLog.innerText = "❌ " + data.message;
+                        detailLog.style.color = "var(--accent-red)";
+                    } else {
+                        detailLog.innerText = "️ " + data.message;
+                        detailLog.style.color = "var(--text-muted)";
+                    }
+
+                    // Завершение
+                    if (data.status === 'done') {
+                        finishGeneration(true);
+                    } else if (data.status === 'error') {
+                        finishGeneration(false);
+                    }
+                } catch (e) {
+                    console.error("Ошибка парсинга SSE:", e);
+                }
+            };
+
+            eventSource.onerror = function(err) {
+                console.error("SSE Connection Error:", err);
+                // Не закрываем сразу, сервер сам закроет соединение при завершении
+            };
+        }
+
+        function finishGeneration(success) {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            if (success) {
+                submitBtn.innerHTML = '✅ Готово!';
+                submitBtn.classList.remove('btn-success');
+                submitBtn.classList.add('btn-primary');
+                statusText.innerText = "Все идеи сохранены!";
+                
+                // Редирект через 1.5 сек
+                setTimeout(() => {
+                    window.location.href = "{% url 'topics:dashboard' %}";
+                }, 1500);
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '🔄 Повторить';
+                statusText.innerText = "Произошла ошибка.";
+                statusText.style.color = "var(--accent-red)";
+            }
+        }
     });
 </script>
 {% endblock %}

@@ -1,7 +1,7 @@
 from django.apps import AppConfig
 
 
-class ArticleConfig(AppConfig):
+class PromptsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'article'
-    verbose_name = "Статьи"
+    name = 'prompts'
+    verbose_name = "Промпты"

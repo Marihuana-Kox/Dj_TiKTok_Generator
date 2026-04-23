@@ -23,7 +23,17 @@ class Migration(migrations.Migration):
             name='project',
             field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='script_data', to='topics.videoproject'),
         ),
-        migrations.DeleteModel(
-            name='VideoProject',
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql='DROP TABLE IF EXISTS "generator_videoproject";',
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+            ],
+            state_operations=[
+                migrations.DeleteModel(
+                    name='VideoProject',
+                ),
+            ],
         ),
     ]

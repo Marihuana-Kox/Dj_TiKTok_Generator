@@ -27,6 +27,6 @@ class VideoProject(models.Model):
         return f"{self.topic} ({self.status})"
 
     class Meta:
-        verbose_name = "Видеопроект"          # Название в единственном числе
-        verbose_name_plural = "Видеопроекты"  # Название во множественном числе
+        verbose_name = "Идея"
+        verbose_name_plural = "Идеи"
         ordering = ['-created_at']

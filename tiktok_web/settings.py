@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'image',
     'ai_inspector',
     'topics',
+    'prompts',
 ]
 
 MIDDLEWARE = [

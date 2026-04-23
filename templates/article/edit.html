@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактор: {{ article.title }}{% endblock %}
+
+{% block content %}
+<div class="editor-wrapper">
+    <div class="flex flex-between mb-2">
+        <a href="{% url 'article:dashboard' %}" class="text-muted">&larr; НАЗАД</a>
+        <h1>Редактирование статьи</h1>
+    </div>
+
+    <form method="post" class="card">
+        {% csrf_token %}
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="form-group">
+            <label class="form-label">{{ form.title.label }}</label>
+            {{ form.title }}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.content.label }}</label>
+            {{ form.content }}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.status.label }}</label>
+            {{ form.status }}
+        </div>
+
+        <div class="flex mt-2 border-top pt-2">
+            <button type="submit" class="btn btn-success">💾 Сохранить</button>
+            <a href="{% url 'article:dashboard' %}" class="btn btn-outline">Отмена</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
