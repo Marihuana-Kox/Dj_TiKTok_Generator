@@ -382,7 +382,9 @@ textarea.form-control {
     display: inline-block;
     box-shadow: 0 0 8px var(--accent-green);
 }
-
+.hidden {
+    display: none !important;
+}
 /* Адаптивность для мобильных */
 @media (max-width: 768px) {
     .footer-grid {

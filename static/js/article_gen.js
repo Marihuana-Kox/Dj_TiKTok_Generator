@@ -12,13 +12,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const promptsToggle = document.getElementById('enable-prompts-toggle');
     const promptContainer = document.getElementById('prompt-settings-container');
     
-    // Элементы прогресс-бара (теперь глобальные)
-    const progressContainer = document.getElementById('gen-progress');
-    const progressBar = document.getElementById('gen-bar');
-    const progressMsg = document.getElementById('gen-msg');
-    const logList = document.getElementById('log-list');
-    const taskId = "{{ task_id|default:'' }}";
-    
     let submitBtn = form ? form.querySelector('button[type="submit"]') : null;
     let isGenerating = false; // Флаг защиты от двойного клика
 
@@ -147,24 +140,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- 5. ФУНКЦИЯ ЗАПУСКА (ГЛОБАЛЬНАЯ ЛОГИКА) ---
+    // --- 5. ФУНКЦИЯ ЗАПУСКА (ОБНОВЛЕННАЯ) ---
     function startGenerationProcess() {
         isGenerating = true;
         console.log("🚀 [ACTION] ЗАПУСК ГЕНЕРАЦИИ!");
         
         window.closeConfirmModal();
         
-        // Показываем прогресс
-        if (progressContainer) progressContainer.classList.remove('d-none');
-        if (progressBar) progressBar.style.width = '0%';
-        if (progressMsg) progressMsg.innerText = "Подготовка...";
-        if (logList) logList.innerHTML = '';
-
+        // Блокируем кнопку
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerText = '⏳ Генерация идет...';
         }
 
+        // Предупреждение при закрытии страницы
         window.onbeforeunload = function() { return "Генерация идет..."; };
 
         const formData = new FormData(form);
@@ -184,10 +173,16 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(data => {
             console.log("📥 Ответ сервера:", data);
-            if (data.status === 'started') {
-                connectSSE();
+            
+            if (data.status === 'started' && data.task_id) {
+                // ✅ ВАЖНО: Запускаем новый трекер прогресса
+                if (typeof initProgressTracker === 'function' && window.GEN_STREAM_URL) {
+                    initProgressTracker(window.GEN_STREAM_URL, data.task_id);
+                } else {
+                    console.error("Функция initProgressTracker не найдена или нет URL потока");
+                }
             } else {
-                throw new Error(data.message || 'Ошибка сервера');
+                throw new Error(data.message || 'Ошибка сервера: не получен task_id');
             }
         })
         .catch(error => {
@@ -197,66 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- 6. SSE ПОТОК ---
-    function connectSSE() {
-        if (!window.GEN_STREAM_URL) return;
-        console.log("📡 Подключение к SSE...");
-        
-        if (taskId) {
-            const eventSource = new EventSource(`/path/to/generate_stream/?task_id=${taskId}`);
-            
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                
-                // Обновляем прогрессбар
-                const progressBar = document.getElementById('your-progress-bar-id');
-                const progressText = document.getElementById('your-text-id');
-                
-                if (progressBar) {
-                    progressBar.style.width = data.percent + '%';
-                    progressBar.setAttribute('aria-valuenow', data.percent);
-                }
-                
-                if (progressText) {
-                    progressText.innerText = `${data.message} (${data.percent}%)`;
-                }
-        
-                if (data.status === 'done') {
-                    eventSource.close();
-                    // Перезагрузка или редирект
-                    setTimeout(() => window.location.reload(), 1000);
-                } else if (data.status === 'error') {
-                    eventSource.close();
-                    alert(data.message);
-                }
-            };
-        }
-    };
-
-    // --- 7. ЗАВЕРШЕНИЕ И СБРОС ---
-    function finishGeneration(success, errorMsg) {
-        window.onbeforeunload = null;
-        isGenerating = false; // Сбрасываем флаг
-        
-        if (success) {
-            if (progressMsg) progressMsg.innerText = "✅ Готово! Перенаправление...";
-            if (submitBtn) {
-                submitBtn.innerText = '✅ Успешно';
-                submitBtn.classList.remove('btn-success');
-                submitBtn.classList.add('btn-primary');
-            }
-            setTimeout(() => { window.location.href = "/article/"; }, 2000);
-        } else {
-            if (progressMsg) progressMsg.innerText = "❌ Ошибка!";
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerText = '🔄 Попробовать снова';
-                submitBtn.classList.add('btn-danger');
-            }
-            if (errorMsg) alert("Ошибка: " + errorMsg);
-        }
-    }
-
+    // --- 6. СБРОС СОСТОЯНИЯ (ПРИ ОШИБКЕ) ---
     function resetUIState() {
         window.onbeforeunload = null;
         isGenerating = false;
@@ -264,9 +200,9 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.disabled = false;
             submitBtn.innerText = '🚀 Запустить генерацию';
         }
-        // Прогресс бар не скрываем, чтобы пользователь видел последний статус
     }
 
+    // --- 7. УТИЛИТА ДЛЯ COOKIE ---
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
