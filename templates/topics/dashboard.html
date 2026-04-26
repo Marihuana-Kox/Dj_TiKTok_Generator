@@ -77,7 +77,9 @@
                     
                     <!-- 4. Статус (СТРОГО ПО ТВОЕМУ СПИСКУ) -->
                     <td>
-                        {% if idea.status == 'pending' %}
+                        {% if idea.status == 'new' %}
+                            <span class="badge badge-new">Новая</span>
+                        {% elif idea.status == 'pending' %}
                             <span class="badge badge-work">Очередь</span>
                         {% elif idea.status == 'processing' %}
                             <span class="badge badge-work">Генерируется</span>

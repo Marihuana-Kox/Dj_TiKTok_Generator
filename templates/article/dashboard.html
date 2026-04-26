@@ -10,7 +10,7 @@
     </div>
     <!-- Кнопка создания новой (если нужна отдельная) -->
     {% comment %} <a href="{% url 'admin:article_article_add' %}" class="btn btn-success">✨ Новая статья</a> {% endcomment %}
-    <button type="button" class="btn btn-primary" id="open-gen-modal">✨ Генерация статей</button>
+    <a href="{% url 'article:generate_page' %}" class="btn btn-primary">✨ Генерация статей</a>
 </div>
 <div id="gen-modal" class="modal-overlay">
     <div class="modal-content">
@@ -84,7 +84,7 @@
                         {% endif %}
                     </td>
                     <td class="text-muted">{{ article.updated_at|date:"d.m.Y H:i" }}</td>
-                    <td><a href="{% url 'article:edit' article.id %}" class="text-bold link-blue">✏️ Ред.</a></td>
+                    <td><a href="{% url 'article:article_editor' article.id %}" class="text-bold link-blue">✏️ Ред.</a></td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="7" class="text-muted text-center">Список статей пуст</td></tr>
@@ -117,94 +117,5 @@
         });
     });
 </script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const modal = document.getElementById('gen-modal');
-        const container = document.getElementById('modal-form-container');
-        const progressBox = document.getElementById('gen-progress');
-        const progressMsg = document.getElementById('gen-msg');
-        const progressBar = document.getElementById('gen-bar');
-        const progressPerc = document.getElementById('gen-percent');
-        let evtSource = null;
-    
-        // Открытие модалки
-        document.getElementById('open-gen-modal').onclick = function() {
-            fetch("{% url 'article:gen_modal' %}")
-            .then(r => r.text()).then(html => {
-                container.innerHTML = html;
-                modal.classList.add('active');
-                if(progressBox) progressBox.style.display = 'none';
-                initForm();
-            });
-        };
-        
-        // Закрытие по крестику
-        document.getElementById('close-gen-modal').onclick = () => modal.classList.remove('active');
-        
-        // Закрытие по клику вне окна
-        modal.addEventListener('click', e => { if(e.target === modal) modal.classList.remove('active'); });
-    
-        // Инициализация формы внутри модалки
-        function initForm() {
-            const form = document.getElementById('article-gen-form');
-            const btn = form ? form.querySelector('button[type="submit"]') : null;
-            if(!form || !btn) return;
-    
-            form.onsubmit = function(e) {
-                e.preventDefault();
-                btn.disabled = true;
-                btn.textContent = '⏳ Генерация...';
-                if(progressBox) progressBox.style.display = 'block';
-                progressMsg.style.color = 'var(--text-muted)';
-                progressMsg.textContent = 'Подготовка очереди...';
-    
-                fetch("{% url 'article:gen_start' %}", {
-                    method: 'POST', 
-                    body: new FormData(form), 
-                    headers: {'X-Requested-With': 'XMLHttpRequest'}
-                })
-                .then(r => r.json())
-                .then(data => {
-                    if(data.status === 'started') {
-                        connectStream();
-                    } else {
-                        btn.disabled = false; 
-                        btn.textContent = 'Ошибка'; 
-                        progressMsg.textContent = data.message || 'Ошибка запуска';
-                        progressMsg.style.color = 'var(--accent-red)';
-                    }
-                });
-            };
-        }
-    
-        // Подключение к SSE потоку
-        function connectStream() {
-            evtSource = new EventSource("{% url 'article:gen_stream' %}");
-            evtSource.onmessage = function(e) {
-                const d = JSON.parse(e.data);
-                if(progressBar) progressBar.style.width = d.percent + '%';
-                if(progressPerc) progressPerc.textContent = d.percent + '%';
-                if(progressMsg) progressMsg.textContent = d.message;
-                
-                if(d.status === 'done') { 
-                    evtSource.close(); 
-                    progressMsg.textContent = 'Готово! Перезагрузка...';
-                    progressMsg.style.color = 'var(--accent-green)';
-                    setTimeout(() => window.location.reload(), 1500); 
-                }
-                if(d.status === 'error') { 
-                    evtSource.close(); 
-                    progressMsg.style.color = 'var(--accent-red)'; 
-                }
-            };
-        }
-        
-        // Обработка кнопки отмены внутри формы
-        document.addEventListener('click', function(e) {
-            if(e.target && e.target.classList.contains('modal-cancel-btn')) {
-                modal.classList.remove('active');
-            }
-        });
-    });
-    </script>
+
 {% endblock %}

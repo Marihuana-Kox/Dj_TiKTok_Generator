@@ -1,3 +1,52 @@
+/* --- DJANGO FORM RESET & GLOBAL FIXES --- */
+
+/* Сброс стилей для списков в формах (radio/checkbox) */
+ul.errorlist, ol.errorlist {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    color: var(--accent-red);
+    font-size: 0.85rem;
+}
+
+form ul, form ol {
+    padding-left: 0;
+    margin: 0;
+    list-style: none;
+}
+
+form li {
+    margin: 0;
+    padding: 0;
+}
+
+/* Убираем стандартные стили Django для label и input, если они мешают */
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+/* Исправление для радио-кнопок и чекбоксов, чтобы они не растягивались */
+input[type="radio"], input[type="checkbox"] {
+    width: auto;
+    height: auto;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+/* Убираем лишние отступы у полей ввода */
+input[type="text"], input[type="number"], input[type="email"], 
+textarea, select {
+    width: 100%;
+    box-sizing: border-box; /* Важно! */
+}
+
+/* Сброс для конкретных классов Django, если они есть */
+.form-row {
+    margin: 0;
+    padding: 0;
+}
 /* --- Переменные --- */
 :root {
     --bg-dark: #0f172a;
@@ -95,6 +144,12 @@ h2 {
     font-weight: 600; 
     margin: 0 0 12px 0; 
     text-transform: uppercase; 
+}
+h5 {
+    font-size: 1.2em;
+}
+small {
+    font-size: 1em;
 }
 .text-muted { color: var(--text-muted); }
 .text-small { font-size: 11px; } /* Чуть меньше базы для второстепенного текста */
@@ -485,3 +540,207 @@ textarea.form-control {
     border: none;
 }
 .modal-close:hover { color: #fff; }
+/* --- Утилиты для макета (Layout Utilities) --- */
+.flex { display: flex; }
+.flex-fill { flex: 1; }
+.flex-grow-2 { flex: 2; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-2 { gap: 10px; }
+.gap-3 { gap: 15px; }
+.d-block { display: block; }
+.d-none { display: none; } /* Класс для скрытия элементов */
+.d-flex { display: flex; }
+.align-items-end { align-items: flex-end; }
+.text-center { text-align: center; }
+.text-small { font-size: 0.85rem; }
+.text-bold { font-weight: 600; }
+.text-blue { color: var(--accent-blue); }
+.text-muted { color: var(--text-muted); }
+.mt-1 { margin-top: 5px; }
+.mt-2 { margin-top: 10px; }
+.mt-3 { margin-top: 15px; }
+.mt-4 { margin-top: 20px; }
+.mb-2 { margin-bottom: 10px; }
+.mb-3 { margin-bottom: 15px; }
+.p-2 { padding: 10px; }
+.p-3 { padding: 15px; }
+.p-4 { padding: 20px; }
+.border { border: 1px solid var(--border-color); }
+.border-top { border-top: 1px solid var(--border-color); }
+.rounded { border-radius: 6px; }
+.overflow-auto { overflow-y: auto; }
+.h-200 { height: 200px; }
+
+/* Цвета фона */
+.bg-dark { background-color: var(--bg-dark); }
+.bg-light-blue { background-color: rgba(59, 130, 246, 0.05); }
+
+/* Элементы форм */
+.form-check { display: flex; align-items: center; gap: 5px; }
+.form-check-input { width: 16px; height: 16px; cursor: pointer; }
+.form-check-label { cursor: pointer; margin: 0; }
+
+/* --- СЕТКА (GRID SYSTEM) --- */
+.container-fluid {
+    width: 100%;
+    padding-right: 15px;
+    padding-left: 15px;
+    margin-right: auto;
+    margin-left: auto;
+}
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -15px;
+    margin-left: -15px;
+}
+.col-md-8 {
+    flex: 0 0 66.666667%;
+    max-width: 66.666667%;
+    padding-right: 15px;
+    padding-left: 15px;
+}
+.col-md-4 {
+    flex: 0 0 33.333333%;
+    max-width: 33.333333%;
+    padding-right: 15px;
+    padding-left: 15px;
+}
+
+/* --- FLEXBOX УТИЛИТЫ --- */
+.flex { display: flex; }
+.flex-fill { flex: 1; }
+.flex-grow-2 { flex: 2; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-between { justify-content: space-between; }
+.justify-content-between { justify-content: space-between; }
+.align-items-end { align-items: flex-end; }
+.gap-2 { gap: 10px; }
+.gap-3 { gap: 15px; }
+
+/* --- ОТОБРАЖЕНИЕ (DISPLAY) --- */
+.d-block { display: block; }
+.d-none { display: none !important; } /* Важно для скрытия блоков JS */
+.d-flex { display: flex; }
+
+/* --- ОТСТУПЫ (MARGINS & PADDING) --- */
+.mt-1 { margin-top: 5px; }
+.mt-2 { margin-top: 10px; }
+.mt-3 { margin-top: 15px; }
+.mt-4 { margin-top: 20px; }
+.mb-1 { margin-bottom: 5px; }
+.mb-2 { margin-bottom: 10px; }
+.mb-3 { margin-bottom: 15px; }
+.p-2 { padding: 10px; }
+.p-3 { padding: 15px; }
+.p-4 { padding: 20px; }
+.pt-3 { padding-top: 15px; }
+.pb-2 { padding-bottom: 10px; }
+
+/* --- РАЗМЕРЫ И ГРАНИЦЫ --- */
+.w-100 { width: 100%; }
+.h-200 { height: 200px; }
+.border { border: 1px solid var(--border-color); }
+.border-top { border-top: 1px solid var(--border-color); }
+.border-bottom { border-bottom: 1px solid var(--border-color); }
+.rounded { border-radius: 6px; }
+.overflow-auto { overflow-y: auto; }
+.sticky-top { position: sticky; top: 20px; z-index: 100; }
+
+/* --- ЦВЕТА И ТЕКСТ --- */
+.bg-dark { background-color: var(--bg-dark); }
+.bg-card { background-color: var(--bg-card); }
+.bg-light-blue { background-color: rgba(59, 130, 246, 0.05); }
+.text-blue { color: var(--accent-blue); }
+.text-muted { color: var(--text-muted); }
+.text-bold { font-weight: 600; }
+.text-small { font-size: 0.85rem; }
+.text-center { text-align: center; }
+.text-danger { color: var(--accent-red); }
+.text-success { color: var(--accent-green); }
+
+/* --- СПИСКИ И ФОРМЫ --- */
+.list-unstyled { padding-left: 0; list-style: none; }
+.form-check { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+.form-check-input { width: 16px; height: 16px; cursor: pointer; margin: 0; }
+.form-check-label { cursor: pointer; margin: 0; user-select: none; }
+
+/* --- АДАПТИВНОСТЬ (МОБИЛЬНЫЕ) --- */
+@media (max-width: 768px) {
+    .col-md-8, .col-md-4 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+.bg-selected {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    transition: background-color 0.2s;
+}
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--bg-card); /* Или твой цвет фона таблицы */
+}
+/* --- СТИЛИ ДЛЯ МОДАЛЬНОГО ОКНА (ОБЯЗАТЕЛЬНО) --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7); /* Темный полупрозрачный фон */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999; /* Поверх всего */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease;
+}
+
+/* Класс, который добавляет JS при открытии */
+.modal-overlay:not(.d-none) {
+    opacity: 1;
+    /* visibility: visible; */
+}
+
+.modal-content {
+    background-color: var(--bg-card, #1e1e2e); /* Цвет фона карточки */
+    border: 1px solid var(--border-color, #444);
+    border-radius: 8px;
+    padding: 25px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    position: relative;
+    z-index: 10000;
+    color: var(--text-color, #fff);
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: var(--text-muted, #aaa);
+}
+.modal-close:hover {
+    color: #fff;
+}
+
+/* Утилиты, которые мы используем в коде */
+.opacity-50 { opacity: 0.5; }
+.pointer-events-none { pointer-events: none; }
+.transition-opacity { transition: opacity 0.3s ease; }
+.bg-selected { background-color: rgba(59, 130, 246, 0.15) !important; }
+.alert-danger {
+    background-color: rgba(220, 53, 69, 0.15);
+    border: 1px solid var(--accent-red, #dc3545);
+    color: var(--accent-red, #dc3545);
+    padding: 10px;
+    border-radius: 4px;
+}

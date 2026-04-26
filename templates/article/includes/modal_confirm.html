@@ -1,0 +1,24 @@
+<!-- templates/article/includes/modal_confirm.html -->
+<div id="confirm-modal" class="modal-overlay d-none">
+    <div class="modal-content modal-compact">
+        <button type="button" class="modal-close" id="close-confirm">&times;</button>
+        
+        <h4 class="text-bold mb-2"">⚠️ Подтверждение запуска</h4>
+        
+        <div class="mb-3">
+            <p class="text-small text-muted mb-2">Параметры генерации:</p>
+            <ul class="list-unstyled border rounded p-2 bg-dark" id="confirm-list">
+                <!-- Сюда JS вставит список -->
+            </ul>
+        </div>
+        
+        <div id="warning-box" class="alert alert-danger d-none mb-3 p-2 rounded">
+            <strong>Ошибка:</strong> <span id="warning-text"></span>
+        </div>
+
+        <div class="flex gap-2 mt-3">
+            <button type="button" id="confirm-start-btn" class="btn btn-success flex-fill">✅ Да, запустить</button>
+            <button type="button" class="btn btn-outline flex-fill" onclick="closeConfirmModal()">Отмена</button>
+        </div>
+    </div>
+</div>

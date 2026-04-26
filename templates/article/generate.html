@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Генерация статей{% endblock %}
+
+{% block content %}
+<form id="article-gen-form">
+    {% csrf_token %}
+    
+    <!-- === РАЗДЕЛ 1: ОСНОВНЫЕ НАСТРОЙКИ === -->
+    <h5 class="mb-2 text-bold text-blue">1. Контент и Языки</h5>
+    
+    <div class="form-group mb-2">
+        <label class="form-label">{{ form.ai_provider.label }}</label>
+        {{ form.ai_provider }}
+    </div>
+
+    <div class="flex mb-2 gap-2">
+        <div class="form-group flex-fill">
+            <label class="form-label">{{ form.article_prompt.label }}</label>
+            {{ form.article_prompt }}
+        </div>
+        <div class="form-group flex-fill">
+            <label class="form-label">{{ form.structure_plan.label }}</label>
+            {{ form.structure_plan }}
+        </div>
+    </div>
+
+    <!-- Выбор языков -->
+    <div class="form-group mb-3 p-2 border rounded bg-dark">
+        <label class="form-label text-bold mb-2 d-block">{{ form.languages.label }}</label>
+        <div class="d-flex flex-wrap gap-3">
+            {% for code, label in form.languages.field.choices %}
+            <div class="form-check">
+                <input type="checkbox" 
+                       name="languages" 
+                       value="{{ code }}" 
+                       id="id_lang_{{ code }}" 
+                       class="form-check-input lang-checkbox"
+                       {% if code == 'en' %}checked disabled{% endif %} 
+                       {% if code in form.languages.initial %}checked{% endif %}>
+                <label class="form-check-label" for="id_lang_{{ code }}">
+                    {{ label }}
+                    {% if code == 'en' %}<span class="text-muted text-small">(База)</span>{% endif %}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+        <small class="text-muted d-block mt-1">English обязателен. Russian включен по умолчанию (можно отключить).</small>
+    </div>
+
+    <!-- === РАЗДЕЛ 2: ВЫБОР ИДЕЙ === -->
+    <h5 class="text-bold text-blue mb-2 border-bottom pb-2 mt-4">2. Идеи для статей</h5>
+    
+    <div class="form-group mb-2">
+        <!-- ЧЕКБОКС ПЕРЕНЕСЕН СЮДА -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <label class="form-label d-block mb-0">
+                <input type="checkbox" id="select-all-ideas" class="form-check-input me-2">
+                Выберите идеи (статус: Pending)
+            </label>
+            <small class="text-bold text-blue">Выбрано: <span id="selected-count">0</span></small>
+        </div>
+        
+        <div class="card p-0 border overflow-auto bg-dark" style="max-height: 300px;">
+            {% if form.idea_selection.field.choices %}
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for value, label in form.idea_selection.field.choices %}
+                            {% if value != '' %}
+                            <tr class="idea-row" onclick="toggleRowCheckbox(this)">
+                                <td class="text-center">
+                                    <input type="checkbox" 
+                                           name="idea_selection" 
+                                           value="{{ value }}" 
+                                           class="form-check-input idea-checkbox" 
+                                           onchange="updateCount()">
+                                </td>
+                                <td class="align-middle">
+                                    <span class="text-small">{{ label }}</span>
+                                </td>
+                            </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="text-center p-5 text-muted">
+                    <h4>⚠️ Нет доступных идей</h4>
+                    <p>Сначала сгенерируйте идеи в разделе "Темы" и убедитесь, что у них статус <b>"pending"</b>.</p>
+                    <a href="{% url 'topics:generate' %}" class="btn btn-primary mt-2">Перейти к генерации идей</a>
+                </div>
+            {% endif %}
+        </div>
+        <small class="text-muted d-block mt-1">Клик по строке также выбирает идею.</small>
+    </div>
+
+    <!-- === РАЗДЕЛ 3: ПРОМПТЫ ДЛЯ ИЗОБРАЖЕНИЙ === -->
+    <h5 class="text-bold text-blue mb-2 border-bottom pb-2 mt-4">3. Промпты для изображений</h5>
+
+    <!-- ГЛАВНЫЙ ПЕРЕКЛЮЧАТЕЛЬ -->
+    <div class="form-group mb-3 p-3 border rounded bg-dark d-flex justify-content-between align-items-center">
+        <div>
+            <label class="form-label text-bold d-block mb-0" style="font-size: 1.1rem;">
+                🎨 Генерировать промпты
+            </label>
+            <small class="text-muted">Если выключить, статья будет создана без промптов для картинок (экономия токенов).</small>
+        </div>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="enable-prompts-toggle" checked style="width: 3em; height: 1.5em;">
+        </div>
+    </div>
+
+    <!-- КОНТЕЙНЕР НАСТРОЕК (блокируется при выключении) -->
+    <div id="prompt-settings-container" class="transition-opacity">
+        
+        <div class="flex gap-2 mb-3">
+            <!-- РЕЖИМ ГЕНЕРАЦИИ -->
+            <div class="form-group flex-fill">
+                <label class="form-label d-block mb-2">Режим разбивки на сцены</label>
+                <div class="d-flex flex-column gap-2">
+                    <div class="form-check">
+                        <input type="radio" name="image_mode" value="auto" id="mode_auto" checked onchange="togglePromptSettings()">
+                        <label class="form-check-label" for="id_image_mode_auto">
+                            🤖 Автоматически (AI сам решит)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input type="radio" name="image_mode" value="manual" id="mode_manual" onchange="togglePromptSettings()">
+                        <label class="form-check-label" for="id_image_mode_manual">
+                            ✋ Вручную (указать кол-во)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- РАЗМЕР -->
+            <div class="form-group flex-fill">
+                <label class="form-label">{{ form.aspect_ratio.label }}</label>
+                {{ form.aspect_ratio }}
+            </div>
+        </div>
+
+        <!-- Блок ручного ввода -->
+        <div id="manual-count-block" class="form-group mb-3 d-none">
+            <label class="form-label">{{ form.manual_scene_count.label }}</label>
+            {{ form.manual_scene_count }}
+        </div>
+
+        <div class="flex gap-2 mb-3">
+            <!-- СТИЛЬ -->
+            <div class="form-group flex-grow-2">
+                <label class="form-label">{{ form.art_style.label }}</label>
+                {{ form.art_style }}
+                <small class="text-muted">Например: anime style, realistic...</small>
+            </div>
+            
+            <!-- ВИДЕО ОПЦИЯ (тоже отключается) -->
+            <div class="form-group flex-fill d-flex align-items-end">
+                <div class="form-check p-2 border rounded w-100">
+                    {{ form.generate_video }}
+                    <label class="form-check-label" for="{{ form.generate_video.id_for_label }}">
+                        {{ form.generate_video.label }}
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Кнопки -->
+    <div class="flex mt-4 border-top pt-3">
+        <button type="submit" class="btn btn-success flex-fill">🚀 Запустить генерацию</button>
+        <button type="button" id="btn-close-modal" class="btn btn-outline flex-fill">Отмена</button>
+    </div>
+</form>
+{% include 'article/includes/modal_progress.html' %}
+{% include 'article/includes/modal_confirm.html' %}
+<!-- Передаем URL-адреса из Django во внешний JS -->
+<script>
+    window.GEN_API_URL = "{% url 'article:start_generation_api' %}";
+    window.GEN_STREAM_URL = "{% url 'article:generation_stream' %}";
+</script>
+{% endblock %}
