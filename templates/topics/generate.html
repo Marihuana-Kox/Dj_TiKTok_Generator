@@ -142,7 +142,14 @@
         });
 
         function connectSSE() {
-            const streamUrl = "{% url 'topics:generate_stream' %}";
+            // Получаем task_id из data-атрибута или используем дефолтный URL
+            const taskId = "{{ task_id|default:'' }}";
+            let streamUrl = "{% url 'topics:generate_stream' %}";
+            
+            // Добавляем task_id как query параметр если он есть
+            if (taskId) {
+                streamUrl += '?task_id=' + taskId;
+            }
             
             if (!streamUrl) {
                 statusText.innerText = "Ошибка: URL потока не найден";
@@ -168,7 +175,7 @@
                         detailLog.innerText = "❌ " + data.message;
                         detailLog.style.color = "var(--accent-red)";
                     } else {
-                        detailLog.innerText = "️ " + data.message;
+                        detailLog.innerText = "⏳ " + data.message;
                         detailLog.style.color = "var(--text-muted)";
                     }
 
