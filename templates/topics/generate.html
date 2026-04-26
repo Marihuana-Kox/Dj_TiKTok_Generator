@@ -10,7 +10,7 @@
     </div>
 
     <!-- Блок Прогресс-бара -->
-    <div id="progress-container" class="card progress-wrapper">
+    <div id="progress-container" class="progress-wrapper" style="display: none;">
         <div class="progress-header">
             <span class="progress-title">🚀 Процесс генерации</span>
             <span id="percent-text" class="progress-percent">0%</span>
@@ -124,8 +124,8 @@
         let eventSource = null;
 
         form.addEventListener('submit', function(e) {
-            // Показываем прогресс бар
-            progressContainer.classList.add('active');
+            // Показываем прогресс бар - используем style.display вместо class
+            progressContainer.style.display = 'block';
             
             // Блокируем кнопку
             submitBtn.disabled = true;

@@ -15,6 +15,8 @@ from django.core.cache import cache
 
 def generate_idea_view(request):
     """Основное view для генерации идей с прогресс-баром"""
+    task_id = None
+    
     if request.method == 'POST':
         form = GenerateIdeasForm(request.POST)
         if form.is_valid():
@@ -107,8 +109,12 @@ def generate_idea_view(request):
 
             # Запуск потока
             thread = threading.Thread(target=run_generation)
+            thread.daemon = True
             thread.start()
 
+            # Небольшая задержка чтобы поток успел создать запись в кэше
+            time.sleep(0.2)
+            
             # Возвращаем страницу с формой и task_id
             return render(request, 'topics/generate.html', {'form': form, 'task_id': task_id})
         else:
@@ -116,7 +122,7 @@ def generate_idea_view(request):
     else:
         form = GenerateIdeasForm()
 
-    return render(request, 'topics/generate.html', {'form': form})
+    return render(request, 'topics/generate.html', {'form': form, 'task_id': task_id})
 
 
 def generate_stream(request):
