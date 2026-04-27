@@ -26,6 +26,13 @@
         {% endif %}
 
         <!-- Поля -->
+{% comment %} 
+        <div class="form-group">
+            {% for i in form %}
+            <label class="form-label">{{ i }}</label>
+            {% endfor %}
+        </div> {% endcomment %}
+
         <div class="form-group">
             <label class="form-label">{{ form.topic.label }}</label>
             {{ form.topic }}

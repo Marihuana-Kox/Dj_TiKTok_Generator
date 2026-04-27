@@ -29,11 +29,11 @@ class GenerateIdeasForm(forms.Form):
 class VideoProjectAdmin(admin.ModelAdmin):
     list_display = ('id', 'topic', 'title_preview', 'status',
                     'created_at', 'has_assets_count')
+    readonly_fields = ('idea_style', 'created_at', 'updated_at')
     list_filter = ('status', 'topic', 'created_at')
     search_fields = ('topic', 'angle', 'notes')
     list_editable = ('status',)
     ordering = ('-created_at',)
-    readonly_fields = ('created_at', 'updated_at')
 
     def title_preview(self, obj):
         text = obj.angle if obj.angle else obj.topic

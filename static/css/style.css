@@ -585,7 +585,7 @@ textarea.form-control {
 .progress-title {
     font-size: 12px;
     font-weight: 700;
-    color: var(--accent-blue);
+    color: var(--accent-green);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -593,7 +593,7 @@ textarea.form-control {
 .progress-percent {
     font-size: 12px;
     font-weight: 800;
-    color: var(--accent-blue);
+    color: var(--accent-green);
 }
 
 .progress-track {

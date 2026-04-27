@@ -9,87 +9,103 @@ function initProgressTracker(streamUrl, taskId, redirectUrl) {
 
     if (!progressContainer || !progressBar) return;
 
-    // Сброс состояния
+    // --- НАСТРОЙКИ СИМУЛЯЦИИ ---
+    let currentPercent = 0;
+    let targetPercent = 0;
+    let isFinished = false;
+
+    // Сброс состояния UI
     progressContainer.style.display = 'block';
     progressContainer.classList.remove('hidden');
-    progressBar.style.width = '0%';
-    progressBar.style.backgroundColor = ""; // Сброс цвета (на случай ошибки ранее)
-    
+    progressBar.style.backgroundColor = ""; 
+    progressBar.style.width = "0%";
+    if(percentText) percentText.textContent = "0%";
+    if(statusText) statusText.textContent = "Подготовка ИИ...";
+
+    // --- ФУНКЦИЯ ПЛАВНОЙ ОТРИСОВКИ (Simulation Loop) ---
+    function updateVisuals() {
+        if (isFinished) return;
+
+        // Если реальный прогресс (targetPercent) выше текущего, подтягиваемся к нему
+        // Если нет — медленно ползем сами (симуляция работы), но не выше 95%
+        if (currentPercent < targetPercent) {
+            currentPercent += 1.0; // Быстрый догон реальных данных
+        } else if (currentPercent < 75) {
+            currentPercent += 0.05; // Очень медленное "ожидание" ответа ИИ
+        }
+
+        progressBar.style.width = `${currentPercent}%`;
+        if(percentText) percentText.textContent = `${Math.floor(currentPercent)}%`;
+
+        requestAnimationFrame(updateVisuals);
+    }
+    requestAnimationFrame(updateVisuals);
+
+    // --- SSE ПОДКЛЮЧЕНИЕ ---
     const url = new URL(streamUrl, window.location.origin);
     url.searchParams.set('task_id', taskId);
-
     const eventSource = new EventSource(url.toString());
 
     eventSource.onmessage = function(event) {
         try {
             const data = JSON.parse(event.data);
-            const percent = data.percent || 0;
             
-            progressBar.style.width = `${percent}%`;
-            if(percentText) percentText.textContent = `${percent}%`;
-            if(statusText) statusText.textContent = data.message || "Обработка...";
+            // Обновляем цель для симулятора
+            if (data.percent) targetPercent = data.percent;
+            
+            if (statusText && data.message) {
+                statusText.textContent = data.message;
+            }
 
-            // Логирование шагов
+            // Логирование шагов в консоль снизу
             if (detailLog && data.message) {
-                detailLog.textContent = (data.status === 'error' ? "❌ " : "⏳ ") + data.message;
-                detailLog.style.color = data.status === 'error' ? "red" : "gray";
+                const div = document.createElement('div');
+                div.className = 'log-entry';
+                div.textContent = `${data.status === 'error' ? "❌" : "⏳"} ${data.message}`;
+                div.style.color = data.status === 'error' ? "#ef4444" : "#ffffff";
+                detailLog.appendChild(div);
+                detailLog.scrollTop = detailLog.scrollHeight;
             }
 
-            // Успешное завершение
-            // Внутри eventSource.onmessage
-            if (data.status === 'done') {
-                progressBar.style.width = '100%';
-                if(percentText) percentText.textContent = '100%';
-                if(statusText) statusText.textContent = 'Готово!';
-                
-                // НЕ ЗАКРЫВАЕМ СРАЗУ, даем пользователю увидеть 100%
-                handleCompletion(eventSource, true); 
-            }
-            // Ошибка
-            else if (data.status === 'error') {
-                progressBar.style.backgroundColor = "red";
-                handleCompletion(eventSource, false);
+            // ФИНАЛ
+            if (data.status === 'done' || data.percent >= 100) {
+                isFinished = true;
+                finishEffect(true);
+            } else if (data.status === 'error') {
+                isFinished = true;
+                finishEffect(false);
             }
         } catch (e) {
             console.error('Ошибка данных SSE:', e);
         }
     };
 
-    eventSource.onerror = function(err) {
-        // Если сервер закрыл соединение, не пытаемся стучаться вечно
-        if (eventSource.readyState === EventSource.CLOSED) {
-            console.log("Соединение закрыто сервером.");
-        } else {
-            // Если случилась ошибка сети — закрываем, чтобы не спамить
+    eventSource.onerror = function() {
+        if (eventSource.readyState !== EventSource.CLOSED) {
             eventSource.close();
-            if(statusText) statusText.textContent = "Ошибка связи с сервером";
+            // Не прерываем симуляцию при сетевой ошибке, 
+            // так как фоновый поток в Django скорее всего доработает.
         }
     };
 
-    function handleCompletion(source, isSuccess) {
-        // Закрываем поток СРАЗУ, чтобы не было повторных запросов
-        source.close();
-        // 1. Сначала принудительно красим в 100%
-        const progressBar = document.getElementById('progress-bar');
-        if (progressBar) {
-            progressBar.style.width = '100%';
-            progressBar.style.backgroundColor = '#4caf50'; // Ярко-зеленый
+    function finishEffect(success) {
+        eventSource.close();
+        
+        // Резкий прыжок до конца
+        progressBar.style.transition = "width 1.5s ease-out, background-color red 1.5s";
+        progressBar.style.width = '100%';
+        if(percentText) percentText.textContent = '100%';
+        
+        if (success) {
+            progressBar.style.backgroundColor = '#4caf50';
+            if(statusText) statusText.textContent = 'Готово! Сохраняем...';
+            
+            setTimeout(() => {
+                if (redirectUrl) window.location.href = redirectUrl;
+            }, 1200);
+        } else {
+            progressBar.style.backgroundColor = "#ef4444";
+            if(statusText) statusText.textContent = 'Ошибка генерации';
         }
-
-        setTimeout(() => {
-            if (isSuccess && redirectUrl) {
-                window.location.href = redirectUrl;
-            } else if (!isSuccess) {
-                // Если ошибка — оставляем бар красным на 5 секунд, потом прячем
-                setTimeout(() => {
-                    progressContainer.style.display = 'none';
-                    progressContainer.classList.add('hidden');
-                }, 5000);
-            } else {
-                // Просто прячем, если нет редиректа
-                progressContainer.style.display = 'none';
-                progressContainer.classList.add('hidden');
-            }
-        }, 3000);
     }
 }

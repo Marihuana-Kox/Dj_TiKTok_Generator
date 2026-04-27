@@ -246,6 +246,11 @@ Language for summary/facts/questions: Russian. Titles must be clean."""
                 idea_obj.angle = final_angle_ru if final_angle_ru else "New Idea"
                 idea_obj.notes = notes_content.strip()
                 idea_obj.status = 'new'
+                # Убедись, что имя поля (prompt_code) совпадает с тем, что ты создал в модели
+                if hasattr(idea_obj, 'idea_style'):
+                    print(
+                        f"🔍 DEBUG: Сохраняем в prompt_code значение: '{idea_style}'")
+                    idea_obj.idea_style = idea_style
                 idea_obj.save()
 
                 saved_count += 1

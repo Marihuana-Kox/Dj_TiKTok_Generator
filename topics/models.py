@@ -1,3 +1,4 @@
+from pyexpat import model
 from django.db import models
 
 
@@ -19,7 +20,8 @@ class VideoProject(models.Model):
                               choices=STATUS_CHOICES, default='pending')
     output_file = models.FileField(
         "Готовое видео", upload_to='videos/', null=True, blank=True)
-
+    idea_style = models.CharField(
+        "Код промпта", max_length=100, null=True, blank=True)
     created_at = models.DateTimeField("Дата создания", auto_now_add=True)
     updated_at = models.DateTimeField("Дата обновления", auto_now=True)
 
