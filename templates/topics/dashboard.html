@@ -13,13 +13,17 @@
 
 <!-- Статистика -->
 <div class="flex mb-2">
-    <div class="card stat-card blue">
+    <div class="card stat-card red">
         <span class="stat-value">{{ stats.total }}</span>
         <span class="stat-label">Всего</span>
     </div>
-    <div class="card stat-card orange">
+    <div class="card stat-card blue">
         <span class="stat-value">{{ stats.new }}</span>
         <span class="stat-label">Новые</span>
+    </div>
+    <div class="card stat-card orange">
+        <span class="stat-value">{{ stats.pending }}</span>
+        <span class="stat-label">Очередь</span>
     </div>
     <div class="card stat-card green">
         <span class="stat-value">{{ stats.done }}</span>
@@ -102,7 +106,7 @@
         </table>
     </div>
 </form>
-
+{% include 'topics/includes/pagination.html' %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const selectAll = document.getElementById('select-all');

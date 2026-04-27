@@ -5,6 +5,7 @@ import threading
 import uuid
 from django.contrib import messages
 from django.http import StreamingHttpResponse
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from topics.models import VideoProject
 from .forms import GenerateIdeasForm, VideoProjectEditForm
@@ -135,17 +136,15 @@ def generate_idea_view(request):
                         callback=callback
                     )
 
-                    # 🎯 4. Финальная стадия (плавный выход)
-                    for i in range(95, 101, 1):
-                        cache.set(f"progress_{task_id}", {
-                            'current': count,
-                            'total': count,
-                            'message': 'Финализация...',
-                            'percent': i,
-                            'status': 'running',
-                            'task_id': task_id
-                        }, timeout=60)
-                        time.sleep(0.05)
+                    final_data = {
+                        'current': count,
+                        'total': count,
+                        'message': 'Готово! Запись в базу данных...',
+                        'percent': 100,
+                        'status': 'done',
+                        'task_id': task_id
+                    }
+                    cache.set(f"progress_{task_id}", final_data, timeout=60)
 
                     messages.success(
                         request, f"✅ Успешно сгенерировано {count} идей!")
@@ -263,15 +262,27 @@ def dashboard(request):
     # Статистика
     stats = {
         'total': VideoProject.objects.count(),
-        'new': VideoProject.objects.filter(status='pending').count(),
+        'new': VideoProject.objects.filter(status='new').count(),
+        'pending': VideoProject.objects.filter(status='pending').count(),
         'done': VideoProject.objects.filter(status='completed').count(),
     }
     # Список последних идей
     ideas = VideoProject.objects.all().order_by('-created_at')[:50]
+    # --- НАСТРОЙКА ПАГИНАЦИИ ---
+    page_number = request.GET.get('page', 1)  # Номер страницы из URL (?page=2)
+    paginator = Paginator(ideas, 20)  # Показывать по 10 идей на странице
+
+    try:
+        ideas_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        ideas_page = paginator.page(1)
+    except EmptyPage:
+        ideas_page = paginator.page(paginator.num_pages)
 
     context = {
         'stats': stats,
-        'ideas': ideas,
+        'ideas': ideas_page,
+        'page_obj': ideas_page
     }
     return render(request, 'topics/dashboard.html', context)
 
