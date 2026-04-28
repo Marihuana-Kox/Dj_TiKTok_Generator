@@ -247,30 +247,45 @@ def generate_stream(request):
 
 
 def dashboard(request):
-    # --- ОБРАБОТКА УДАЛЕНИЯ ---
+    # --- ОБРАБОТКА УДАЛЕНИЯ И СМЕНЫ СТАТУСА ---
     if request.method == 'POST':
         action = request.POST.get('action')
-        if action == 'delete_selected':
-            selected_ids = request.POST.getlist('selected_ideas')
-            if selected_ids:
-                count, _ = VideoProject.objects.filter(
-                    id__in=selected_ids).delete()
+        selected_ids = request.POST.getlist('selected_ideas')
+        
+        if selected_ids:
+            ideas = VideoProject.objects.filter(id__in=selected_ids)
+            
+            if action == 'delete_selected':
+                count, _ = ideas.delete()
                 messages.success(request, f"✅ Удалено {count} идей.")
-            else:
-                messages.warning(request, "⚠️ Вы не выбрали ни одной идеи.")
-            return redirect('topics:dashboard')
-    # Статистика
+                
+            elif action == 'change_status':
+                new_status = request.POST.get('new_status')
+                if new_status:
+                    # Обновляем статус у всех выбранных идей
+                    ideas.update(status=new_status)
+                    messages.success(request, f"✅ Статус изменен на «{new_status}» для {ideas.count()} идей.")
+                else:
+                    messages.warning(request, "⚠️ Не выбран новый статус.")
+        else:
+            messages.warning(request, "⚠️ Вы не выбрали ни одной идеи.")
+            
+        return redirect('topics:dashboard')
+
+    # Статистика (без изменений)
     stats = {
         'total': VideoProject.objects.count(),
         'new': VideoProject.objects.filter(status='new').count(),
         'pending': VideoProject.objects.filter(status='pending').count(),
         'done': VideoProject.objects.filter(status='completed').count(),
     }
-    # Список последних идей
+    
+    # Список последних идей (без изменений)
     ideas = VideoProject.objects.all().order_by('-created_at')[:50]
-    # --- НАСТРОЙКА ПАГИНАЦИИ ---
-    page_number = request.GET.get('page', 1)  # Номер страницы из URL (?page=2)
-    paginator = Paginator(ideas, 20)  # Показывать по 10 идей на странице
+    
+    # --- НАСТРОЙКА ПАГИНАЦИИ (без изменений) ---
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(ideas, 20)
 
     try:
         ideas_page = paginator.page(page_number)
@@ -285,7 +300,6 @@ def dashboard(request):
         'page_obj': ideas_page
     }
     return render(request, 'topics/dashboard.html', context)
-
 
 def project_edit(request, pk):
     # Получаем проект или 404

@@ -29,6 +29,9 @@ def start_generation_api(request):
     """API endpoint для запуска генерации через AJAX"""
     if request.method == 'POST':
         form = ArticleGenerationForm(request.POST)
+        if not form.is_valid():
+            print(form.errors)  # Вывод ошибок в консоль
+            return JsonResponse({'status': 'error', 'message': 'Invalid form data'})
         if form.is_valid():
             session_key = request.session.session_key
             if not session_key:
@@ -368,7 +371,7 @@ def generation_stream(request):
         event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
-    response['Connection'] = 'keep-alive'
+    # response['Connection'] = 'keep-alive'
     return response
 
 
@@ -387,23 +390,123 @@ def parse_ai_json(text):
 
 
 def article_dashboard(request):
+    # --- УДАЛЕНИЕ И СМЕНА СТАТУСА ---
     if request.method == 'POST':
         action = request.POST.get('action')
-        if action == 'delete_selected':
-            selected_ids = request.POST.getlist('selected_articles')
-            if selected_ids:
-                count, _ = Article.objects.filter(id__in=selected_ids).delete()
+        selected_ids = request.POST.getlist('selected_articles')
+        
+        if selected_ids:
+            clusters = ArticleCluster.objects.filter(id__in=selected_ids)
+            
+            if action == 'delete_selected':
+                count, _ = clusters.delete()
                 messages.success(request, f"✅ Удалено {count} статей.")
-            else:
-                messages.warning(request, "⚠️ Вы не выбрали ни одной статьи.")
-            return redirect('article:dashboard')
-    articles = Article.objects.all().order_by('-updated_at')
+                
+            elif action == 'change_status':
+                new_status = request.POST.get('new_status')
+                if new_status:
+                    # Если выбрано "published", ставим True, иначе False
+                    is_complete_val = (new_status == 'published')
+                    clusters.update(is_complete=is_complete_val)
+                    
+                    status_text = "Опубликовано" if is_complete_val else "В работе"
+                    messages.success(request, f"✅ Статус изменен на «{status_text}» для {clusters.count()} статей.")
+                else:
+                    messages.warning(request, "⚠️ Не выбран новый статус.")
+        else:
+            messages.warning(request, "⚠️ Вы не выбрали ни одной статьи.")
+            
+        return redirect('article:dashboard')
+
+    # --- ПОДГОТОВКА ДАННЫХ ---
+    clusters_qs = ArticleCluster.objects.all().order_by('-created_at')
+    
+    print(f"🔍 [DEBUG] Найдено кластеров в БД: {clusters_qs.count()}")
+    
+    prepared_clusters = []
+    
+    for cluster in clusters_qs:
+        try:
+            # Получаем переводы. Используем list(), чтобы сразу выполнить запрос
+            translations = list(cluster.translations.all())
+            
+            main_trans = None
+            for t in translations:
+                if t.language.code == 'ru':
+                    main_trans = t
+                    break
+            
+            if not main_trans and translations:
+                main_trans = translations[0]
+                
+            prepared_clusters.append({
+                'instance': cluster,
+                'translations': translations,
+                'main_trans': main_trans,
+            })
+            print(f"   ✅ Обработан кластер #{cluster.id}: {len(translations)} переводов, заголовок: {main_trans.title if main_trans else 'НЕТ'}")
+            
+        except Exception as e:
+            print(f"   ❌ Ошибка при обработке кластера #{cluster.id}: {e}")
+
+    print(f"🚀 [DEBUG] Итоговый список для шаблона: {len(prepared_clusters)} элементов.")
+
     stats = {
-        'total': articles.count(),
-        'draft': articles.filter(status='draft').count(),
-        'published': articles.filter(status='published').count(),
+        'total': clusters_qs.count(),
+        'draft': clusters_qs.filter(is_complete=False).count(),
+        'published': clusters_qs.filter(is_complete=True).count(),
     }
-    return render(request, 'article/dashboard.html', {'articles': articles, 'stats': stats})
+
+    return render(request, 'article/dashboard.html', {
+        'articles': prepared_clusters,
+        'stats': stats,
+    })
+# def article_dashboard(request):
+#     if request.method == 'POST':
+#         action = request.POST.get('action')
+#         if action == 'delete_selected':
+#             selected_ids = request.POST.getlist('selected_articles')
+#             if selected_ids:
+#                 count, _ = ArticleCluster.objects.filter(id__in=selected_ids).delete()
+#                 messages.success(request, f"✅ Удалено {count} статей.")
+#             else:
+#                 messages.warning(request, "⚠️ Вы не выбрали ни одной статьи.")
+#             return redirect('article:dashboard')
+#     # --- ПОДГОТОВКА ДАННЫХ ---
+#     # 1. Получаем все кластеры
+#     clusters_qs = ArticleCluster.objects.all().order_by('-created_at')
+
+#     prepared_clusters = []
+    
+#     for cluster in clusters_qs:
+#         # Получаем все переводы для этого кластера (сразу в список)
+#         translations = list(cluster.translations.all())
+        
+#         # Ищем русский перевод или берем первый попавшийся
+#         main_trans = None
+#         for t in translations:
+#             if t.language.code == 'ru':
+#                 main_trans = t
+#                 break
+        
+#         # Если русского нет, берем первый из списка
+#         if not main_trans and translations:
+#             main_trans = translations[0]
+            
+#         prepared_clusters.append({
+#             'instance': cluster,
+#             'translations': translations,      # Готовый список переводов
+#             'main_trans': main_trans,          # Главный перевод (RU или первый)
+#             'has_ru': main_trans and main_trans.language.code == 'ru'
+#         })
+
+#     stats = {
+#         'total': clusters_qs.count(),
+#         'draft': clusters_qs.filter(is_complete=False).count(),
+#         'published': clusters_qs.filter(is_complete=True).count(),
+#     }
+
+#     return render(request, 'article/dashboard.html', {'clusters': prepared_clusters, 'stats': stats})
 
 
 def article_editor(request, pk):

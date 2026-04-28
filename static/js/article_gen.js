@@ -174,15 +174,38 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             console.log("📥 Ответ сервера:", data);
             
-            if (data.status === 'started' && data.task_id) {
-                // ✅ ВАЖНО: Запускаем новый трекер прогресса
+            // if (data.status === 'started' && data.task_id) {
+            //     // ✅ ВАЖНО: Запускаем новый трекер прогресса
+            //     if (typeof initProgressTracker === 'function' && window.GEN_STREAM_URL) {
+            //         initProgressTracker(window.GEN_STREAM_URL, data.task_id);
+            //     } else {
+            //         console.error("Функция initProgressTracker не найдена или нет URL потока");
+            //     }
+            // } else {
+            //     throw new Error(data.message || 'Ошибка сервера: не получен task_id');
+            // }
+            if (data.status === 'started') {
+                console.log("✅ Генерация запущена! Подключаемся к потоку...");
+                
+                // Запускаем трекер. Если функция требует task_id, передадим null или session_id, 
+                // но лучше изменить саму функцию initProgressTracker, чтобы она не требовала ID при работе через сессию.
                 if (typeof initProgressTracker === 'function' && window.GEN_STREAM_URL) {
-                    initProgressTracker(window.GEN_STREAM_URL, data.task_id);
+                    // Передаем null вместо task_id, если функция умеет работать без него
+                    // ИЛИ просто вызываем connectSSE(), если у тебя есть такая функция напрямую
+                    if (initProgressTracker.length > 0) {
+                         initProgressTracker(window.GEN_STREAM_URL, null); 
+                    } else {
+                         initProgressTracker();
+                    }
+                } else if (typeof connectSSE === 'function') {
+                    // Если у тебя функция называется connectSSE
+                    connectSSE(); 
                 } else {
-                    console.error("Функция initProgressTracker не найдена или нет URL потока");
+                    console.error("❌ Функция отслеживания прогресса не найдена!");
                 }
             } else {
-                throw new Error(data.message || 'Ошибка сервера: не получен task_id');
+                // Показываем реальную ошибку, если статус не 'started'
+                throw new Error(data.message || 'Сервер вернул неожиданный статус: ' + data.status);
             }
         })
         .catch(error => {

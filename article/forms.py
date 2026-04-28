@@ -37,6 +37,7 @@ class ArticleGenerationForm(forms.Form):
         choices=[('auto', '🤖 Автоматически (AI разобьет на сцены)'),
                  ('manual', '✋ Вручную (Указать кол-во)')],
         initial='auto',
+        required=False,
         widget=forms.RadioSelect(attrs={'class': 'form-check-input'})
     )
 
@@ -55,6 +56,7 @@ class ArticleGenerationForm(forms.Form):
         choices=[('9:16', '9:16 (Stories/Shorts)'),
                  ('16:9', '16:9 (YouTube)'), ('1:1', '1:1 (Post)')],
         initial='9:16',
+        required=False,
         widget=forms.Select(attrs={'class': 'form-control'})
     )
 

@@ -44,9 +44,35 @@
                 <label for="select-all" class="text-bold ml-1">Выбрать все</label>
             </div>
             <!-- ДОБАВЛЕН КЛАСС ml-2 ДЛЯ ОТСТУПА -->
-            <button type="submit" name="action" value="delete_selected" class="btn btn-outline ml-2" onclick="return confirm('Удалить выбранные?');">
+            <!-- <button type="submit" name="action" value="delete_selected" class="btn btn-outline ml-2" onclick="return confirm('Удалить выбранные?');">
                 🗑️ Удалить
-            </button>
+            </button> -->
+            <div class="flex items-center gap-2">
+                <!-- Группа удаления -->
+                <button type="submit" name="action" value="delete_selected" id="btn-delete" class="btn btn-outline" disabled onclick="return confirm('Вы уверены? Это действие нельзя отменить.');">
+                    🗑️ Удалить
+                </button>
+                
+                <div class="separator" style="width:1px; height:20px; background:var(--border-color); margin:0 5px;"></div>
+                
+                <!-- Группа смены статуса -->
+                <!-- Смена статуса -->
+                <select name="new_status" id="status-select" class="form-control" style="width: auto; min-width: 150px;" disabled>
+                    <option value="" selected disabled>Изменить статус на...</option>
+                    <option value="new">🆕 Новая</option>
+                    <option value="pending">⏳ В очереди</option>
+                    <option value="processing">🔄 Генерируется</option>
+                    <option value="completed">✅ Готово</option>
+                    <option value="failed">❌ Ошибка</option>
+                    <!-- ('pending', 'В очереди'),
+                    ('processing', 'Генерируется'),
+                    ('completed', 'Готово'),
+                    ('failed', 'Ошибка'), -->
+                </select>
+                <button type="submit" name="action" value="change_status" id="btn-status" class="btn btn-primary" disabled>
+                    Применить
+                </button>
+            </div>
         </div>
 
         <table class="table">

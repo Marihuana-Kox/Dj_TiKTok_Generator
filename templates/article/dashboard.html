@@ -8,21 +8,21 @@
         <h1>Панель статей</h1>
         <p class="text-muted">Написание и редактирование контента.</p>
     </div>
-    <!-- Кнопка создания новой (если нужна отдельная) -->
-    {% comment %} <a href="{% url 'admin:article_article_add' %}" class="btn btn-success">✨ Новая статья</a> {% endcomment %}
     <a href="{% url 'article:generate_page' %}" class="btn btn-primary">✨ Генерация статей</a>
 </div>
+
+<!-- Модалка генерации (без изменений) -->
 <div id="gen-modal" class="modal-overlay">
     <div class="modal-content">
         <button type="button" class="modal-close" id="close-gen-modal">&times;</button>
         <h2 class="mb-3">Генерация статей</h2>
         <div id="modal-form-container">
-            <!-- Сюда загрузится форма -->
             <p class="text-muted">Загрузка...</p>
         </div>
     </div>
 </div>
-<!-- Статистика -->
+
+<!-- Статистика (без изменений) -->
 <div class="flex mb-2">
     <div class="card stat-card blue">
         <span class="stat-value">{{ stats.total }}</span>
@@ -45,10 +45,27 @@
             <div class="flex items-center">
                 <input type="checkbox" id="select-all" class="form-control checkbox-fix">
                 <label for="select-all" class="text-bold ml-1">Выбрать все</label>
+                <span id="selection-count" class="ml-2 text-muted" style="display:none;">(выбрано: <span id="count-val">0</span>)</span>
             </div>
-            <button type="submit" name="action" value="delete_selected" class="btn btn-outline ml-2" onclick="return confirm('Удалить выбранные статьи?');">
-                🗑️ Удалить
-            </button>
+            
+            <div class="flex items-center gap-2">
+                <!-- Группа удаления -->
+                <button type="submit" name="action" value="delete_selected" id="btn-delete" class="btn btn-outline" disabled onclick="return confirm('Вы уверены? Это действие нельзя отменить.');">
+                    🗑️ Удалить
+                </button>
+                
+                <div class="separator" style="width:1px; height:20px; background:var(--border-color); margin:0 5px;"></div>
+                
+                <!-- Группа смены статуса -->
+                <select name="new_status" id="status-select" class="form-control" style="width: auto; min-width: 150px;" disabled>
+                    <option value="" selected disabled>Изменить статус на...</option>
+                    <option value="published">✅ Опубликовано</option>
+                    <option value="draft">✏️ Черновик / В работе</option>
+                </select>
+                <button type="submit" name="action" value="change_status" id="btn-status" class="btn btn-primary" disabled>
+                    Применить
+                </button>
+            </div>
         </div>
 
         <table class="table">
@@ -58,36 +75,97 @@
                     <th></th>
                     <th>ID</th>
                     <th>Заголовок</th>
+                    <th>Языки</th> <!-- Переместил языки сюда, чтобы было логичнее -->
                     <th>Статус</th>
                     <th>Обновлено</th>
                     <th>Действие</th>
                 </tr>
             </thead>
             <tbody>
-                {% for article in articles %}
-                <tr class="idea-row">
-                    <td class="text-muted">{{ forloop.counter }}</td>
-                    <td class="text-center">
-                        <input type="checkbox" name="selected_articles" value="{{ article.id }}" class="idea-checkbox form-control checkbox-fix">
-                    </td>
-                    <td class="text-muted text-small">#{{ article.id }}</td>
-                    <td class="text-bold">{{ article.title|truncatechars:50 }}</td>
-                    <td>
-                        {% if article.status == 'draft' %}
-                            <span class="badge badge-work">Черновик</span>
-                        {% elif article.status == 'in_progress' %}
-                            <span class="badge badge-new">В работе</span>
-                        {% elif article.status == 'published' %}
-                            <span class="badge badge-done">Опубликовано</span>
+                {% for item in articles %}
+                    {% with cluster=item.instance trans_list=item.translations main=item.main_trans %}
+                    
+                    <tr class="idea-row">
+                        
+                        <!-- 1. НОМЕР -->
+                        <td class="text-muted">{{ forloop.revcounter }}</td>
+                        
+                        <!-- 2. ЧЕКБОКС -->
+                         {% if main %}
+                        <td class="text-center">
+                            <input type="checkbox" name="selected_articles" value="{{ cluster.id }}" class="idea-checkbox form-control checkbox-fix">
+                        </td>
                         {% else %}
-                            <span class="badge">{{ article.status }}</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-muted">{{ article.updated_at|date:"d.m.Y H:i" }}</td>
-                    <td><a href="{% url 'article:article_editor' article.id %}" class="text-bold link-blue">✏️ Ред.</a></td>
-                </tr>
+                        <td class="text-center">
+                            <input type="checkbox" name="selected_articles" value="{{ cluster.id }}" checked class="idea-checkbox form-control checkbox-fix">
+                        </td>
+                         {% endif %}
+                        
+                        <!-- 3. ID -->
+                        <td class="text-muted text-small">#{{ cluster.id }}</td>
+                        
+                        <!-- 4. ЗАГОЛОВОК -->
+                        <td class="text-bold">
+                            {% if main %}
+                                {{ main.title|truncatechars:50 }}
+                            {% else %}
+                                <!-- Если заголовка нет -->
+                                <span class="text-danger">⚠️ Нет данных</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- 5. ЯЗЫКИ -->
+                        <td class="languages-block">
+                            {% if trans_list %}
+                                <div class="flex gap-1" style="flex-wrap: wrap;">
+                                    {% for trans in trans_list %}
+                                        <span class="badge bg-light text-dark border" title="{{ trans.language.name }} ({{ trans.get_status_display }})">
+                                            {% if trans.language.code == 'ru' %}🇷🇺
+                                            {% elif trans.language.code == 'en' %}🇺🇸
+                                            {% elif trans.language.code == 'de' %}🇩
+                                            {% elif trans.language.code == 'fr' %}🇫
+                                            {% elif trans.language.code == 'es' %}🇪🇸
+                                            {% else %}🌐{% endif %}
+                                            {{ trans.language.code|upper }}
+                                            <!-- Индикатор статуса перевода -->
+                                            {% if trans.status == 'published' %}✅{% elif trans.status == 'draft' %}✏️{% endif %}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <!-- Если переводов нет -->
+                                <span class="badge text-white">❌ Пусто, Нет ни одного перевода</span>
+                                <!-- <small class="text-muted d-block mt-1">Нет ни одного перевода</small> -->
+                            {% endif %}
+                        </td>
+
+                        <!-- 6. СТАТУС КЛАСТЕРА -->
+                        <td>
+                            {% if cluster.is_complete %}
+                                <span class="badge badge-done">Готово</span>
+                            {% elif main %}
+                                <span class="badge badge-work">В работе</span>
+                            {% else %}
+                                <span class="badge bg-danger">Нет данных</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- 7. ДАТА -->
+                        <td class="text-muted">{{ cluster.updated_at|date:"d.m.Y H:i" }}</td>
+
+                        <!-- 8. ДЕЙСТВИЕ -->
+                        <td>
+                            {% if main %}
+                                <a href="{% url 'article:article_editor' cluster.id %}" class="text-bold link-blue">✏️ Ред.</a>
+                            {% else %}
+                                <span class="text-muted small">Недоступно</span>
+                                <!-- Можно добавить кнопку "Перезапустить" или "Удалить" -->
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endwith %}
                 {% empty %}
-                <tr><td colspan="7" class="text-muted text-center">Список статей пуст</td></tr>
+                    <tr><td colspan="8" class="text-muted text-center">Список статей пуст</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -95,12 +173,11 @@
 </form>
 
 <script>
-    // Тот же скрипт, что и для идей (копируешь из dashboard.html topics)
     document.addEventListener('DOMContentLoaded', function() {
         const selectAll = document.getElementById('select-all');
         const checkboxes = document.querySelectorAll('.idea-checkbox');
         const rows = document.querySelectorAll('.idea-row');
-        // ... (вставь код скрипта из предыдущего ответа) ...
+        
         if (selectAll) {
             selectAll.addEventListener('change', function() {
                 checkboxes.forEach((cb, index) => {

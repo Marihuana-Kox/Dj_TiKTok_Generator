@@ -1,24 +1,33 @@
-<!-- templates/article/includes/modal_confirm.html -->
-<div id="confirm-modal" class="modal-overlay d-none">
-    <div class="modal-content modal-compact">
-        <button type="button" class="modal-close" id="close-confirm">&times;</button>
-        
-        <h4 class="text-bold mb-2"">⚠️ Подтверждение запуска</h4>
-        
-        <div class="mb-3">
-            <p class="text-small text-muted mb-2">Параметры генерации:</p>
-            <ul class="list-unstyled border rounded p-2 bg-dark" id="confirm-list">
-                <!-- Сюда JS вставит список -->
-            </ul>
-        </div>
-        
-        <div id="warning-box" class="alert alert-danger d-none mb-3 p-2 rounded">
-            <strong>Ошибка:</strong> <span id="warning-text"></span>
-        </div>
+<!-- Модальное окно подтверждения и статуса -->
+<div id="status-modal" class="modal-overlay">
+  <div class="modal-content">
+    
+    <!-- Кнопка закрытия (крестик) -->
+    <button id="modal-close-x" class="modal-close">&times;</button>
 
-        <div class="flex gap-2 mt-3">
-            <button type="button" id="confirm-start-btn" class="btn btn-success flex-fill">✅ Да, запустить</button>
-            <button type="button" class="btn btn-outline flex-fill" onclick="closeConfirmModal()">Отмена</button>
-        </div>
+    <h3 id="status-modal-title" class="modal-title">🚀 Подготовка к генерации</h3>
+    
+    <!-- Блок со сводкой настроек -->
+    <div id="status-summary" class="modal-summary">
+        <!-- Сюда JS вставит список -->
     </div>
+
+    <!-- Кнопки управления -->
+    <div id="status-actions" class="modal-actions">
+        <button id="btn-confirm-start" class="btn btn-success">✅ Продолжить</button>
+        <button id="btn-cancel-start" class="btn btn-secondary">❌ Отменить</button>
+    </div>
+
+    <!-- Блок прогресс-бара (скрыт по умолчанию) -->
+    <div id="status-progress-block" class="modal-progress-block d-none">
+        <div class="progress-status-text" id="progress-status-text">Инициализация...</div>
+        
+        <div class="progress-track">
+            <div id="gen-progress-bar" class="progress-bar progress-bar-animated"></div>
+        </div>
+        
+        <div class="progress-details" id="progress-details"></div>
+    </div>
+
+  </div>
 </div>
