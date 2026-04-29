@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактор статьи #{{ cluster.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    
+    <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+    <div class="card mb-4">
+        <div class="card-header flex flex-between items-center">
+            <h2>📄 Статья #{{ cluster.id }}</h2>
+            
+            <!-- Форма статуса -->
+            <form method="post" class="flex items-center gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_cluster_status">
+                
+                <label class="text-bold mr-2">Статус:</label>
+                <input type="checkbox" name="is_complete" value="on" 
+                       {% if cluster.is_complete %}checked{% endif %}
+                       onchange="this.form.submit()">
+                
+                {% if cluster.is_complete %}
+                    <span class="badge badge-done">Опубликовано</span>
+                {% else %}
+                    <span class="badge badge-work">В работе</span>
+                {% endif %}
+            </form>
+        </div>
+        <div class="card-body">
+            {% if main_trans %}
+                <p><strong>Заголовок (RU):</strong> {{ main_trans.title }}</p>
+                <p class="text-muted">{{ main_trans.description|truncatechars:150 }}</p>
+            {% else %}
+                <p class="text-danger">Нет доступных переводов для предпросмотра.</p>
+            {% endif %}
+            <small class="text-muted">Обновлено: {{ cluster.updated_at|date:"d.m.Y H:i" }}</small>
+        </div>
+    </div>
+
+    <!-- СПИСОК ПЕРЕВОДОВ -->
+    <h3 class="mb-3">🌍 Переводы</h3>
+    
+    {% if translations %}
+        <div class="grid grid-cols-1 gap-4">
+            {% for trans in translations %}
+            <div class="card">
+                <!-- Заголовок карточки -->
+                <div class="card-header flex flex-between items-center">
+                    <div class="flex items-center gap-2">
+                        <!-- Флаг -->
+                        <span class="text-xl">
+                            {% if trans.language.code == 'ru' %}🇷🇺
+                            {% elif trans.language.code == 'en' %}🇺🇸
+                            {% elif trans.language.code == 'de' %}🇩
+                            {% elif trans.language.code == 'fr' %}🇫
+                            {% else %}{% endif %}
+                        </span>
+                        <span class="text-bold">{{ trans.language.name }} ({{ trans.language.code|upper }})</span>
+                        
+                        <!-- Статус перевода -->
+                        <span class="badge {% if trans.status == 'published' %}badge-done{% elif trans.status == 'draft' %}badge-work{% else %}badge-new{% endif %}">
+                            {{ trans.get_status_display }}
+                        </span>
+                    </div>
+                    
+                    <button type="button" class="btn btn-sm btn-outline" onclick="toggleEditor('{{ trans.id }}')">
+                        ✏️ Ред.
+                    </button>
+                </div>
+
+                <!-- Режим просмотра (по умолчанию виден) -->
+                <div id="view-{{ trans.id }}" class="card-body">
+                    <h4 class="text-bold">{{ trans.title }}</h4>
+                    <p class="text-muted text-small">{{ trans.description|truncatechars:100 }}</p>
+                    <div class="text-small" style="white-space: pre-wrap; max-height: 100px; overflow: hidden;">{{ trans.content|truncatechars:300 }}</div>
+                </div>
+
+                <!-- Режим редактирования (скрыт по умолчанию) -->
+                <div id="editor-{{ trans.id }}" class="card-body" style="display: none;">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="save_translation">
+                        <input type="hidden" name="translation_id" value="{{ trans.id }}">
+                        
+                        <div class="mb-3">
+                            <label class="text-bold d-block">Заголовок</label>
+                            <input type="text" name="title" value="{{ trans.title }}" class="form-control" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="text-bold d-block">Описание</label>
+                            <textarea name="description" class="form-control" rows="2">{{ trans.description }}</textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="text-bold d-block">Текст</label>
+                            <textarea name="content" class="form-control" rows="8">{{ trans.content }}</textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="text-bold d-block">Хештеги</label>
+                            <input type="text" name="hashtags" value="{{ trans.hashtags }}" class="form-control">
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+                            <button type="button" class="btn btn-secondary" onclick="toggleEditor('{{ trans.id }}')">Отмена</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-warning">У этого кластера пока нет созданных переводов.</div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'article:dashboard' %}" class="btn btn-secondary">← Назад</a>
+    </div>
+</div>
+
+<script>
+    function toggleEditor(id) {
+        var view = document.getElementById('view-' + id);
+        var editor = document.getElementById('editor-' + id);
+        
+        if (editor.style.display === 'none') {
+            editor.style.display = 'block';
+            view.style.display = 'none';
+        } else {
+            editor.style.display = 'none';
+            view.style.display = 'block';
+        }
+    }
+</script>
+{% endblock %}

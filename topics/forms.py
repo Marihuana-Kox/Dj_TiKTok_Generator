@@ -102,36 +102,29 @@ class GenerateIdeasForm(forms.Form):
         # 1. Получаем все активные стили из БД
         # Мы берем уникальные комбинации style и name, чтобы показать пользователю красивые названия
         active_prompts = IdeaPrompt.objects.filter(
-            is_active=True).values('style', 'name').distinct()
-
+            is_active=True).order_by('name')
         # Формируем список вариантов
         style_choices = [
             ('random', '🎲 Случайный стиль (Random)'),  # Опция рандома
         ]
 
         # Добавляем стили из базы
-        # Группа по типу стиля, но показываем красивое имя первого найденного промпта
-        seen_styles = set()
-        for item in active_prompts:
-            style_code = item['style']
-            if style_code not in seen_styles:
-                # Красивое отображение: "Сенсационный (Вирусный кликбейт)"
-                display_name = f"{self.get_style_display_name(style_code)} ({item['name']})"
-                style_choices.append((style_code, display_name))
-                seen_styles.add(style_code)
+        for prompt in active_prompts:
+            # Просто добавляем пару: (код, имя)
+            style_choices.append((prompt.code_name, prompt.name))
 
         self.fields['idea_style'].choices = style_choices
         self.fields['idea_style'].initial = 'random'  # По умолчанию рандом
 
-    def get_style_display_name(self, style_code):
-        """Вспомогательный метод для красивых названий"""
-        names = {
-            'facts': 'Факты',
-            'sensational': 'Сенсация',
-            'mystery': 'Мистика',
-            'educational': 'Образование',
-        }
-        return names.get(style_code, style_code.capitalize())
+    # def get_style_display_name(self, style_code):
+    #     """Вспомогательный метод для красивых названий"""
+    #     names = {
+    #         'facts': 'Факты',
+    #         'sensational': 'Сенсация',
+    #         'mystery': 'Мистика',
+    #         'educational': 'Образование',
+    #     }
+    #     return names.get(style_code, style_code.capitalize())
 
 
 class VideoProjectEditForm(forms.ModelForm):

@@ -30,7 +30,7 @@ function initProgressTracker(streamUrl, taskId, redirectUrl) {
         // Если нет — медленно ползем сами (симуляция работы), но не выше 95%
         if (currentPercent < targetPercent) {
             currentPercent += 1.0; // Быстрый догон реальных данных
-        } else if (currentPercent < 75) {
+        } else if (currentPercent < 70) {
             currentPercent += 0.05; // Очень медленное "ожидание" ответа ИИ
         }
 

@@ -114,27 +114,47 @@ def start_generation_api(request):
                         print(
                             f">>> [DEBUG] Контекст (факты): {additional_context[:100]}...")
 
-                        # --- ПРОМПТ СТАТЬИ ---
+                        # --- ПРОМПТ СТАТЬИ (ИСПРАВЛЕНО: template_content + .render()) ---
+
+                        selected_prompt_obj = None
+                        prompt_name = ""
+
                         if prompt_code == 'random':
                             selected_prompt_obj = ArticlePrompt.objects.filter(
                                 is_active=True).order_by('?').first()
-                            prompt_name = "Случайный стиль"
+                            prompt_name = f"Случайный ({selected_prompt_obj.code_name if selected_prompt_obj else 'None'})"
                         else:
                             selected_prompt_obj = ArticlePrompt.objects.filter(
                                 code_name=prompt_code, is_active=True).first()
-                            prompt_name = prompt_code or "Базовый"
+                            prompt_name = prompt_code
 
                         if selected_prompt_obj:
-                            en_prompt_text = render_article_prompt(
-                                style_code=selected_prompt_obj.code_name,
-                                topic=ai_topic_en,          # Используем английский вариант
-                                language="English",
-                                banned_topics="",
-                                old_context=additional_context  # Передаем факты и вопросы
-                            )
+                            print(
+                                f"✅ [DEBUG] НАЙДЕН ПРОМПТ: {selected_prompt_obj.code_name}")
+
+                            # Используем встроенный метод .render() из базового класса BasePrompt
+                            # Он сам подставит topic, language и т.д. в шаблон template_content
+                            try:
+                                en_prompt_text = selected_prompt_obj.render(
+                                    topic=ai_topic_en,
+                                    language="English",
+                                    banned_topics="",
+                                    old_context=additional_context
+                                )
+                                print(
+                                    f"📝 [DEBUG] Промпт успешно отрендерен. Длина: {len(en_prompt_text)}")
+                                print(
+                                    f"📝 [DEBUG] Начало текста: {en_prompt_text[:60]}...")
+
+                            except Exception as render_err:
+                                print(f"⚠️ Ошибка рендеринга: {render_err}")
+                                # Фоллбэк: просто берем сырой текст, если форматирование сломалось
+                                en_prompt_text = selected_prompt_obj.template_content
                         else:
+                            print(
+                                f"⚠️ [DEBUG] Промпт '{prompt_code}' НЕ НАЙДЕН!")
                             en_prompt_text = f"Write an article about {ai_topic_en}. Context: {additional_context}"
-                            prompt_name = "Без шаблона"
+                            prompt_name = "Заглушка (Default)"
 
                         update_progress(session_key, current_step,
                                         f"Шаблон: {prompt_name}")
@@ -148,10 +168,10 @@ def start_generation_api(request):
                             en_content_raw = generate_text(
                                 provider, final_system_message, max_tokens=3000)
 
-                            print(
-                                f">>> [DEBUG] === СЫРОЙ ОТВЕТ МОДЕЛИ (первые 1000 символов) ===")
-                            print(en_content_raw[:1000])
-                            print(f">>> [DEBUG] === КОНЕЦ СЫРОГО ОТВЕТА ===")
+                            # print(
+                            #     f">>> [DEBUG] === СЫРОЙ ОТВЕТ МОДЕЛИ (первые 1000 символов) ===")
+                            # print(en_content_raw[:1000])
+                            # print(f">>> [DEBUG] === КОНЕЦ СЫРОГО ОТВЕТА ===")
 
                             if "Topic unknown" in en_content_raw or "insufficiently studied" in en_content_raw:
                                 raise ValueError(
@@ -164,8 +184,8 @@ def start_generation_api(request):
                             en_data = parse_ai_json(en_content_raw)
 
                             if not en_data.get('content') or len(en_data['content']) < 50:
-                                print(
-                                    f">>> [DEBUG] Распарсенные данные: {en_data}")
+                                # print(
+                                # f">>> [DEBUG] Распарсенные данные: {en_data}")
                                 raise ValueError(
                                     f"Контент слишком короткий. Получено: {en_data.get('content', 'NONE')}")
 
@@ -394,62 +414,65 @@ def article_dashboard(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         selected_ids = request.POST.getlist('selected_articles')
-        
+
         if selected_ids:
             clusters = ArticleCluster.objects.filter(id__in=selected_ids)
-            
+
             if action == 'delete_selected':
                 count, _ = clusters.delete()
                 messages.success(request, f"✅ Удалено {count} статей.")
-                
+
             elif action == 'change_status':
                 new_status = request.POST.get('new_status')
                 if new_status:
                     # Если выбрано "published", ставим True, иначе False
                     is_complete_val = (new_status == 'published')
                     clusters.update(is_complete=is_complete_val)
-                    
+
                     status_text = "Опубликовано" if is_complete_val else "В работе"
-                    messages.success(request, f"✅ Статус изменен на «{status_text}» для {clusters.count()} статей.")
+                    messages.success(
+                        request, f"✅ Статус изменен на «{status_text}» для {clusters.count()} статей.")
                 else:
                     messages.warning(request, "⚠️ Не выбран новый статус.")
         else:
             messages.warning(request, "⚠️ Вы не выбрали ни одной статьи.")
-            
+
         return redirect('article:dashboard')
 
     # --- ПОДГОТОВКА ДАННЫХ ---
     clusters_qs = ArticleCluster.objects.all().order_by('-created_at')
-    
-    print(f"🔍 [DEBUG] Найдено кластеров в БД: {clusters_qs.count()}")
-    
+
+    # print(f"🔍 [DEBUG] Найдено кластеров в БД: {clusters_qs.count()}")
+
     prepared_clusters = []
-    
+
     for cluster in clusters_qs:
         try:
             # Получаем переводы. Используем list(), чтобы сразу выполнить запрос
             translations = list(cluster.translations.all())
-            
+
             main_trans = None
             for t in translations:
                 if t.language.code == 'ru':
                     main_trans = t
                     break
-            
+
             if not main_trans and translations:
                 main_trans = translations[0]
-                
+
             prepared_clusters.append({
                 'instance': cluster,
                 'translations': translations,
                 'main_trans': main_trans,
             })
-            print(f"   ✅ Обработан кластер #{cluster.id}: {len(translations)} переводов, заголовок: {main_trans.title if main_trans else 'НЕТ'}")
-            
+            # print(
+            #     f"   ✅ Обработан кластер #{cluster.id}: {len(translations)} переводов, заголовок: {main_trans.title if main_trans else 'НЕТ'}")
+
         except Exception as e:
             print(f"   ❌ Ошибка при обработке кластера #{cluster.id}: {e}")
 
-    print(f"🚀 [DEBUG] Итоговый список для шаблона: {len(prepared_clusters)} элементов.")
+    # print(
+    #     f"🚀 [DEBUG] Итоговый список для шаблона: {len(prepared_clusters)} элементов.")
 
     stats = {
         'total': clusters_qs.count(),
@@ -461,91 +484,43 @@ def article_dashboard(request):
         'articles': prepared_clusters,
         'stats': stats,
     })
-# def article_dashboard(request):
-#     if request.method == 'POST':
-#         action = request.POST.get('action')
-#         if action == 'delete_selected':
-#             selected_ids = request.POST.getlist('selected_articles')
-#             if selected_ids:
-#                 count, _ = ArticleCluster.objects.filter(id__in=selected_ids).delete()
-#                 messages.success(request, f"✅ Удалено {count} статей.")
-#             else:
-#                 messages.warning(request, "⚠️ Вы не выбрали ни одной статьи.")
-#             return redirect('article:dashboard')
-#     # --- ПОДГОТОВКА ДАННЫХ ---
-#     # 1. Получаем все кластеры
-#     clusters_qs = ArticleCluster.objects.all().order_by('-created_at')
-
-#     prepared_clusters = []
-    
-#     for cluster in clusters_qs:
-#         # Получаем все переводы для этого кластера (сразу в список)
-#         translations = list(cluster.translations.all())
-        
-#         # Ищем русский перевод или берем первый попавшийся
-#         main_trans = None
-#         for t in translations:
-#             if t.language.code == 'ru':
-#                 main_trans = t
-#                 break
-        
-#         # Если русского нет, берем первый из списка
-#         if not main_trans and translations:
-#             main_trans = translations[0]
-            
-#         prepared_clusters.append({
-#             'instance': cluster,
-#             'translations': translations,      # Готовый список переводов
-#             'main_trans': main_trans,          # Главный перевод (RU или первый)
-#             'has_ru': main_trans and main_trans.language.code == 'ru'
-#         })
-
-#     stats = {
-#         'total': clusters_qs.count(),
-#         'draft': clusters_qs.filter(is_complete=False).count(),
-#         'published': clusters_qs.filter(is_complete=True).count(),
-#     }
-
-#     return render(request, 'article/dashboard.html', {'clusters': prepared_clusters, 'stats': stats})
 
 
 def article_editor(request, pk):
-    """Страница редактирования статьи и её переводов"""
-    main_article = get_object_or_404(Article, pk=pk)
-    translations_qs = ArticleTranslation.objects.filter(
-        title=main_article.title).select_related('language')
-    trans_dict = {t.language.code: t for t in translations_qs}
+    cluster = get_object_or_404(ArticleCluster, id=pk)
+    translations = cluster.translations.all().order_by('language__order')
 
+    # Безопасное получение основного перевода
+    main_trans = translations.filter(language__code='ru').first()
+    if not main_trans and translations.exists():
+        main_trans = translations.first()
+
+    # Обработка POST
     if request.method == 'POST':
-        main_article.title = request.POST.get('title_en', main_article.title)
-        main_article.content = request.POST.get(
-            'content_en', main_article.content)
-        main_article.description = request.POST.get(
-            'description_en', main_article.description)
-        main_article.hashtags = request.POST.get(
-            'hashtags_en', main_article.hashtags)
-        main_article.save()
+        action = request.POST.get('action')
+        if action == 'save_translation':
+            trans_id = request.POST.get('translation_id')
+            if trans_id:
+                trans = get_object_or_404(
+                    ArticleTranslation, id=trans_id, cluster=cluster)
+                trans.title = request.POST.get('title')
+                trans.content = request.POST.get('content')
+                trans.description = request.POST.get('description')
+                trans.hashtags = request.POST.get('hashtags')
+                trans.save()
+                messages.success(request, "Сохранено!")
+                return redirect('article:article_editor', pk=cluster.id)
 
-        langs_to_check = ['ru', 'de', 'fr', 'es']
-        for lang_code in langs_to_check:
-            if lang_code in trans_dict:
-                t_obj = trans_dict[lang_code]
-                t_obj.title = request.POST.get(
-                    f'title_{lang_code}', t_obj.title)
-                t_obj.content = request.POST.get(
-                    f'content_{lang_code}', t_obj.content)
-                t_obj.description = request.POST.get(
-                    f'description_{lang_code}', t_obj.description)
-                t_obj.hashtags = request.POST.get(
-                    f'hashtags_{lang_code}', t_obj.hashtags)
-                t_obj.save()
-
-        messages.success(
-            request, f"✅ Статья '{main_article.title}' успешно обновлена!")
-        return redirect('article:dashboard')
+        elif action == 'update_cluster_status':
+            cluster.is_complete = request.POST.get('is_complete') == 'on'
+            cluster.save()
+            messages.success(request, "Статус обновлен!")
+            return redirect('article:article_editor', pk=cluster.id)
 
     context = {
-        'article': main_article,
-        'translations': trans_dict,
+        'cluster': cluster,
+        'translations': translations,
+        'main_trans': main_trans,
+        # 'all_languages': Language.objects.filter(is_active=True), # Можно убрать, если не используем для добавления
     }
-    return render(request, 'article/edit.html', context)
+    return render(request, 'article/editor.html', context)

@@ -1,9 +1,11 @@
 import json
 import re
+import traceback
 from datetime import timedelta
 from django.utils import timezone
 from .models import VideoProject
 from ai_inspector.services import generate_text
+from prompts.services import get_random_idea_prompt
 
 # ПРОВЕРКА ИМПОРТА НА УРОВНЕ МОДУЛЯ
 try:
@@ -137,19 +139,32 @@ def generate_unique_ideas(provider_name='huggingface', count=3, topic="Исто�
             # Попытка получить промпт из БД
             if prompts_enabled:
                 try:
+                    if idea_style == 'random':
+                        obj = get_random_idea_prompt()  # 1. Добавили скобки () для вызова
+                        if obj:                         # 2. Проверка: если промпт найден
+                            idea_style = obj.code_name  # Берем код
+                            print(f"✅ Случайный промпт найден: '{idea_style}'")
+                        else:
+                            # Если нет — сразу в fallback
+                            raise ValueError("Нет активных промптов")
+
                     system_prompt = render_idea_prompt(
                         style_code=idea_style,
                         topic=current_topic_string,
                         banned_topics=banned_context,
                         old_context=old_ideas_context,
-                        language="Russian"
+                        language="English"
                     )
+                    print(f"✅ Промпт отрендерен для стиля '{idea_style}'")
+
                 except Exception as e:
                     print(f"⚠️ Prompt DB error: {e}. Switching to fallback.")
                     prompts_enabled = False
+                    system_prompt = None  # Важно обнулить, чтобы сработал блок ниже
 
             # Fallback промпт, если БД недоступна
             if not system_prompt:
+                print("⚠️ Используем Дефолтный промпт.")
                 system_prompt = f"""You are an expert Creative Director.
 INPUT CATEGORY: "{current_topic_string}".
 TASK: Invent a SPECIFIC story within this category.
@@ -157,8 +172,7 @@ Return ONLY a valid JSON object. No extra text. No comments.
 Keys:
 'topic_en' (Category in English),
 'topic_ru' (Category in Russian),
-'angle_en' (Catchy Title in English, clean string),
-'angle_ru' (Catchy Title in Russian),
+'angle_en' (Catchy Title in Russian, clean string),
 'summary' (in Russian),
 'facts' (list of 3 strings in Russian),
 'questions' (list of 2 strings in Russian).

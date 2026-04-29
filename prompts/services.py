@@ -1,6 +1,14 @@
 from .models import IdeaPrompt, StructurePlanPrompt, ArticlePrompt
 import random
 
+import random
+from .models import IdeaPrompt
+
+
+def get_random_idea_prompt():
+    """Получает случайный активный промпт для идеи."""
+    return IdeaPrompt.objects.filter(is_active=True).order_by("?").first()
+
 
 def get_idea_prompt(style_code=None):
     """
@@ -18,22 +26,12 @@ def get_idea_prompt(style_code=None):
 
     # Если указан конкретный стиль
     if style_code:
-        qs = qs.filter(style=style_code)
+        qs = qs.filter(code_name=style_code)
         if qs.exists():
             # Если промптов этого стиля несколько, тоже берем случайный для разнообразия
             return random.choice(list(qs))
 
     # Фоллбэк: если стиль не найден, берем любой активный
-    return qs.first()
-
-
-def get_idea_prompt(style_code=None):
-    """Получает активный промпт для идей. Можно фильтровать по стилю."""
-    qs = IdeaPrompt.objects.filter(is_active=True)
-    if style_code:
-        qs = qs.filter(style=style_code)
-
-    # Берем первый попавшийся (или можно добавить поле is_default)
     return qs.first()
 
 

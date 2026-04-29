@@ -81,7 +81,7 @@ def generate_idea_view(request):
                                       100) if total > 0 else 0
 
                         # ⚠️ ограничим до 95%, чтобы финал был плавный
-                        percent = min(percent, 95)
+                        percent = min(percent, 89)
 
                         progress_data = {
                             'current': current,
@@ -251,25 +251,26 @@ def dashboard(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         selected_ids = request.POST.getlist('selected_ideas')
-        
+
         if selected_ids:
             ideas = VideoProject.objects.filter(id__in=selected_ids)
-            
+
             if action == 'delete_selected':
                 count, _ = ideas.delete()
                 messages.success(request, f"✅ Удалено {count} идей.")
-                
+
             elif action == 'change_status':
                 new_status = request.POST.get('new_status')
                 if new_status:
                     # Обновляем статус у всех выбранных идей
                     ideas.update(status=new_status)
-                    messages.success(request, f"✅ Статус изменен на «{new_status}» для {ideas.count()} идей.")
+                    messages.success(
+                        request, f"✅ Статус изменен на «{new_status}» для {ideas.count()} идей.")
                 else:
                     messages.warning(request, "⚠️ Не выбран новый статус.")
         else:
             messages.warning(request, "⚠️ Вы не выбрали ни одной идеи.")
-            
+
         return redirect('topics:dashboard')
 
     # Статистика (без изменений)
@@ -279,10 +280,10 @@ def dashboard(request):
         'pending': VideoProject.objects.filter(status='pending').count(),
         'done': VideoProject.objects.filter(status='completed').count(),
     }
-    
+
     # Список последних идей (без изменений)
     ideas = VideoProject.objects.all().order_by('-created_at')[:50]
-    
+
     # --- НАСТРОЙКА ПАГИНАЦИИ (без изменений) ---
     page_number = request.GET.get('page', 1)
     paginator = Paginator(ideas, 20)
@@ -300,6 +301,7 @@ def dashboard(request):
         'page_obj': ideas_page
     }
     return render(request, 'topics/dashboard.html', context)
+
 
 def project_edit(request, pk):
     # Получаем проект или 404
