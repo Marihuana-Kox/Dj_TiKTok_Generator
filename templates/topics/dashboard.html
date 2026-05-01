@@ -134,50 +134,50 @@
 </form>
 {% include 'topics/includes/pagination.html' %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const selectAll = document.getElementById('select-all');
-        const checkboxes = document.querySelectorAll('.idea-checkbox');
-        const rows = document.querySelectorAll('.idea-row');
+    // document.addEventListener('DOMContentLoaded', function() {
+    //     const selectAll = document.getElementById('select-all');
+    //     const checkboxes = document.querySelectorAll('.idea-checkbox');
+    //     const rows = document.querySelectorAll('.idea-row');
 
-        // Логика "Выбрать все"
-        if (selectAll) {
-            selectAll.addEventListener('change', function() {
-                checkboxes.forEach((cb, index) => {
-                    cb.checked = selectAll.checked;
-                    // Подсветка строки
-                    if(rows[index]) {
-                        rows[index].style.background = selectAll.checked ? 'rgba(59, 130, 246, 0.1)' : 'transparent';
-                    }
-                });
-            });
-        }
+    //     // Логика "Выбрать все"
+    //     if (selectAll) {
+    //         selectAll.addEventListener('change', function() {
+    //             checkboxes.forEach((cb, index) => {
+    //                 cb.checked = selectAll.checked;
+    //                 // Подсветка строки
+    //                 if(rows[index]) {
+    //                     rows[index].style.background = selectAll.checked ? 'rgba(59, 130, 246, 0.1)' : 'transparent';
+    //                 }
+    //             });
+    //         });
+    //     }
 
-        // Логика одиночного выбора
-        checkboxes.forEach((cb, index) => {
-            cb.addEventListener('change', function() {
-                // Подсветка конкретной строки
-                if(rows[index]) {
-                    rows[index].style.background = cb.checked ? 'rgba(59, 130, 246, 0.1)' : 'transparent';
-                }
+    //     // Логика одиночного выбора
+    //     checkboxes.forEach((cb, index) => {
+    //         cb.addEventListener('change', function() {
+    //             // Подсветка конкретной строки
+    //             if(rows[index]) {
+    //                 rows[index].style.background = cb.checked ? 'rgba(59, 130, 246, 0.1)' : 'transparent';
+    //             }
                 
-                // Снять галочку с "Выбрать все", если отменили выбор
-                if (!cb.checked && selectAll) {
-                    selectAll.checked = false;
-                }
-            });
-        });
-         // Логика одиночного выбора (ПОДСВЕЧКА ПРИ ПЕРВОМ КЛИКЕ)
-         checkboxes.forEach((cb, index) => {
-            cb.addEventListener('change', function() {
-                // Сразу красим строку
-                toggleHighlight(rows[index], cb.checked);
+    //             // Снять галочку с "Выбрать все", если отменили выбор
+    //             if (!cb.checked && selectAll) {
+    //                 selectAll.checked = false;
+    //             }
+    //         });
+    //     });
+    //      // Логика одиночного выбора (ПОДСВЕЧКА ПРИ ПЕРВОМ КЛИКЕ)
+    //      checkboxes.forEach((cb, index) => {
+    //         cb.addEventListener('change', function() {
+    //             // Сразу красим строку
+    //             toggleHighlight(rows[index], cb.checked);
                 
-                // Снимаем галочку с "Выбрать все", если отменили выбор
-                if (!cb.checked && selectAll) {
-                    selectAll.checked = false;
-                }
-            });
-        });
-    });
+    //             // Снимаем галочку с "Выбрать все", если отменили выбор
+    //             if (!cb.checked && selectAll) {
+    //                 selectAll.checked = false;
+    //             }
+    //         });
+    //     });
+    // });
 </script>
 {% endblock %}

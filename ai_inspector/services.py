@@ -1,5 +1,6 @@
 import json
 from django.conf import settings
+import requests
 from ai_inspector.models import AIProvider
 
 # Импорты клиентов
@@ -14,8 +15,6 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-
-# Можно добавить Google Gemini, Anthropic и т.д. по аналогии
 
 
 def generate_text(provider_name, prompt, max_tokens=2500, temperature=0.7):

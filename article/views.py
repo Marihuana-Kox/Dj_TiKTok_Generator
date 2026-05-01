@@ -1,4 +1,5 @@
 import json
+import re
 import time
 import threading
 from django.utils import timezone
@@ -7,14 +8,14 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib import messages
 
 # Импорт моделей
-from prompts.models import ArticlePrompt, StructurePlanPrompt
+from prompts.models import ArticlePrompt, SystemInstruction
 from topics.models import VideoProject
 from article.models import Article, ArticleCluster, ArticleTranslation, ImagePrompt, Language, SceneType
 from article.forms import ArticleGenerationForm
 
 # Импорт сервисов
 from ai_inspector.services import generate_text
-from prompts.services import render_article_prompt, render_structure_prompt
+from prompts.services import get_system_instruction, render_article_prompt, render_system_instruction
 
 # Глобальное хранилище прогресса
 ARTICLE_GEN_PROGRESS = {}
@@ -111,6 +112,7 @@ def start_generation_api(request):
                             additional_context = "\n".join(lines[1:]).strip()
 
                         print(f">>> [DEBUG] Тема для AI (EN): {ai_topic_en}")
+                        print(additional_context)
                         print(
                             f">>> [DEBUG] Контекст (факты): {additional_context[:100]}...")
 
@@ -168,10 +170,10 @@ def start_generation_api(request):
                             en_content_raw = generate_text(
                                 provider, final_system_message, max_tokens=3000)
 
-                            # print(
-                            #     f">>> [DEBUG] === СЫРОЙ ОТВЕТ МОДЕЛИ (первые 1000 символов) ===")
-                            # print(en_content_raw[:1000])
-                            # print(f">>> [DEBUG] === КОНЕЦ СЫРОГО ОТВЕТА ===")
+                            print(
+                                f">>> [DEBUG] === СЫРОЙ ОТВЕТ МОДЕЛИ (первые 500 символов) ===")
+                            print(en_content_raw[:500])
+                            print(f">>> [DEBUG] === КОНЕЦ СЫРОГО ОТВЕТА ===")
 
                             if "Topic unknown" in en_content_raw or "insufficiently studied" in en_content_raw:
                                 raise ValueError(
@@ -184,8 +186,8 @@ def start_generation_api(request):
                             en_data = parse_ai_json(en_content_raw)
 
                             if not en_data.get('content') or len(en_data['content']) < 50:
-                                # print(
-                                # f">>> [DEBUG] Распарсенные данные: {en_data}")
+                                print(
+                                    f">>> [DEBUG] Распарсенные данные: {en_data}")
                                 raise ValueError(
                                     f"Контент слишком короткий. Получено: {en_data.get('content', 'NONE')}")
 
@@ -228,26 +230,47 @@ def start_generation_api(request):
                                 update_progress(
                                     session_key, current_step, f"Перевод на {lang_obj.name}...")
 
-                                trans_prompt = f"Translate to {lang_obj.name}. Return JSON: title, content, description, hashtags.\nOriginal:\n{en_data['content']}"
+                                # --- ПРОВЕРКА: Есть ли данные для перевода? ---
+                                if not en_data or not en_data.get('content'):
+                                    raise ValueError(
+                                        "Нет данных статьи (en_data) для перевода!")
+
+                                # --- ВЫЗОВ СЕРВИСА ПЕРЕВОДА ---
+                                from prompts.services import get_system_instruction
+
+                                # Создаем контекст ПЕРЕД вызовом функции
+                                context = {
+                                    'target_lang': lang_obj.name,
+                                    'article_content': f"Title: {en_data['title']}\n\nContent:\n{en_data['content']}"
+                                }
+
+                                # Получаем промпт из БД
+                                trans_prompt = get_system_instruction(
+                                    'translation_strict', context)
+
+                                # Генерируем перевод
                                 trans_raw = generate_text(
                                     provider, trans_prompt, max_tokens=2500)
 
+                                # Парсим ответ
                                 trans_data = parse_ai_json(trans_raw)
 
+                                # Если парсинг не удался, используем оригинал
                                 if not trans_data.get('content'):
                                     print(
-                                        f">>> [THREAD] ⚠️ Парсинг перевода {code} не удался, используем EN текст.")
+                                        f"⚠️ Парсинг перевода {code} не удался, используем EN текст.")
                                     trans_data = {
-                                        'title': main_article.title,
-                                        'content': main_article.content,
-                                        'description': main_article.description,
-                                        'hashtags': main_article.hashtags
+                                        'title': en_data['title'],
+                                        'content': en_data['content'],
+                                        'description': en_data.get('description', ''),
+                                        'hashtags': en_data.get('hashtags', '')
                                     }
 
+                                # Сохраняем перевод
                                 ArticleTranslation.objects.create(
                                     cluster=cluster, language=lang_obj,
                                     title=trans_data.get(
-                                        'title', main_article.title),
+                                        'title', en_data['title']),
                                     content=trans_data.get('content', ''),
                                     description=trans_data.get(
                                         'description', ''),
@@ -260,6 +283,8 @@ def start_generation_api(request):
                             except Exception as trans_err:
                                 print(
                                     f">>> [THREAD] ❌ Ошибка перевода {code}: {trans_err}. Пропускаем язык.")
+                                import traceback
+                                traceback.print_exc()
                                 continue
 
                         # 4. Промпты для картинок
@@ -395,17 +420,65 @@ def generation_stream(request):
     return response
 
 
+def clean_json_string(text):
+    """
+    Очищает текст от символов, ломающих JSON:
+    1. Заменяет умные кавычки на обычные.
+    2. Экранирует двойные кавычки внутри строки.
+    3. Заменяет реальные переносы строк на \n.
+    """
+    if not text:
+        return ""
+
+    # 1. Замена умных кавычек и апострофов
+    text = text.replace('"', '"')   # Левая двойная
+    text = text.replace('"', '"')   # Правая двойная
+    text = text.replace(''', "'")   # Левая одинарная
+    text = text.replace(''', "'")   # Правая одинарная (апостроф)
+    text = text.replace('`', "'")   # Гравис
+
+    # ВАЖНО: Мы НЕ делаем replace('\n', '\\n') здесь,
+    # так как это сломает структуру JSON (переносы между полями).
+    # Если модель вставила реальный перенос строки ВНУТРИ строкового значения,
+    # это нарушает стандарт JSON, но многие парсеры это прощают.
+    # Если будет ошибка, мы попробуем другой метод ниже.
+
+    return text
+
+
 def parse_ai_json(text):
+    if not text:
+        return {}
+
+    # 1. Чистим от маркдауна (если есть)
+    text = text.replace("```json", "").replace("```", "").strip()
+
+    # 2. НАХОДИМ JSON (от первой { до последней })
+    start = text.find('{')
+    end = text.rfind('}')
+
+    if start == -1 or end == -1:
+        print("❌ Нет JSON скобок")
+        return {}
+
+    # Вырезаем кусок
+    json_str = text[start: end+1]
+
+    # 3. ГЛАВНЫЙ ТРЮК: Заменяем ВСЕ реальные переносы строк на пробелы.
+    # Да, текст статьи станет одной длинной строкой без абзацев,
+    # НО это гарантированно спасет от ошибки "Invalid control character".
+    # Абзацы можно восстановить потом заменой двойных пробелов, если нужно,
+    # но для начала главное — чтобы работало.
+    json_str = json_str.replace('\n', ' ').replace('\r', ' ')
+
+    # 4. Чистим кавычки (на всякий случай)
+    json_str = json_str.replace('"', '"').replace('"', '"')
+
     try:
-        clean_text = text.strip()
-        if clean_text.startswith("```json"):
-            clean_text = clean_text[7:]
-        if clean_text.endswith("```"):
-            clean_text = clean_text[:-3]
-        clean_text = clean_text.strip()
-        return json.loads(clean_text)
+        return json.loads(json_str)
     except Exception as e:
-        print(f"JSON Parse Error: {e}")
+        print(f"❌ Ошибка JSON: {e}")
+        # Если не вышло — возвращаем пустоту, чтобы код не падал
         return {}
 
 

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import IdeaPrompt, StructurePlanPrompt, ArticlePrompt
+from .models import IdeaPrompt, SystemInstruction, ArticlePrompt
 
 
 @admin.register(IdeaPrompt)
@@ -16,14 +16,24 @@ class IdeaPromptAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(StructurePlanPrompt)
-class StructurePlanPromptAdmin(admin.ModelAdmin):
-    list_display = ('name', 'code_name', 'version', 'is_active', 'created_at')
+@admin.register(SystemInstruction)
+class SystemInstructionAdmin(admin.ModelAdmin):
+    # Используем только существующие поля: name, code_name, is_active, version
+    list_display = ('name', 'code_name', 'is_active', 'version', 'created_at')
+
+    search_fields = ('name', 'code_name', 'template_content', 'description')
     list_filter = ('is_active',)
+
+    # Группировка полей в форме редактирования
     fieldsets = (
-        ('Инфо', {'fields': ('name', 'code_name', 'version', 'description')}),
-        ('Промпт (EN)', {'fields': ('template_content',)}),
-        ('Статус', {'fields': ('is_active',)}),
+        ("Основная информация", {
+            "fields": ("name", "code_name", "description", "is_active", "version")
+        }),
+        ("Шаблон промпта", {
+            "fields": ("template_content",),
+            # Можно свернуть в кучу, если текст длинный
+            "classes": ("collapse",)
+        }),
     )
 
 

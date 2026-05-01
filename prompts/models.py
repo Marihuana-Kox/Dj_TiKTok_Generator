@@ -53,14 +53,31 @@ class IdeaPrompt(BasePrompt):
 # --- ТАБЛИЦА 2: Промпты для ПЛАНА/СТРУКТУРЫ ---
 
 
-class StructurePlanPrompt(BasePrompt):
+class SystemInstruction(BasePrompt):
     """
-    Промпты для генерации скелета статьи: Хук, Интрига, Факты, Вывод.
-    Результатом будет JSON со структурой.
+    Универсальное хранилище для любых системных инструкций:
+    - Перевод
+    - Генерация идей
+    - Суммаризация
+    - И т.д.
+
+    Наследует от BasePrompt поля:
+    - name (Название для людей)
+    - code_name (Код для вызова в Python)
+    - description
+    - template_content
+    - is_active
+    - version
     """
+
+    def __str__(self):
+        # ИСПРАВЛЕНО: Используем self.name вместо несуществующего self.display_name
+        status = "✅" if self.is_active else "❌"
+        return f"{status} [{self.code_name}] {self.name}"
+
     class Meta:
-        verbose_name = "Промпт для Плана Статьи"
-        verbose_name_plural = "2. Промпты для Планов (Структура)"
+        verbose_name = "Системная Инструкция"
+        verbose_name_plural = "2. Системные Инструкции"
         ordering = ['-is_active', '-created_at']
 
 # --- ТАБЛИЦА 3: Промпты для СТАТЕЙ ---

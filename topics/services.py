@@ -36,6 +36,7 @@ def clean_ai_string(text):
 
     # 2. Список префиксов, которые часто лепит AI
     prefixes = [
+        "the translated title is:",
         "the translated title is:", "translation:", "english:",
         "here is the english translation:", "title:", "angle_en:",
         "the title in english is:", "translated as:", "i suggest:"
