@@ -235,13 +235,17 @@ def start_generation_api(request):
                                     raise ValueError(
                                         "Нет данных статьи (en_data) для перевода!")
 
-                                # --- ВЫЗОВ СЕРВИСА ПЕРЕВОДА ---
-                                from prompts.services import get_system_instruction
+                                # --- ПОДГОТОВКА ДАННЫХ ДЛЯ ПЕРЕВОДА ---
 
-                                # Создаем контекст ПЕРЕД вызовом функции
+                                # Берем оригинальный английский заголовок
+                                original_en_title = en_data.get(
+                                    'title', 'Unknown Topic')
+
                                 context = {
                                     'target_lang': lang_obj.name,
-                                    'article_content': f"Title: {en_data['title']}\n\nContent:\n{en_data['content']}"
+                                    'original_title': original_en_title,  # <-- Новая переменная для промпта
+                                    # <-- Только текст статьи, заголовок отдельно
+                                    'article_content': en_data['content']
                                 }
 
                                 # Получаем промпт из БД
