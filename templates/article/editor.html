@@ -44,7 +44,8 @@
     {% if translations %}
         <div class="grid grid-cols-1 gap-4">
             {% for trans in translations %}
-            <div class="card">
+            <div class="card" id="block-{{ trans.language.code }}" data-init-words="{{ trans.words }}" 
+     data-init-chars="{{ trans.chars }}">
                 <!-- Заголовок карточки -->
                 <div class="card-header flex flex-between items-center">
                     <div class="flex items-center gap-2">
@@ -95,9 +96,8 @@
                         
                         <div class="mb-3">
                             <label class="text-bold d-block">Текст</label>
-                            <textarea name="content" class="form-control" rows="8">{{ trans.content }}</textarea>
+                            <textarea name="content" id="id_content_{{ trans.instance.language.code }}" class="form-control" rows="10">{{ trans.content }}</textarea>
                         </div>
-                        
                         <div class="mb-3">
                             <label class="text-bold d-block">Хештеги</label>
                             <input type="text" name="hashtags" value="{{ trans.hashtags }}" class="form-control">
@@ -109,6 +109,7 @@
                         </div>
                     </form>
                 </div>
+                {% include 'article/includes/word_counter.html' %}
             </div>
             {% endfor %}
         </div>

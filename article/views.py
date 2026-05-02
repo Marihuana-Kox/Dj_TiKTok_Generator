@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib import messages
-
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 # Импорт моделей
 from prompts.models import ArticlePrompt, SystemInstruction
 from topics.models import VideoProject
@@ -381,6 +381,17 @@ def update_progress(session_key, current_step, message, status='running'):
             'log': ARTICLE_GEN_PROGRESS[session_key].get('log', []) + [f"{time.strftime('%H:%M:%S')}: {message}"]
         })
 
+# 1. ОТДЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ПОДСЧЕТА (в самом верху или рядом с другими хелперами)
+
+
+def count_text_stats(text):
+    """Просто считает слова и символы. Возвращает кортеж (слова, символы)."""
+    if not text:
+        return 0, 0
+    words = len(text.split())
+    chars = len(text)
+    return words, chars
+
 
 def generation_stream(request):
     def event_stream():
@@ -502,7 +513,6 @@ def article_dashboard(request):
             elif action == 'change_status':
                 new_status = request.POST.get('new_status')
                 if new_status:
-                    # Если выбрано "published", ставим True, иначе False
                     is_complete_val = (new_status == 'published')
                     clusters.update(is_complete=is_complete_val)
 
@@ -519,21 +529,47 @@ def article_dashboard(request):
     # --- ПОДГОТОВКА ДАННЫХ ---
     clusters_qs = ArticleCluster.objects.all().order_by('-created_at')
 
-    # print(f"🔍 [DEBUG] Найдено кластеров в БД: {clusters_qs.count()}")
+    # --- НАСТРОЙКА ПАГИНАЦИИ ---
+    page_number = request.GET.get('page', 1)
+    per_page = 20
+    paginator = Paginator(clusters_qs, per_page)
 
+    try:
+        articles_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        articles_page = paginator.page(1)
+    except EmptyPage:
+        articles_page = paginator.page(paginator.num_pages)
+
+    # --- РАСЧЕТ ОБРАТНОЙ НУМЕРАЦИИ ---
+    total_count = clusters_qs.count()
+
+    # Номер первой строки на этой странице (с конца)
+    start_num = total_count - ((articles_page.number - 1) * per_page)
+
+    # Номер последней строки
+    count_on_page = len(articles_page.object_list)
+    end_num = start_num - count_on_page + 1
+
+    if total_count == 0:
+        start_num = 0
+        end_num = 0
+
+    # Генерация списка номеров (например: 70, 69, ... 51)
+    row_numbers = range(start_num, end_num - 1, -1)
+
+    # --- ПОДГОТОВКА СПИСКА СТАТЕЙ (только для текущей страницы) ---
     prepared_clusters = []
 
-    for cluster in clusters_qs:
+    # Крутим цикл только по объектам на ТЕКУЩЕЙ странице
+    for cluster in articles_page.object_list:
         try:
-            # Получаем переводы. Используем list(), чтобы сразу выполнить запрос
             translations = list(cluster.translations.all())
-
             main_trans = None
             for t in translations:
                 if t.language.code == 'ru':
                     main_trans = t
                     break
-
             if not main_trans and translations:
                 main_trans = translations[0]
 
@@ -542,44 +578,47 @@ def article_dashboard(request):
                 'translations': translations,
                 'main_trans': main_trans,
             })
-            # print(
-            #     f"   ✅ Обработан кластер #{cluster.id}: {len(translations)} переводов, заголовок: {main_trans.title if main_trans else 'НЕТ'}")
-
         except Exception as e:
-            print(f"   ❌ Ошибка при обработке кластера #{cluster.id}: {e}")
+            print(f"Ошибка кластера #{cluster.id}: {e}")
 
-    # print(
-    #     f"🚀 [DEBUG] Итоговый список для шаблона: {len(prepared_clusters)} элементов.")
+    # Объединяем статьи с номерами строк
+    articles_with_numbers = zip(prepared_clusters, row_numbers)
 
     stats = {
-        'total': clusters_qs.count(),
+        'total': total_count,
         'draft': clusters_qs.filter(is_complete=False).count(),
         'published': clusters_qs.filter(is_complete=True).count(),
     }
-
-    return render(request, 'article/dashboard.html', {
-        'articles': prepared_clusters,
+    context = {
         'stats': stats,
-    })
+        'articles_with_numbers': articles_with_numbers,
+        'page_obj': articles_page,
+        'total_count': total_count,
+        'start_num': start_num,
+        'end_num': end_num,
+    }
+    return render(request, 'article/dashboard.html', context)
 
 
 def article_editor(request, pk):
     cluster = get_object_or_404(ArticleCluster, id=pk)
     translations = cluster.translations.all().order_by('language__order')
 
-    # Безопасное получение основного перевода
+    # основной перевод
     main_trans = translations.filter(language__code='ru').first()
-    if not main_trans and translations.exists():
+    if not main_trans:
         main_trans = translations.first()
 
-    # Обработка POST
+    # POST
     if request.method == 'POST':
         action = request.POST.get('action')
+
         if action == 'save_translation':
             trans_id = request.POST.get('translation_id')
             if trans_id:
                 trans = get_object_or_404(
-                    ArticleTranslation, id=trans_id, cluster=cluster)
+                    ArticleTranslation, id=trans_id, cluster=cluster
+                )
                 trans.title = request.POST.get('title')
                 trans.content = request.POST.get('content')
                 trans.description = request.POST.get('description')
@@ -594,10 +633,18 @@ def article_editor(request, pk):
             messages.success(request, "Статус обновлен!")
             return redirect('article:article_editor', pk=cluster.id)
 
+    # 👉 ВОТ КЛЮЧЕВОЕ: добавляем счетчики прямо в объекты
+    for t in translations:
+        text = t.content or ""
+        words, chars = count_text_stats(text)
+
+        t.word_count = words
+        t.char_count = chars
+
     context = {
         'cluster': cluster,
         'translations': translations,
         'main_trans': main_trans,
-        # 'all_languages': Language.objects.filter(is_active=True), # Можно убрать, если не используем для добавления
     }
+
     return render(request, 'article/editor.html', context)

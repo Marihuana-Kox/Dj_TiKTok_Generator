@@ -89,10 +89,10 @@
                 </tr>
             </thead>
             <tbody>
-                {% for idea in ideas %}
+                {% for idea, row_num in ideas_with_numbers %}
                 <tr class="idea-row">
                     <!-- 1. Порядковый номер (сквозная нумерация) -->
-                    <td class="text-muted">{{ forloop.counter }}</td>
+                    <td class="text-muted">{{ row_num }}</td>
                     
                     <!-- 2. Чекбокс выбора -->
                     <td style="text-align: center;">
@@ -100,7 +100,7 @@
                     </td>
                     
                     <!-- 3. ID (настоящий ID БД) -->
-                    <td class="text-muted" style="font-size: 10px;">{{ idea.id }}</td>
+                    <td class="text-muted"><---</td>
                     
                     <td class="text-bold">{{ idea.topic }}</td>
                     <td>{{ idea.angle|truncatechars:40 }}</td>

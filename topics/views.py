@@ -295,10 +295,35 @@ def dashboard(request):
     except EmptyPage:
         ideas_page = paginator.page(paginator.num_pages)
 
+    # --- ДОБАВЛЕНО: РАСЧЕТ ОБРАТНОЙ НУМЕРАЦИИ ---
+    total_count = ideas.count()  # Общее количество идей
+    per_page = 20                # Количество на странице
+
+    # Номер первой идеи на этой странице (с конца)
+    start_num = total_count - ((ideas_page.number - 1) * per_page)
+
+    # Номер последней идеи на этой странице
+    count_on_page = len(ideas_page.object_list)
+    end_num = start_num - count_on_page + 1
+
+    # Защита от нуля или отрицательных чисел
+    if total_count == 0:
+        start_num = 0
+        end_num = 0
+
+    # ГЕНЕРАЦИЯ СПИСКА НОМЕРОВ (70, 69, 68...)
+    row_numbers = range(start_num, end_num - 1, -1)
+
+    # СОЕДИНЕНИЕ ИДЕЙ С НОМЕРАМИ
+    ideas_with_numbers = zip(ideas_page.object_list, row_numbers)
+
     context = {
         'stats': stats,
-        'ideas': ideas_page,
-        'page_obj': ideas_page
+        'ideas_with_numbers': ideas_with_numbers,
+        'page_obj': ideas_page,
+        'total_count': total_count,
+        'start_num': start_num,
+        'end_num': end_num,
     }
     return render(request, 'topics/dashboard.html', context)
 

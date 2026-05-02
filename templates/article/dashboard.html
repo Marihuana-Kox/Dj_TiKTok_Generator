@@ -82,93 +82,94 @@
                 </tr>
             </thead>
             <tbody>
-                {% for item in articles %}
-                    {% with cluster=item.instance trans_list=item.translations main=item.main_trans %}
+                {% if articles_with_numbers %}
+                    {% for article, row_num in articles_with_numbers %} 
                     
-                    <tr class="idea-row">
-                        
-                        <!-- 1. НОМЕР -->
-                        <td class="text-muted">{{ forloop.revcounter }}</td>
-                        
-                        <!-- 2. ЧЕКБОКС -->
-                         {% if main %}
-                        <td class="text-center">
-                            <input type="checkbox" name="selected_articles" value="{{ cluster.id }}" class="idea-checkbox form-control checkbox-fix">
-                        </td>
-                        {% else %}
-                        <td class="text-center">
-                            <input type="checkbox" name="selected_articles" value="{{ cluster.id }}" checked class="idea-checkbox form-control checkbox-fix">
-                        </td>
-                         {% endif %}
-                        
-                        <!-- 3. ID -->
-                        <td class="text-muted text-small">#{{ cluster.id }}</td>
-                        
-                        <!-- 4. ЗАГОЛОВОК -->
-                        <td class="text-bold">
-                            {% if main %}
-                                {{ main.title|truncatechars:50 }}
+                        <tr class="idea-row">
+                            
+                            <!-- 1. НОМЕР -->
+                            <td class="text-muted">{{ row_num }}</td>
+                            
+                            <!-- 2. ЧЕКБОКС -->
+                            {% if article %}
+                            <td class="text-center">
+                                <input type="checkbox" name="selected_articles" value="{{ cluster.id }}" class="idea-checkbox form-control checkbox-fix">
+                            </td>
                             {% else %}
-                                <!-- Если заголовка нет -->
-                                <span class="text-danger">⚠️ Нет данных</span>
+                            <td class="text-center">
+                                <input type="checkbox" name="selected_articles" value="{{ cluster.id }}" checked class="idea-checkbox form-control checkbox-fix">
+                            </td>
                             {% endif %}
-                        </td>
+                            
+                            <!-- 3. ID -->
+                            <td class="text-muted text-small">{{ article.instance.id }}</td>
+                            
+                            <!-- 4. ЗАГОЛОВОК -->
+                            <td class="text-bold">
+                                {% if article %}
+                                    {{ article.main_trans.title|truncatechars:50 }}
+                                {% else %}
+                                    <!-- Если заголовка нет -->
+                                    <span class="text-danger">⚠️ Нет данных</span>
+                                {% endif %}
+                            </td>
 
-                        <!-- 5. ЯЗЫКИ -->
-                        <td class="languages-block">
-                            {% if trans_list %}
-                                <div class="flex gap-1" style="flex-wrap: wrap;">
-                                    {% for trans in trans_list %}
-                                        <span class="badge bg-light text-dark border" title="{{ trans.language.name }} ({{ trans.get_status_display }})">
-                                            {% if trans.language.code == 'ru' %}🇷🇺
-                                            {% elif trans.language.code == 'en' %}🇺🇸
-                                            {% elif trans.language.code == 'de' %}🇩
-                                            {% elif trans.language.code == 'fr' %}🇫
-                                            {% elif trans.language.code == 'es' %}🇪🇸
-                                            {% else %}🌐{% endif %}
-                                            {{ trans.language.code|upper }}
-                                            <!-- Индикатор статуса перевода -->
-                                            {% if trans.status == 'published' %}✅{% elif trans.status == 'draft' %}✏️{% endif %}
-                                        </span>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <!-- Если переводов нет -->
-                                <span class="badge text-white">❌ Пусто, Нет ни одного перевода</span>
-                                <!-- <small class="text-muted d-block mt-1">Нет ни одного перевода</small> -->
-                            {% endif %}
-                        </td>
+                            <!-- 5. ЯЗЫКИ -->
+                            <td class="languages-block">
+                               {% if article.translations %}
+                                    <div class="flex gap-1" style="flex-wrap: wrap;">
+                                        {% for trans in article.translations %}
+                                            <span class="badge bg-light text-dark border" title="{{ trans.language.name }} ({{ trans.get_status_display }})">
+                                                {% if trans.language.code == 'ru' %}🇷🇺
+                                                {% elif trans.language.code == 'en' %}🇺🇸
+                                                {% elif trans.language.code == 'de' %}🇩
+                                                {% elif trans.language.code == 'fr' %}🇫
+                                                {% elif trans.language.code == 'es' %}🇪🇸
+                                                {% else %}🌐{% endif %}
+                                                {{ trans.language.code|upper }}
+                                                <!-- Индикатор статуса перевода -->
+                                                {% if trans.status == 'published' %}✅{% elif trans.status == 'draft' %}✏️{% endif %}
+                                            </span>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <!-- Если переводов нет -->
+                                    <span class="badge text-white">❌ Пусто, Нет ни одного перевода</span>
+                                    <!-- <small class="text-muted d-block mt-1">Нет ни одного перевода</small> -->
+                                {% endif %}
+                            </td>
 
-                        <!-- 6. СТАТУС КЛАСТЕРА -->
-                        <td>
-                            {% if cluster.is_complete %}
-                                <span class="badge badge-done">Готово</span>
-                            {% elif main %}
-                                <span class="badge badge-work">В работе</span>
-                            {% else %}
-                                <span class="badge bg-danger">Нет данных</span>
-                            {% endif %}
-                        </td>
+                            <!-- 6. СТАТУС КЛАСТЕРА -->
+                            <td>
+                                {% if article.instance.is_complete %}
+                                    <span class="badge badge-done">Готово</span>
+                                {% elif article.main_trans %}
+                                    <span class="badge badge-work">В работе</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Нет данных</span>
+                                {% endif %}
+                            </td>
 
-                        <!-- 7. ДАТА -->
-                        <td class="text-muted">{{ cluster.updated_at|date:"d.m.Y H:i" }}</td>
+                            <!-- 7. ДАТА -->
+                            <td class="text-muted">{{ article.instance.updated_at|date:"d.m.Y H:i" }}</td>
 
-                        <!-- 8. ДЕЙСТВИЕ -->
-                        <td>
-                            {% if main %}
-                                <a href="{% url 'article:article_editor' cluster.id %}" class="text-bold link-blue">✏️ Ред.</a>
-                            {% else %}
-                                <span class="text-muted small">Недоступно</span>
-                                <!-- Можно добавить кнопку "Перезапустить" или "Удалить" -->
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endwith %}
-                {% empty %}
-                    <tr><td colspan="8" class="text-muted text-center">Список статей пуст</td></tr>
-                {% endfor %}
+                            <!-- 8. ДЕЙСТВИЕ -->
+                            <td>
+                                {% if article.instance %}
+                                    <a href="{% url 'article:article_editor' article.instance.id %}" class="text-bold link-blue">✏️ Ред.</a>
+                                {% else %}
+                                    <span class="text-muted small">Недоступно</span>
+                                    <!-- Можно добавить кнопку "Перезапустить" или "Удалить" -->
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr><td colspan="8" class="text-muted text-center">Список статей пуст</td></tr>
+                    {% endif %}
             </tbody>
         </table>
+        {% include 'topics/includes/pagination.html' %}
     </div>
 </form>
 
