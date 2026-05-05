@@ -1,0 +1,62 @@
+<!-- =======================================================================
+     МОДАЛЬНОЕ ОКНО ГЕНЕРАЦИИ ПРОМПТОВ
+     ======================================================================= -->
+{% if show_modal and project_data %}
+<div id="generation-modal" class="modal-overlay">
+    <div class="modal-content">
+        <!-- Кнопка закрытия (на случай зависания) -->
+        <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+        
+        <h3 class="modal-title">🚀 Генерация раскадровки</h3>
+        
+        <!-- Блок сводки параметров -->
+        <div class="modal-summary">
+            <ul>
+                <li>
+                    <span class="text-muted">Статья:</span>
+                    <span class="text-bold">{{ project_data.title|truncatechars:25 }}</span>
+                </li>
+                <li>
+                    <span class="text-muted">Режим:</span>
+                    <span class="text-bold">
+                        {% if project_data.mode == 'auto' %} 🤖 Авто {% else %} ⚙️ Ручной {% endif %}
+                    </span>
+                </li>
+                {% if project_data.mode == 'manual' %}
+                <li>
+                    <span class="text-muted">Стиль:</span>
+                    <span class="badge badge-work">{{ project_data.style }}</span>
+                </li>
+                <li>
+                    <span class="text-muted">Кадры:</span>
+                    <span class="text-bold">{{ project_data.count }} шт.</span>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <!-- Прогресс бар -->
+        <div class="modal-progress-block">
+            <div class="flex flex-between mb-2">
+                <span class="progress-title">Обработка сцен...</span>
+                <span class="progress-percent" id="progress-text">0%</span>
+            </div>
+            
+            <div class="progress-track">
+                <div class="progress-fill progress-bar-animated" id="progress-bar" style="width: 0%;"></div>
+            </div>
+            
+            <div class="progress-status text-muted mt-2" id="status-text">
+                Инициализация нейросети...
+            </div>
+        </div>
+
+        <!-- Кнопка завершения (скрыта пока идет процесс) -->
+        <div class="modal-actions mt-4 d-none" id="finish-action">
+            <a href="{% url 'image:project_edit' project_data.id %}" class="btn btn-success w-100">
+                ✏️ Перейти к редактированию промптов
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}

@@ -1,0 +1,54 @@
+<!-- Модалка подтверждения генерации -->
+<div id="generation-confirm-modal" class="modal-overlay d-none">
+    <div class="modal-content" style="max-width: 500px;">
+        <button type="button" class="modal-close" onclick="closeConfirmModal()">&times;</button>
+        <h3 class="modal-title">🎨 Генерация изображений</h3>
+        <div class="modal-body mt-3">
+            <div class="p-3 bg-light rounded mb-3">
+                <p class="mb-2"><strong>Промптов:</strong> <span id="modal-prompt-count">0</span></p>
+                <p class="mb-2"><strong>Провайдер:</strong> <span id="modal-provider">-</span></p>
+                <p class="mb-2"><strong>Размер:</strong> <span id="modal-size">-</span></p>
+                <p class="mb-0"><strong>Стиль:</strong> <span id="modal-style">-</span></p>
+            </div>
+            <div class="alert alert-warning text-small">⚠️ Не закрывайте страницу во время генерации.</div>
+        </div>
+        <div class="modal-actions mt-4 flex gap-2">
+            <button type="button" class="btn btn-outline flex-fill" onclick="closeConfirmModal()">Отмена</button>
+            <button type="button" class="btn btn-primary flex-fill" id="modal-confirm-btn">🚀 Начать</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка прогресса -->
+<div id="generation-progress-modal" class="modal-overlay d-none">
+    <div class="modal-content" style="max-width: 600px;">
+        <h3 class="modal-title">⏳ Генерация...</h3>
+        <div class="modal-body mt-3">
+            <div class="mb-4">
+                <div class="flex flex-between mb-2">
+                    <span class="text-bold">Прогресс:</span>
+                    <span class="text-bold text-blue" id="total-progress-percent">0%</span>
+                </div>
+                <div class="progress-track" style="height: 12px;">
+                    <div class="progress-fill" id="total-progress-bar" style="width: 0%;"></div>
+                </div>
+                <p class="text-muted text-small mt-2" id="total-progress-text">Подготовка...</p>
+            </div>
+            <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                <h5 class="text-small text-muted mb-2">Статус:</h5>
+                <div id="prompt-status-list"></div>
+            </div>
+        </div>
+        <div class="modal-actions mt-4">
+            <button type="button" class="btn btn-outline w-100" id="close-progress-btn" onclick="closeProgressModal()" disabled>Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast уведомление -->
+<div id="toast-notification" class="toast-notification d-none">
+    <div class="toast-content">
+        <span id="toast-icon">✅</span>
+        <span id="toast-message">Готово!</span>
+    </div>
+</div>

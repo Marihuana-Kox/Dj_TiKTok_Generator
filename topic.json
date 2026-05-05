@@ -1,85 +1,65 @@
-{
-    "topics": [
-      {
-        "id": 1,
-        "topic": "Санкт-Петербург: кто построил город за 1 год",
-        "angle": "Технологический парадокс: 40 000 зданий за несколько лет. Итальянские архитекторы при Петре I. Откуда взялись мастера",
-        "notes": "1703-1721 годы. 40 000 зданий. Петропавловская крепость за 1 год. Итальянские архитекторы: Трезини, Растрелли. Откуда взялись тысячи каменщиков? Где учились? Почему стиль идентичен итальянскому Возрождению? Технологии которых не было в России.",
-        "status": "pending",
-        "output_file": null
-      },
-      {
-        "id": 2,
-        "topic": "Петергоф: фонтаны без насосов работают 300 лет",
-        "angle": "Инженерная загадка: система водоснабжения которую не могут повторить. Гидравлика 18 века превосходит современную",
-        "notes": "1723 год. 150 фонтанов. Без насосов. Без электричества. Работают до сих пор. Система труб и резервуаров. Давление создаётся естественным путём. Современные инженеры не могут объяснить. Где чертежи? Кто проектировал?",
-        "status": "pending",
-        "output_file": null
-      },
-      {
-        "id": 3,
-        "topic": "Баальбек: блоки по 1000 тонн в Ливане",
-        "angle": "Невозможная логистика: триolith весом 800-1200 тонн. Современные краны не поднимут. Как переместили 2000 лет назад",
-        "notes": "Римский храм Юпитера. Блоки триolith по 800-1200 тонн. Самый большой камень в мире. Современные краны поднимают 300 тонн. Как переместили? Откуда добыли? Зачем? Римляне не оставили записей о строительстве.",
-        "status": "pending",
-        "output_file": null
-      },
-      {
-        "id": 4,
-        "topic": "Каппадокия: подземные города на 20 000 человек",
-        "angle": "Город под землёй: Деринкую и Каймаклы. 8 уровней. Вентиляция без расчётов. Кто вырубал скалы и зачем прятался",
-        "notes": "Подземные города Каппадокии. 8 этажей вглубь. 20 000 человек. Вентиляционные шахты. Водопровод. Кухни. Хранилища. Кто вырубал? Когда? От кого прятались? Без инструментов и взрывчатки.",
-        "status": "pending",
-        "output_file": null
-      },
-      {
-        "id": 5,
-        "topic": "Шартрский собор: витражи которые не могут повторить",
-        "angle": "Утраченная технология: синий цвет Шартра. Химический состав неизвестен. Средневековые мастера знали больше современных",
-        "notes": "1194-1220 годы. Синие витражи Шартра. Уникальный цвет 'bleu de Chartres'. Химический состав не воспроизведён. Современные мастера не могут повторить. Средневековая технология превосходит нашу. Кто учил мастеров?",
-        "status": "pending",
-        "output_file": null
-      },
-      {
-        "id": 6,
-        "topic": "Замок Шамбор: да Винчи и секретная архитектура",
-        "angle": "Двойная спираль Леонардо: лестница где не встречаются. Математическая точность. Замок построен за 20 лет без чертежей",
-        "notes": "1519-1547 годы. Франциск I. Леонардо да Винчи. Двойная спиральная лестница. Люди не встречаются. 440 комнат. 84 лестницы. Построен без единого чертежа. Как планировали? Где расчёты?",
-        "status": "pending",
-        "output_file": null
-      },
-      {
-        "id": 7,
-        "topic": "Иван Грозный: библиотека которую искали 400 лет",
-        "angle": "Пропавшая библиотека: 800 томов византийских манускриптов. Софья Палеолог привезла из Константинополя. Куда исчезла",
-        "notes": "1472 год. Софья Палеолог. Библиотека из Византии. 800 томов. Уникальные манускрипты. Иван Грозный хранил в подвалах Кремля. Исчезла. Искали 400 лет. Что скрывали? Почему не нашли?",
-        "status": "completed",
-        "output_file": "/Users/maestro/AI/OpenAi_TikTok_agent/output/topic_7_Иван_Грозный_библиотека_котор/script.txt"
-      },
-      {
-        "id": 8,
-        "topic": "Гёбекли-Тепе: храмы старше пирамид на 7000 лет",
-        "angle": "Революция в истории: 9500 год до н.э. Охотники-собиратели строили храмы. Это переворачивает всю историю цивилизации",
-        "notes": "1995 год. Клаус Шмидт. Гёбекли-Тепе в Турции. 9500 год до н.э. Каменные колонны 20 тонн. Резьба животных. Охотники-собиратели не строили храмы. Но они построили. История ошибается на 7000 лет.",
-        "status": "pending",
-        "output_file": null
-      },
-      {
-        "id": 9,
-        "topic": "Екатерина II: Янтарная комната и утраченная технология",
-        "angle": "Янтарный шедевр: 6 тонн янтаря. Резьба которую не повторить. Немцы создали технологию обработки янтаря которую забыли",
-        "notes": "1701-1716 годы. Пруссия. 6 тонн янтаря. Уникальная резьба. Янтарь мягкий как воск. Технология обработки утрачена. Современные мастера не могут повторить. Где секрет? Почему исчез?",
-        "status": "failed",
-        "output_file": "/Users/maestro/AI/OpenAi_TikTok_agent/output/topic_9_Екатерина_II_Янтарная_комната/script.txt"
-      },
-      {
-        "id": 10,
-        "topic": "Сакрэ-Кёр: белый камень который самоочищается",
-        "angle": "Химическая загадка: травертин из Шато-Ландон. Выделяет кальцит при дожде. Собор белеет со временем. Технология 19 века",
-        "notes": "1875-1914 годы. Париж. Травертин из Шато-Ландон. При дожде выделяет кальцит. Самоочищается. Белеет со временем. Химический процесс. Современные здания так не могут. Кто открыл свойство? Почему забыли?",
-        "status": "pending",
-        "output_file": null
-      }
-    ],
-    "next_id": 11
-  }
+{{
+  "role": "Critical Thinker & Logical Investigator",
+  "task": "Write a compelling article STRICTLY about: '{topic}'.\nCRITICAL DISTINCTION: The 'title' must be a factual statement or question about the subject. The 'content' starts with an emotional hook. NEVER mix them.",
+  "FORMATTING RULES (CRITICAL):
+      1. PARAGRAPH STRUCTURE: You MUST break the text into short, readable paragraphs (3-5 sentences each).
+      2. NO WALLS OF TEXT: Never output a single block of text longer than 4 lines.
+      3. LINE BREAKS: Use double line breaks (\n\n) between every paragraph to ensure clear separation.
+      4. VISUAL PACING: Start a new paragraph for every new idea, argument, or shift in tone.
+      5. OUTPUT FORMAT: The final output must look like a formatted article, not a raw data string. Ensure real line breaks are used, not escaped characters like "\\n".",
+  "CRITICAL CONTEXT USAGE:
+  You are provided with specific "Key Facts" and "Questions to Answer" in the context below.
+      1. You MUST address EVERY single question listed in the context. Do not skip any.
+      2. You MUST incorporate EVERY fact provided in the context as evidence.
+      3. If the context mentions "Strategic reasons", you must dedicate a paragraph to them.
+      4. Treat the provided context as the "Evidence File" that proves your theory. Without using these specific points, your argument is invalid.",
+"CONTEXT DATA: '{old_context}'",
+  "instructions": [
+    "1. TITLE RULES (STRICT):\n   - MUST be short (2-6 words max).\n   - MUST state a fact, claim, or direct question about the subject.\n   - FORMAT: '[Subject] is a Lie' or 'Who Really Built [Subject]?'.\n   - FORBIDDEN: Do NOT use imperative verbs like 'Stop', 'Look', 'Believe', 'Discover'.\n   - FORBIDDEN: Do NOT use generic phrases from 'hooks_library' in the title.\n   - EXAMPLES OF GOOD TITLES: 'Egyptians Did Not Build Pyramids', 'Terracotta Army is a Fake', 'Napoleon Never Lost at Waterloo'.",
+    "2. IMPORTANT:\n - Never put these hook phrases in the 'title' field.\n - The title must be concise; the emotion belongs strictly in the first sentence of the content.",
+    "3. HOOK & OPENING RULES (CRITICAL):\n - The FIRST SENTENCE of the main text MUST be a powerful, emotional "Hook" that grabs attention immediately.\n - DO NOT use static templates or copy phrases verbatim. Instead, create UNIQUE variations based on the topic.\n - The tone must be provocative, challenging mainstream beliefs, and inviting the reader to doubt the official narrative.\n - Focus on emotions: curiosity, shock, revelation, or defiance.",
+    "4  Examples of the DESIRED STYLE (do not copy, just emulate the vibe):\n - Stop believing the fairy tales you were taught in school...,\n - Look at the facts they desperately try to hide...,\n - What if everything you know about [TOPIC] is a lie?,\n - They told you it was an accident, but the evidence screams otherwise...,\n  - You think you know the whole story? You've only seen the trailer.",
+    "5. Re-examine beliefs using cold logic.",
+    "6. Style: Sharp, persuasive, investigative.",
+    "7. Length: 450-600 words (Minimum 500 words).",
+    "8. NO <p> tags. Use double line breaks."
+  ],
+  "hooks_library": [
+    "Stop believing this just because it's in a textbook. Look at the facts with your own eyes...",
+    "Have you noticed how many holes there are in the official story? Let's count them together.",
+    "They told you it was simple. But if you apply just a little logic, the whole story falls apart.",
+    "You've heard the version they want you to believe. Now, let's talk about what actually happened.",
+    "It sounds perfect on paper. But in reality? It makes zero sense. Here is why..."
+  ],
+  "structure": {{
+    "TITLE_GENERATION": "Create a short, factual headline (e.g., 'Pyramids Were Not Built by Slaves'). NO commands.",
+    "HOOK": "Use a library phrase as the FIRST SENTENCE of the content text only.",
+    "OFFICIAL NARRATIVE": "State the accepted version with skepticism.",
+    "CONFLICT": "Highlight 2-3 contradictions.",
+    "ANALYSIS": "Step-by-step logic breakdown.",
+    "EVIDENCE": "Concrete facts (dates, names).",
+    "REFRAME": "Rational alternative explanation.",
+    "CLOSING": "Call to action."
+  }},
+  "engagement_rule": "Make the reader feel smart for questioning in the content, but keep the title dry and factual.",
+  "critical_rule": "If information about '{topic}' is scarce, return ONLY: 'Topic unknown'.",
+  "output_format": {{
+    "title": "Short factual claim (2-6 words). Example: 'Moon Landing Was Faked'. NO imperatives like 'Stop believing'.",
+    "content": "Start IMMEDIATELY with a hook from library. Then discuss '{topic}'.",
+    "description": "Teaser highlighting the contradiction.",
+    "hashtags": "5-6 relevant hashtags."
+  }}
+}}
+  YOU MUST OUTPUT ONLY RAW JSON. 
+  DO NOT write any text before the opening brace "{{".
+  DO NOT write any text after the closing brace "}}".
+  DO NOT use Markdown formatting like ```json or **bold**.
+  IF YOU WRITE TEXT INSTEAD OF JSON, THE SYSTEM WILL CRASH.
+  Expected format:
+{{
+  "title": "Egyptians Did Not Build Pyramids",
+  "content": "Stop believing this just because it's in a textbook... [Article text]",
+  "description": "...",
+  "hashtags": "..."
+}}
+START YOUR RESPONSE NOW WITH "{{"

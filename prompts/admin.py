@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import IdeaPrompt, SystemInstruction, ArticlePrompt
+from .models import IdeaPrompt, ImagePromptTemplate, SystemInstruction, ArticlePrompt
 
 
 @admin.register(IdeaPrompt)
@@ -45,4 +45,31 @@ class ArticlePromptAdmin(admin.ModelAdmin):
         ('Инфо', {'fields': ('name', 'code_name', 'version', 'description')}),
         ('Промпт (EN)', {'fields': ('template_content',)}),
         ('Статус', {'fields': ('is_active',)}),
+    )
+
+
+@admin.register(ImagePromptTemplate)
+class ImagePromptTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code_name', 'preferred_format',
+                    'is_active', 'version')
+    list_filter = ('is_active', 'preferred_format')
+    search_fields = ('name', 'code_name', 'description')
+
+    # ГРУППИРОВКА В МЕНЮ
+    # Эта строка создает заголовок раздела в админке
+    verbose_name = "Шаблон для Изображений"
+    verbose_name_plural = "4. Промпты для Изображений"
+
+    # Дополнительные настройки отображения полей
+    fieldsets = (
+        ('Основное', {
+            'fields': ('name', 'code_name', 'description', 'is_active', 'version')
+        }),
+        ('Контент промпта', {
+            'fields': ('template_content',),
+            'description': 'Используй переменные: {scenes_count}, {style_keywords}, {aspect_ratio}, {source_text}'
+        }),
+        ('Настройки вывода', {
+            'fields': ('preferred_format',),
+        }),
     )

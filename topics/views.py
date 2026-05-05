@@ -81,7 +81,7 @@ def generate_idea_view(request):
                                       100) if total > 0 else 0
 
                         # ⚠️ ограничим до 95%, чтобы финал был плавный
-                        percent = min(percent, 89)
+                        percent = min(percent, 76)
 
                         progress_data = {
                             'current': current,
@@ -178,14 +178,14 @@ def generate_idea_view(request):
         return render(request, 'topics/generate.html', {'form': form})
 
 
-def generate_stream(request):
-    """SSE Endpoint для генерации идей"""
-    task_id = request.GET.get('task_id')
+# def generate_stream(request):
+#     """SSE Endpoint для генерации идей"""
+#     task_id = request.GET.get('task_id')
 
-    if not task_id:
-        def empty(
-        ): yield "data: {\"status\": \"error\", \"message\": \"No Task ID\"}\n\n"
-        return StreamingHttpResponse(empty(), content_type='text/event-stream')
+#     if not task_id:
+#         def empty(
+#         ): yield "data: {\"status\": \"error\", \"message\": \"No Task ID\"}\n\n"
+#         return StreamingHttpResponse(empty(), content_type='text/event-stream')
 
 
 def generate_stream(request):

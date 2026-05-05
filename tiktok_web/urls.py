@@ -23,13 +23,15 @@ from django.views.generic import RedirectView
 urlpatterns = [
     path(
         'admin/article/',
-        RedirectView.as_view(pattern_name='admin:article_article_changelist', permanent=False),
+        RedirectView.as_view(
+            pattern_name='admin:article_article_changelist', permanent=False),
     ),
     path('admin/', admin.site.urls),
-    path('', include('generator.urls')),  # Подключаем наши URL
+    path('', include('core.urls', namespace='core')),
+    path('generator/', include('generator.urls')),  # Подключаем наши URL
     path('config/', include('config.urls')),
     path('article/', include('article.urls')),
-    path('image/', include('image.urls')),
+    path('images/', include('image.urls')),
     path('topics/', include('topics.urls'))
 ]
 

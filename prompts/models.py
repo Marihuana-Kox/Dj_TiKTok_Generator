@@ -97,3 +97,43 @@ class ArticlePrompt(BasePrompt):
         verbose_name = "Промпт для Статьи"
         verbose_name_plural = "3. Промпты для Статей"
         ordering = ['-is_active', '-created_at']
+
+
+# --- ТАБЛИЦА 4: Промпты для ГЕНЕРАЦИИ ИЗОБРАЖЕНИЙ (Раскадровка) ---
+
+class ImagePromptTemplate(BasePrompt):
+    """
+    Шаблоны промптов для генерации раскадровки (сцен) на основе текста статьи.
+
+    Ожидаемые переменные в шаблоне (template_content):
+    - {scenes_count}: Количество сцен (число).
+    - {style_keywords}: Ключевые слова стиля (строка).
+    - {aspect_ratio}: Формат кадра (например, 16:9).
+    - {source_text}: Текст статьи для анализа.
+    - {language}: Язык описания сцен.
+
+    Пример кодового имени для поиска в коде: 'storyboard_generator_v1'
+    """
+
+    OUTPUT_FORMAT_CHOICES = [
+        ('json_list', 'JSON List ( [{"desc": "...", "prompt": "..."}] )'),
+        ('json_object', 'JSON Object ( {"scenes": [...]} )'),
+        ('markdown', 'Markdown Table'),
+    ]
+
+    preferred_format = models.CharField(
+        "Предпочитаемый формат ответа",
+        max_length=20,
+        choices=OUTPUT_FORMAT_CHOICES,
+        default='json_list',
+        help_text="Подсказка для модели, в каком формате вернуть данные."
+    )
+
+    class Meta:
+        verbose_name = "Шаблон для Изображений (Раскадровка)"
+        verbose_name_plural = "4. Промпты для Изображений"
+        ordering = ['-is_active', '-created_at']
+
+    def __str__(self):
+        status = "✅" if self.is_active else "❌"
+        return f"{status} [IMG] [{self.code_name}] {self.name}"

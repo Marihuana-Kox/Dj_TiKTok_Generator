@@ -1,0 +1,47 @@
+<!-- ПАГИНАЦИЯ -->
+{% if page_obj.has_other_pages %}
+<div class="flex flex-between items-center mt-3 pt-3" style="border-top: 1px solid var(--border-color);">
+    <div class="text-muted text-small">
+        Показано {{ page_obj.start_index }}–{{ page_obj.end_index }} из {{ paginator.count }}
+    </div>
+    
+    <div class="flex gap-1">
+        <!-- Первая страница -->
+        {% if page_obj.has_previous %}
+            <a href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+               class="btn btn-sm btn-outline">« Первая</a>
+        {% else %}
+            <span class="btn btn-sm btn-outline" style="opacity: 0.5; cursor: not-allowed;">« Первая</span>
+        {% endif %}
+        
+        <!-- Предыдущая -->
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+               class="btn btn-sm btn-outline">← Назад</a>
+        {% else %}
+            <span class="btn btn-sm btn-outline" style="opacity: 0.5; cursor: not-allowed;">← Назад</span>
+        {% endif %}
+        
+        <!-- Номер текущей страницы -->
+        <span class="btn btn-sm btn-primary">
+            {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
+        </span>
+        
+        <!-- Следующая -->
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+               class="btn btn-sm btn-outline">Вперёд →</a>
+        {% else %}
+            <span class="btn btn-sm btn-outline" style="opacity: 0.5; cursor: not-allowed;">Вперёд →</span>
+        {% endif %}
+        
+        <!-- Последняя страница -->
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+               class="btn btn-sm btn-outline">Последняя »</a>
+        {% else %}
+            <span class="btn btn-sm btn-outline" style="opacity: 0.5; cursor: not-allowed;">Последняя »</span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

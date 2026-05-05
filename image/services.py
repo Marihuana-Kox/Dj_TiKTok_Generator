@@ -1,52 +1,415 @@
+# image/services.py
 import os
 import json
-from openai import OpenAI  # Или Gemini
-from config.models import SystemConfig
+import re
+from django.db import transaction
+from .models import ImagePrompt, ImageProject
+from prompts.models import ImagePromptTemplate
+from ai_inspector.models import AIProvider  # Импортируем модель
+from django.core.files.base import ContentFile
+from django.conf import settings
+from datetime import datetime
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
+
+try:
+    from huggingface_hub import InferenceClient
+except ImportError:
+    InferenceClient = None
 
 
-def generate_scene_prompts(project, num_scenes: int = None, aspect_ratio: str = '9:16'):
+def get_ai_client(provider_override=None):
     """
-    Генерирует промпты на основе текста статьи.
+    Универсальная фабрика клиентов.
+    Берёт API ключ из модели AIProvider, а не из SystemConfig.
     """
-    script = project.script_data
-    if not script:
-        raise Exception("Нет текста статьи для генерации промптов!")
+    config = AIProvider.objects.filter(
+        is_active=True).order_by('provider_type', 'name')
 
-    config = SystemConfig.get_config()
+    # Определяем провайдера
+    if provider_override:
+        provider_code = provider_override.lower()
+    else:
+        # Если нет переопределения, берем текущего из SystemConfig
+        from config.models import SystemConfig
+        config = SystemConfig.get_config()
+        provider_code = getattr(config, 'current_provider', 'openai').lower()
 
-    # Используем тот же ключ, что и для статьи
-    client = OpenAI(api_key=config.openai_key)
-    model = config.default_article_model  # Или отдельная модель для картинок
+    # Получаем провайдера из БД
+    try:
+        provider_obj = AIProvider.objects.get(
+            name=provider_code, is_active=True)
+    except AIProvider.DoesNotExist:
+        raise ValueError(
+            f"Провайдер '{provider_code}' не найден или неактивен в БД!")
 
-    # Если количество не указано, предлагаем AI решить самому (обычно 4-6)
-    count_instr = f"Generate exactly {num_scenes} scenes." if num_scenes else "Break the story into logical visual scenes (usually 4-6)."
+    # Получаем расшифрованный API ключ
+    api_key = provider_obj.get_api_key()
 
-    system_prompt = f"""
-    You are an expert AI Art Director for TikTok videos.
-    Task: Break the following script into visual scenes and write detailed image prompts for Flux/Midjourney.
-    
-    Constraints:
-    - Aspect Ratio: {aspect_ratio}
-    - Style: Photorealistic, cinematic lighting, historical accuracy mixed with mystery.
-    - Output: JSON list of strings.
+    if not api_key:
+        raise ValueError(
+            f"API ключ для провайдера '{provider_code}' не настроен!")
+
+    # === БЕРЁМ МОДЕЛЬ ИЗ provider_obj.config['model_id'] ===
+    model_name = provider_obj.config.get('model_id')
+    if not model_name:
+        raise ValueError(
+            f"Модель не указана в настройках провайдера '{provider_code}'!")
+
+    print(f"📌 Провайдер: {provider_code}, Модель: {model_name}")
+
+    # Возвращаем клиента
+    if provider_code == 'openai':
+        if not OpenAI:
+            raise ImportError("Установи: pip install openai")
+        client = OpenAI(api_key=api_key)
+        return client, model_name, provider_code
+
+    elif provider_code == 'huggingface':
+        if not InferenceClient:
+            raise ImportError("Установи: pip install huggingface_hub")
+        client = InferenceClient(token=api_key)
+        return client, model_name, provider_code
+
+    elif provider_code == 'gemini':
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        return model, model_name, provider_code
+
+    else:
+        raise ValueError(f"Неподдерживаемый провайдер: {provider_code}")
+
+
+def call_llm_universal(prompt_text, provider_override=None):
+    """Отправляет запрос в AI, используя текущего провайдера."""
+    client, model_name, provider = get_ai_client(provider_override)
+
+    print(f"\n>>> ВЫЗОВ AI: Провайдер={provider}, Модель={model_name}")
+
+    if provider == 'openai':
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system",
+                    "content": "You are a helpful assistant that outputs valid JSON."},
+                {"role": "user", "content": prompt_text}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+
+    elif provider == 'huggingface':
+        try:
+            output = client.chat_completion(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt_text}],
+                max_tokens=2500,
+                temperature=0.7
+            )
+            return output.choices[0].message.content
+        except Exception:
+            output = client.text_generation(prompt_text, max_new_tokens=2500)
+            return output
+
+    elif provider == 'gemini':
+        response = client.generate_content(prompt_text)
+        return response.text
+
+    else:
+        raise ValueError(f"Логика для провайдера {provider} не реализована")
+
+
+def parse_ai_response(raw_response):
+    """
+    Парсит ответ от AI и возвращает список сцен.
+    Обрабатывает разные форматы JSON и очищает от markdown.
+    """
+    print(f"\n{'='*60}")
+    print(f"СЫРОЙ ОТВЕТ AI (первые 2000 символов):")
+    print(f"{'='*60}")
+    print(raw_response)
+    print(repr(raw_response[:2000]))  # repr() покажет экранированные символы
+    print(f"======================\n")
+
+    try:
+        # 1. Очищаем от markdown-блоков (```json ... ```)
+        cleaned = raw_response.strip()
+        cleaned = re.sub(r'^```json\s*', '', cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\s*```$', '', cleaned)
+        cleaned = cleaned.strip()
+
+        # 2. Ищем JSON массив в тексте
+        match = re.search(r'\[.*\]', cleaned, re.DOTALL)
+        if match:
+            json_str = match.group()
+        else:
+            json_str = cleaned
+
+        print(f"=== JSON ДЛЯ ПАРСИНГА ===")
+        print(json_str[:500])
+        print(f"========================\n")
+
+        # 3. Парсим JSON
+        scenes_data = json.loads(json_str)
+
+        # 4. Нормализуем
+        if not isinstance(scenes_data, list):
+            if isinstance(scenes_data, dict):
+                if 'prompts' in scenes_data:
+                    scenes_data = [{"scene_description": f"Scene {i+1}", "prompt_text": p}
+                                   for i, p in enumerate(scenes_data['prompts'])]
+                elif 'scenes' in scenes_data:
+                    scenes_data = scenes_data['scenes']
+                else:
+                    scenes_data = [scenes_data]
+            else:
+                raise ValueError(f"Неожиданный формат: {type(scenes_data)}")
+        # 4. Нормализуем формат (чтобы всегда был список сцен)
+        # if not isinstance(scenes_data, list):
+        #     if isinstance(scenes_data, dict):
+        #         if 'prompts' in scenes_data:
+        #             scenes_data = [{"scene_description": f"Scene {i+1}", "prompt_text": p}
+        #                            for i, p in enumerate(scenes_data['prompts'])]
+        #         elif 'scenes' in scenes_data:
+        #             scenes_data = scenes_data['scenes']
+        #         elif 'data' in scenes_data:
+        #             scenes_data = scenes_data['data']
+        #         else:
+        #             scenes_data = [scenes_data]
+        #     else:
+        #         raise ValueError(
+        #             f"Неожиданный формат ответа: {type(scenes_data)}")
+
+        # 5. Проверяем каждую сцену на наличие нужных полей
+        normalized = []
+        for i, scene in enumerate(scenes_data):
+            if isinstance(scene, dict):
+                normalized.append({
+                    'scene_description': scene.get('scene_description', scene.get('description', f'Scene {i+1}')),
+                    'prompt_text': scene.get('prompt_text', scene.get('prompt', ''))
+                })
+            else:
+                normalized.append({
+                    'scene_description': f'Scene {i+1}',
+                    'prompt_text': str(scene)
+                })
+
+        print(f"✅ Успешно распарсено {len(normalized)} сцен")
+        return normalized
+
+    except json.JSONDecodeError as e:
+        print(f"!!! ОШИБКА JSON: {e}")
+        print(f"Полный ответ AI: {raw_response}")
+        raise Exception(f"AI вернул невалидный JSON: {e}")
+    except Exception as e:
+        print(f"!!! ОШИБКА ПАРСИНГА: {e}")
+        raise Exception(f"Ошибка обработки ответа AI: {e}")
+
+
+def generate_storyboard(project, scenes_count=10, provider_override=None):
+    """
+    Главная функция генерации раскадровки.
     """
 
-    user_prompt = f"""
-    Script:
-    {script.script_en}
+    print(f"\n>>> НАЧАЛО ГЕНЕРАЦИИ для проекта #{project.id}")
 
-    {count_instr}
-    
-    Return JSON: {{ "prompts": ["prompt 1", "prompt 2", ...] }}
-    """
+    # 1. Проверка статьи
+    trans = project.article.translations.filter(
+        language__code='ru').first() or project.article.translations.first()
+    if not trans or not trans.content:
+        raise ValueError("В статье нет текста!")
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "system", "content": system_prompt},
-                  {"role": "user", "content": user_prompt}],
-        response_format={"type": "json_object"},
-        temperature=0.7
+    source_text = trans.content[:4000]
+
+    # 2. Получение шаблона из БД
+    template_obj = ImagePromptTemplate.objects.filter(
+        code_name='storyboard_generator',
+        is_active=True
+    ).first()
+
+    if template_obj:
+        print(f"ID: {template_obj.id}")
+        print(f"Name: {template_obj.name}")
+        print(f"Code Name: {template_obj.code_name}")
+
+        # Проверяем все возможные поля
+        print(f"\n--- ПРОВЕРКА ПОЛЕЙ ---")
+        print(
+            f"template_content: {'✅ ЕСТЬ' if hasattr(template_obj, 'template_content') else '❌ НЕТ'}")
+        print(f"text: {'✅ ЕСТЬ' if hasattr(template_obj, 'text') else '❌ НЕТ'}")
+        print(
+            f"content: {'✅ ЕСТЬ' if hasattr(template_obj, 'content') else '❌ НЕТ'}")
+
+        # Выводим содержимое
+        if hasattr(template_obj, 'template_content'):
+            print(f"\n--- TEMPLATE_CONTENT (первые 500 симв.) ---")
+            print(template_obj.template_content[:500])
+        elif hasattr(template_obj, 'text'):
+            print(f"\n--- TEXT (первые 500 симв.) ---")
+            print(template_obj.text[:500])
+        elif hasattr(template_obj, 'content'):
+            print(f"\n--- CONTENT (первые 500 симв.) ---")
+            print(template_obj.content[:500])
+        else:
+            print(f"\n❌ НЕ НАЙДЕНО ПОЛЕ С ТЕКСТОМ!")
+            print(
+                f"Все поля: {[f.name for f in template_obj._meta.get_fields()]}")
+
+        print(f"{'='*60}\n")
+    else:
+        print(f"❌ ПРОМПТ НЕ НАЙДЕН В БД!")
+        raise Exception("Промпт 'storyboard_generator' не найден в БД!")
+    template_text = template_obj.template_content
+
+    # 3. Заполнение шаблона
+    final_prompt = template_text.format(
+        scenes_count=scenes_count,
+        style_keywords=project.get_style_full(),
+        aspect_ratio=project.aspect_ratio,
+        source_text=source_text,
+        language="Russian"
     )
 
-    data = json.loads(response.choices[0].message.content)
-    return data.get('prompts', [])
+    # 4. Вызов AI
+    raw_response = call_llm_universal(final_prompt, provider_override)
+    print(f"<<< ПОЛУЧЕН ОТВЕТ (длина: {len(raw_response)})")
+
+    # 5. Парсинг JSON (ВЫЗЫВАЕМ НОВЫЙ МЕТОД)
+    scenes_data = parse_ai_response(raw_response)
+
+    # 6. Сохранение в БД
+    with transaction.atomic():
+        project.prompts.all().delete()
+        count = 0
+        for i, item in enumerate(scenes_data):
+            desc = item.get('scene_description', item.get(
+                'description', f'Scene {i+1}'))
+            txt = item.get('prompt_text', item.get('prompt', ''))
+
+            ImagePrompt.objects.create(
+                project=project,
+                order=i+1,
+                scene_description=desc,
+                prompt_text=txt,
+                generation_status='pending'
+            )
+            count += 1
+
+        project.prompts_generated = True
+        project.status = 'prompts_ready'
+        project.save()
+
+    print(f"✅ УСПЕХ! Создано {count} сцен.")
+    return count
+
+
+def generate_image_from_prompt(prompt, provider_name: str, aspect_ratio: str = None, style_preset: str = 'current'):
+    """
+    Генерирует изображение для одного промпта.
+    """
+
+    # Обновляем статус
+    prompt.generation_status = 'generating'
+    prompt.save()
+
+    try:
+        # Получаем провайдера
+        provider = AIProvider.objects.get(name=provider_name, is_active=True)
+        api_key = provider.get_api_key()
+        config = provider.config
+        model_id = config.get('model_id')
+
+        # Получаем клиент
+        client, model, provider_type = _get_image_client(
+            provider, api_key, config)
+
+        # Размер: из параметра или из проекта
+        size = _aspect_ratio_to_size(
+            aspect_ratio or prompt.project.aspect_ratio)
+
+        # Стиль: модифицируем промпт
+        final_prompt = _apply_style_preset(
+            prompt.prompt_text, style_preset, prompt.project)
+
+        # Генерация
+        if provider_type == 'huggingface':
+            image = client.text_to_image(
+                final_prompt,
+                width=size['width'],
+                height=size['height'],
+                num_inference_steps=config.get(
+                    'default_params', {}).get('num_inference_steps', 28)
+            )
+
+            # Сохранение изображения
+            filename = f"prompt_{prompt.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            rel_path = os.path.join(
+                'image_projects', str(prompt.project.id), filename)
+            abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+
+            # Создаём папку
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+            # Сохраняем файл
+            image.save(abs_path)
+
+            # Обновляем промпт (сохраняем относительный путь)
+            prompt.image = rel_path
+            prompt.generation_status = 'success'
+            prompt.save()
+
+            print(f"✅ Изображение сохранено: {rel_path}")
+            return rel_path
+
+        raise ValueError(f"Неподдерживаемый провайдер: {provider_name}")
+
+    except Exception as e:
+        prompt.generation_status = 'failed'
+        prompt.error_message = str(e)
+        prompt.save()
+        print(f"❌ Ошибка генерации: {e}")
+        raise
+
+
+def _apply_style_preset(prompt_text: str, style_preset: str, project) -> str:
+    """Применяет стиль к промпту"""
+    if style_preset == 'current':
+        style_keywords = getattr(project, 'get_style_full', lambda: '')()
+        return f"{prompt_text}, {style_keywords}" if style_keywords else prompt_text
+    elif style_preset == 'cinematic':
+        return f"{prompt_text}, cinematic lighting, dramatic shadows, high contrast, 8k, photorealistic"
+    elif style_preset == 'anime':
+        return f"{prompt_text}, anime style, studio ghibli, vibrant colors, detailed"
+    elif style_preset == 'realistic':
+        return f"{prompt_text}, photorealistic, 8k, highly detailed, natural lighting"
+    elif style_preset == 'artistic':
+        return f"{prompt_text}, artistic, painterly style, oil painting, dramatic"
+    return prompt_text  # 'custom' или неизвестный — как есть
+
+
+def _aspect_ratio_to_size(aspect_ratio: str) -> dict:
+    """Конвертирует aspect_ratio в пиксели"""
+    sizes = {
+        '9:16': {'width': 1080, 'height': 1920},
+        '16:9': {'width': 1920, 'height': 1080},
+        '1:1': {'width': 1024, 'height': 1024},
+        '21:9': {'width': 2560, 'height': 1080},
+    }
+    return sizes.get(aspect_ratio, sizes['9:16'])
+
+
+def _get_image_client(provider, api_key: str, config: dict):
+    """Возвращает клиент для генерации изображений"""
+    model_id = config.get('model_id')
+
+    if provider.name in ['huggingface', 'huggingface_image']:
+        from huggingface_hub import InferenceClient
+        client = InferenceClient(token=api_key, model=model_id)
+        return client, model_id, 'huggingface'
+
+    raise ValueError(f"Неизвестный image-провайдер: {provider.name}")

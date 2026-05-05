@@ -12,7 +12,7 @@ class Language(models.Model):
     class Meta:
         ordering = ['order', 'name']
         verbose_name = "Язык"
-        verbose_name_plural = "1. Языки"
+        verbose_name_plural = "Языки"
 
     def __str__(self):
         return f"{self.flag_emoji} {self.name} ({self.code})"

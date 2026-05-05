@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Главная страница{% endblock %}
+
+{% block content %}
+<div class="container">
+        <!-- Заголовок -->
+        <p class="subtitle">
+            Универсальная платформа для генерации уникального контента. 
+            От альтернативной истории до параллельных новостей — создавай смыслы за секунды.
+        </p>
+
+        <!-- Карточки (Универсальные) -->
+        <div class="features">
+            <div class="feature-card">
+                <span class="feature-icon">⚡</span>
+                <span class="feature-title">Генерация</span>
+                <span class="feature-desc">Мгновенное создание статей, сценариев и постов на любую тему.</span>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🌐</span>
+                <span class="feature-title">Мультиязычность</span>
+                <span class="feature-desc">Автоматический перевод и адаптация контента под разные аудитории.</span>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🎯</span>
+                <span class="feature-title">Структура</span>
+                <span class="feature-desc">Готовые форматы для TikTok, YouTube, Telegram и блогов.</span>
+            </div>
+        </div>
+
+        <!-- Кнопки действий -->
+        <div class="btn-group">
+            <!-- Ссылка на дашборд статей (замени 'article:dashboard' на свой URL если нужно) -->
+            <a href="{% url 'article:dashboard' %}" class="btn btn-primary">Перейти в редактор</a>
+            
+            <!-- Ссылка на идеи (если есть) или заглушка -->
+            <a href="{% url 'topics:dashboard' %}" class="btn btn-secondary">Генератор идей</a>
+        </div>
+    </div>
+{% endblock %}

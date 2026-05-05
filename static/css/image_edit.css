@@ -1,0 +1,153 @@
+/* Сетка: слева текст, справа картинка */
+.prompt-grid {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 20px;
+    align-items: stretch;
+}
+
+/* Левая колонка: 2 текстовых блока */
+.prompt-texts {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.text-block {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Правая колонка: Картинка на всю высоту */
+.prompt-image {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.thumbnail-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid var(--border-color, #333);
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.thumbnail-wrapper:hover {
+    transform: scale(1.02);
+    border-color: #667eea;
+}
+
+.thumbnail-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.thumbnail-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.thumbnail-wrapper:hover .thumbnail-overlay {
+    opacity: 1;
+}
+
+.thumbnail-icon {
+    font-size: 40px;
+    color: #fff;
+}
+
+.thumbnail-empty {
+    width: 100%;
+    min-height: 400px;
+    border: 2px dashed var(--border-color, #333);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.02);
+}
+
+/* Лайтбокс */
+.lightbox-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.lightbox-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.lightbox-content {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+}
+
+.lightbox-image {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 8px;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 32px;
+    cursor: pointer;
+}
+
+.lightbox-close:hover {
+    color: #667eea;
+}
+
+.lightbox-title {
+    position: absolute;
+    bottom: -30px;
+    left: 0;
+    color: #fff;
+    font-size: 14px;
+}
+
+/* Адаптив для мобильных */
+@media (max-width: 768px) {
+    .prompt-grid {
+        grid-template-columns: 1fr;
+    }
+    .prompt-image {
+        order: -1;
+    }
+    .thumbnail-wrapper, .thumbnail-empty {
+        min-height: 250px;
+    }
+}

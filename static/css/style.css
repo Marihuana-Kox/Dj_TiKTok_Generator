@@ -299,7 +299,7 @@ textarea.form-control {
 }
 
 .table td {
-    padding: 10px;
+    padding: 10px 6px 8px;
     border-bottom: 1px solid var(--border-color);
     color: var(--text-main);
     font-size: 15px;
@@ -725,7 +725,7 @@ textarea.form-control {
 }
 
 /* --- Модальное окно (База) --- */
-.modal-overlay {
+/* .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -766,7 +766,7 @@ textarea.form-control {
 
 .modal-overlay.active .modal-content {
     transform: translateY(0);
-}
+} */
 
 .modal-close {
     position: absolute;
@@ -831,7 +831,7 @@ textarea.form-control {
     gap: 15px;
 }
 
-.btn {
+/* .btn {
     padding: 12px 24px;
     border: none;
     border-radius: 8px;
@@ -841,7 +841,7 @@ textarea.form-control {
     transition: all 0.2s;
     color: white;
     text-align: center;
-}
+} */
 
 .btn:hover {
     transform: translateY(-2px);
@@ -1677,4 +1677,10 @@ textarea.form-control {
 /* Для темной темы можно использовать другой цвет */
 body.dark-mode .bg-selected {
     background-color: rgba(255, 255, 255, 0.05) !important;
+}
+/* В конец style.css */
+textarea.form-control {
+    min-height: 50px !important;
+    line-height: 1.4;
+    resize: vertical;
 }
