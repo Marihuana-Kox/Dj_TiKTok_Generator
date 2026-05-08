@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактор проекта #{{ project.id }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    
+    <!-- 1. ЗАГОЛОВОК И НАВИГАЦИЯ -->
+    <div class="flex flex-between align-items-end mb-2">
+        <div>
+            <h1>✏️ Редактор промптов</h1>
+            <p class="text-muted mt-1">
+                Проект: <span class="text-bold text-blue">#{{ project.id }}</span> | 
+                Статья: {{ project.search_title|truncatechars:40 }}
+            </p>
+        </div>
+        <a href="{% url 'image:dashboard' %}" class="btn btn-outline">← Назад в дашборд</a>
+    </div>
+
+    <!-- 2. ИНФО-ПАНЕЛЬ ПРОЕКТА -->
+    <div class="card p-3 mb-3 bg-light-blue border">
+        <div class="flex flex-wrap gap-3 justify-content-between align-items-center">
+            <div class="flex gap-2 flex-wrap">
+                <span class="badge badge-work">{{ project.get_style_preset_display }}</span>
+                <span class="badge badge-new">{{ project.aspect_ratio }}</span>
+                <span class="badge {% if project.prompts_generated %}badge-done{% else %}badge-err{% endif %}">
+                    Промпты: {% if project.prompts_generated %}Созданы{% else %}Нет{% endif %}
+                </span>
+            </div>
+            <div class="text-small text-muted">
+                Всего сцен: <span class="text-bold text-main">{{ prompts.count }}</span>
+            </div>
+        </div>
+    </div>
+        <!-- 2.5. ПАНЕЛЬ ГЕНЕРАЦИИ ИЗОБРАЖЕНИЙ -->
+        <div class="card p-3 mb-3">
+            <div class="flex flex-between items-center mb-3">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="select-all-prompts" class="form-control checkbox-fix">
+                    <label for="select-all-prompts" class="text-bold">Выбрать все</label>
+                    <span class="text-muted text-small" id="selected-count">(выбрано: 0)</span>
+                </div>
+            </div>
+            
+            <!-- Настройки генерации -->
+            <div class="row mb-3">
+                <!-- 1. Выбор провайдера -->
+                <div class="col-md-4 mb-2">
+                    <label class="form-label text-small">🤖 Провайдер:</label>
+                    <select id="image-provider-select" class="form-control">
+                        <option value="" disabled selected>Выберите провайдера...</option>
+                        {% for provider in image_providers %}
+                            <option value="{{ provider.name }}" 
+                                    data-model="{{ provider.config.model_id|default:'' }}">
+                                {{ provider.display_name }}
+                            </option>
+                        {% empty %}
+                            <option value="" disabled>⚠️ Нет image-провайдеров</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- 2. Выбор размера -->
+                <div class="col-md-3 mb-2">
+                    <label class="form-label text-small">📐 Размер:</label>
+                    <select id="image-size-select" class="form-control">
+                        <option value="9:16" {% if project.aspect_ratio == '9:16' %}selected{% endif %}>9:16 (TikTok/Reels)</option>
+                        <option value="16:9" {% if project.aspect_ratio == '16:9' %}selected{% endif %}>16:9 (YouTube)</option>
+                        <option value="1:1" {% if project.aspect_ratio == '1:1' %}selected{% endif %}>1:1 (Square)</option>
+                        <option value="21:9" {% if project.aspect_ratio == '21:9' %}selected{% endif %}>21:9 (Cinema)</option>
+                    </select>
+                </div>
+                
+                <!-- 3. Применение стиля -->
+                <div class="col-md-5 mb-2">
+                    <label class="form-label text-small">🎨 Стиль:</label>
+                    <div class="flex gap-2">
+                        <select id="style-preset-select" class="form-control">
+                            <option value="current">Текущий ({{ project.get_style_preset_display }})</option>
+                            <option value="cinematic">🎬 Cinematic Dark</option>
+                            <option value="anime">🎌 Anime</option>
+                            <option value="realistic">📷 Photorealistic</option>
+                            <option value="artistic">🎨 Artistic</option>
+                            <option value="custom">✏️ Свой (из промпта)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Кнопка генерации -->
+            <div class="flex flex-between items-center">
+                <p class="text-muted text-small mb-0">
+                    ℹ️ Выберите промпты выше и нажмите кнопку для генерации
+                </p>
+                <button type="button" id="generate-images-btn" class="btn btn-primary" disabled>
+                    🎨 Генерировать выбранные (<span id="btn-count">0</span>)
+                </button>
+            </div>
+        </div>
+    <!-- 3. ФОРМА РЕДАКТИРОВАНИЯ -->
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div class="space-y-3">
+            {% for prompt in prompts %}
+            <div class="card mb-3">
+                <!-- Заголовок с чекбоксом -->
+                <div class="flex flex-between align-items-center mb-3 border-bottom pb-2">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" name="selected_prompts" value="{{ prompt.id }}" 
+                            class="prompt-checkbox form-control checkbox-fix" id="prompt-{{ prompt.id }}"
+                            {% if prompt.generation_status == 'success' %}checked{% endif %}>
+                        <label for="prompt-{{ prompt.id }}" class="text-bold text-blue">Сцена #{{ prompt.order }}</label>
+                    </div>
+                    <span class="badge 
+                        {% if prompt.generation_status == 'success' %}badge-done
+                        {% elif prompt.generation_status == 'failed' %}badge-err
+                        {% elif prompt.generation_status == 'generating' %}badge-work
+                        {% else %}badge-new{% endif %}">
+                        {{ prompt.get_generation_status_display }}
+                    </span>
+                </div>
+
+                <!-- Основной контент: Слева текст, Справа картинка -->
+                <div class="prompt-grid">
+                    <!-- Левая колонка: 2 текстовых блока -->
+                    <div class="prompt-texts">
+                        <div class="text-block">
+                            <label class="form-label">Описание сцены (RU):</label>
+                            <textarea name="desc_{{ prompt.id }}" class="form-control" rows="5">{{ prompt.scene_description }}</textarea>
+                        </div>
+                        <div class="text-block">
+                            <label class="form-label">Текст промпта (EN):</label>
+                            <textarea name="prompt_{{ prompt.id }}" class="form-control" rows="3">{{ prompt.prompt_text }}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Правая колонка: Миниатюра -->
+                    <div class="prompt-image">
+                        <label class="form-label">Результат:</label>
+                        {% if prompt.image %}
+                            <div class="thumbnail-wrapper" onclick="openLightbox('{{ prompt.image.url }}', 'Сцена #{{ prompt.order }}')">
+                                <img src="{{ prompt.image.url }}" alt="Scene {{ prompt.order }}" class="thumbnail-img">
+                                <div class="thumbnail-overlay">
+                                    <span class="thumbnail-icon">🔍</span>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="thumbnail-empty">
+                                <span class="text-muted">❌ Нет изображения</span>
+                            </div>
+                        {% endif %}
+                        
+                        {% if prompt.error_message %}
+                            <div class="alert alert-error mt-2 text-small">{{ prompt.error_message|truncatechars:100 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </form>
+</div>
+<!-- Лайтбокс для просмотра изображений -->
+<div id="lightbox-overlay" class="lightbox-overlay" onclick="closeLightbox()">
+    <div class="lightbox-content">
+        <button type="button" class="lightbox-close" onclick="closeLightbox()">&times;</button>
+        <img id="lightbox-image" class="lightbox-image" src="" alt="">
+        <p id="lightbox-title" class="lightbox-title"></p>
+    </div>
+</div>
+{% endblock %}

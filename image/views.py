@@ -17,8 +17,19 @@ from django.db import transaction
 
 @login_required
 def image_dashboard(request):
-    from django.db.models import Count, Q
-    from .models import ImageProject
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        selected_ids = request.POST.getlist('selected_projects')
+
+        if action == 'delete_selected' and selected_ids:
+            ImageProject.objects.filter(id__in=selected_ids).delete()
+            messages.success(
+                request, f'✅ Удалено проектов: {len(selected_ids)}')
+            return redirect('image:dashboard')
+
+        elif action == 'regenerate_failed' and selected_ids:
+            # Логика перегенерации
+            pass
 
     # 1. Получаем все проекты
     projects_qs = ImageProject.objects.select_related(

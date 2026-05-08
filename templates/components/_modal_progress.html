@@ -1,0 +1,30 @@
+<!-- ГЛОБАЛЬНАЯ МОДАЛКА — скрыта по умолчанию через d-none -->
+<div id="progress-modal" class="modal-overlay d-none">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h6 class="modal-title">🚀 Генерация</h6>
+            <button type="button" class="modal-close" id="close-progress-modal">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+            <p id="gen-progress-message" style="text-align: center; margin: 0 0 16px 0; color: #495057;">
+                Инициализация...
+            </p>
+            
+            <div class="progress-track">
+                <div id="gen-progress-bar" class="progress-bar bg-primary progress-bar-animated">
+                    <span id="gen-progress-percent">0%</span>
+                </div>
+            </div>
+        </div>
+        <!-- Лог — ФИКСИРОВАННАЯ ВЫСОТА, ПРОКРУТКА ВНУТРИ -->
+        <div class="progress-log-wrapper">
+            <small class="text-muted">Лог операций:</small>
+            <ul id="gen-progress-log"></ul>
+        </div>
+        
+        <div class="modal-footer">
+            <button type="button" class="btn-modal btn-secondary" id="cancel-progress-btn">Отмена</button>
+        </div>
+    </div>
+</div>

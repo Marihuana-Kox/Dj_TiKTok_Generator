@@ -11,8 +11,12 @@
     
     <!-- Наш CSS -->
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <link rel="stylesheet" href="{% static 'css/modal_image_gen.css' %}">
+    <link rel="stylesheet" href="{% static 'css/main_page_style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+    <!-- <link rel="stylesheet" href="{% static 'css/modal_image_gen.css' %}"> -->
     <link rel="stylesheet" href="{% static 'css/image_edit.css' %}">
+    <link rel="stylesheet" href="{% static 'css/article/article_edit.css' %}">
+    <link rel="stylesheet" href="{% static 'css/audio/dashboard_style.css' %}">
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -20,27 +24,15 @@
 
     <!-- Навигация -->
     {% include 'components/_nav.html' %}
-
-    <div class="container">
-        {% block content %}{% endblock %}
-    </div>
-
+    <section>
+        <div class="container">
+            <!-- Блок с контентом - страницы -->
+            {% block content %}{% endblock %}
+        </div>
+    </section>
     <!-- Футер -->
     {% include 'components/_footer.html' %}
-
-    {% block extra_js %}{% endblock %}
-    {% load static %}
-
-<!-- Глобальный скрипт генератора (доступен на всех страницах) -->
-<script src="{% static 'js/main.js' %}"></script>
-<script src="{% static 'js/article_form.js' %}"></script>
-<script src="{% static 'js/article_progress.js' %}"></script>
-<script src="{% static 'js/article_delete_status.js' %}"></script>
-<script src="{% static 'js/progress.js' %}"></script>
-<script src="{% static 'js/word_counter.js' %}"></script>
-<script src="{% static 'js/image_dashboard.js' %}"></script>
-<script src="{% static 'js/image_modal_infor.js' %}"></script>
-<script src="{% static 'js/image_edit.js' %}"></script>
-<script src="{% static 'js/image_ajax_post.js' %}"></script>
+    {% include 'components/_modal_progress.html' %}
+    {% include 'components/_extra_js.html' %}
 </body>
 </html>

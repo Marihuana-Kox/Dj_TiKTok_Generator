@@ -1,0 +1,214 @@
+/* МОДАЛКА — СКРЫТА ПО УМОЛЧАНИЮ */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    /* НЕ УКАЗЫВАЕМ display здесь! */
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* d-none ВСЕГДА скрывает модалку */
+.modal-overlay.d-none {
+    display: none !important;
+    opacity: 0;
+    visibility: hidden;
+}
+
+/* Когда модалка активна (JS добавляет этот класс) */
+.modal-overlay.active {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Остальные стили */
+.modal-content {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 600px;
+    height: 60vh; /* ← Максимум 80% высоты экрана */
+    overflow: hidden; /* ← Не выходить за пределы */
+    display: flex;
+    flex-direction: column;
+    margin: 100px auto 0;
+}
+
+.modal-header {
+    display: flex;
+    color: #764ba2;
+    margin: 24px;
+    justify-content: space-between;
+}
+.modal-header h6 {
+    margin: 0;
+    font-size: 2.25em;
+    font-weight: 600;
+}
+
+/* Кнопка закрытия (крестик) */
+.modal-close {
+    position: relative;
+    top: -20px;
+    left: 4%;
+    font-size: 28px;
+    font-weight: bold;
+    color: #ffffff;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s, color 0.2s;
+    line-height: 1;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    opacity: 1;
+    color: #ff4444;
+}
+
+/* Для модалки с белым фоном (если header без градиента) */
+.modal-content .modal-close {
+    color: #666;
+}
+
+.modal-content .modal-close:hover {
+    color: #ff4444;
+}
+
+.modal-body {
+    padding: 0 24px;
+}
+
+.progress-track {
+    width: 100%;
+    height: 24px;
+    background: #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+/* Лог — ПРОКРУЧИВАЕТСЯ ВНУТРИ */
+#gen-progress-log {
+    list-style: none;
+    margin: 5px 24px 10px;
+    font-size: 0.9em;
+    font-style: italic;
+    height: 100px; /* ← Фиксированная высота логов */
+    overflow-y: auto;  /* ← Прокрутка внутри */
+    background: rgb(51 65 85);
+    border: 1px solid #474747;
+    color: blanchedalmond;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+#gen-progress-log li {
+    padding: 4px 0;
+    border-bottom: 1px solid #4a4848;
+}
+
+#gen-progress-log li:last-child {
+    border-bottom: none;
+}
+
+#gen-progress-log li.success { color: #4caf50; }
+#gen-progress-log li.error { color: #ef4444; }
+
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.progress-bar.bg-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.progress-bar.bg-success {
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+}
+
+.progress-bar.bg-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.progress-bar-animated {
+    animation: progressStripes 1s linear infinite;
+    background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
+        transparent
+    );
+    background-size: 1rem 1rem;
+}
+
+@keyframes progressStripes {
+    from { background-position: 1rem 0; }
+    to { background-position: 0 0; }
+}
+.progress-log-wrapper .text-muted{
+    padding-left: 24px;
+}
+.progress-log {
+    max-height: 200px;
+    overflow-y: auto;
+    background: #193959;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.progress-log li {
+    padding: 6px 8px;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 13px;
+    list-style: none;
+}
+
+.modal-footer {
+    padding: 16px 24px;
+    /* border-top: 1px solid #e9ecef; */
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-modal {
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: #ffffff;
+}

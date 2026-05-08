@@ -3,9 +3,9 @@
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<!-- <div class="container"> -->
+<div class="container">
     <div class="row justify-content-center">
-        <div class="col-md-8 auto_center">
+        <div class="auto_center">
             
             <div class="card">
                 <!-- Заголовок карточки -->
@@ -124,25 +124,11 @@
                             <button type="submit" class="btn btn-primary flex-fill">
                                 🚀 Создать проект
                             </button>
-                        </div>
                     </form>
                 </div>
             </div>
 
         </div>
     </div>
-    {% include 'image/includes/modal_infor.html' %}
-<!-- </div> -->
-
-<!-- СКРИПТ ПЕРЕКЛЮЧЕНИЯ (Использует твой класс d-none) -->
-<script>
-    function toggleSettings(isManual) {
-        const block = document.getElementById('manual-settings-block');
-        if (isManual) {
-            block.classList.remove('d-none');
-        } else {
-            block.classList.add('d-none');
-        }
-    }
-</script>
+</div>
 {% endblock %}

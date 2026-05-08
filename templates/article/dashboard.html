@@ -11,17 +11,6 @@
     <a href="{% url 'article:generate_page' %}" class="btn btn-primary">✨ Генерация статей</a>
 </div>
 
-<!-- Модалка генерации (без изменений) -->
-<div id="gen-modal" class="modal-overlay">
-    <div class="modal-content">
-        <button type="button" class="modal-close" id="close-gen-modal">&times;</button>
-        <h2 class="mb-3">Генерация статей</h2>
-        <div id="modal-form-container">
-            <p class="text-muted">Загрузка...</p>
-        </div>
-    </div>
-</div>
-
 <!-- Статистика (без изменений) -->
 <div class="flex mb-2">
     <div class="card stat-card blue">
@@ -88,21 +77,21 @@
                         <tr class="idea-row">
                             
                             <!-- 1. НОМЕР -->
-                            <td class="text-muted">{{ row_num }}</td>
+                            <td class="text-center">{{ row_num }}</td>
                             
                             <!-- 2. ЧЕКБОКС -->
                             {% if article %}
                             <td class="text-center">
-                                <input type="checkbox" name="selected_articles" value="{{ cluster.id }}" class="idea-checkbox form-control checkbox-fix">
+                                <input type="checkbox" name="selected_articles" value="{{ article.instance.id }}" class="idea-checkbox form-control checkbox-fix">
                             </td>
                             {% else %}
                             <td class="text-center">
-                                <input type="checkbox" name="selected_articles" value="{{ cluster.id }}" checked class="idea-checkbox form-control checkbox-fix">
+                                <input type="checkbox" name="selected_articles" value="{{ article.instance.id  }}" checked class="idea-checkbox form-control checkbox-fix">
                             </td>
                             {% endif %}
                             
                             <!-- 3. ID -->
-                            <td class="text-muted text-small">{{ article.instance.id }}</td>
+                            <td class="text-center text-small">{{ article.instance.id }}</td>
                             
                             <!-- 4. ЗАГОЛОВОК -->
                             <td class="text-bold">

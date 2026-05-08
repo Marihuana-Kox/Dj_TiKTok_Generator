@@ -28,11 +28,13 @@ urlpatterns = [
     ),
     path('admin/', admin.site.urls),
     path('', include('core.urls', namespace='core')),
-    path('generator/', include('generator.urls')),  # Подключаем наши URL
-    path('config/', include('config.urls')),
-    path('article/', include('article.urls')),
-    path('images/', include('image.urls')),
-    path('topics/', include('topics.urls'))
+    # Подключаем наши URL
+    path('generator/', include('generator.urls', namespace='generator')),
+    path('config/', include('config.urls', namespace='config')),
+    path('article/', include('article.urls', namespace='article')),
+    path('images/', include('image.urls', namespace='images')),
+    path('topics/', include('topics.urls', namespace='topics')),
+    path('audio/', include('audio.urls', namespace='audio')),
 ]
 
 # Чтобы отдавать медиа-файлы (картинки/видео) в режиме разработки

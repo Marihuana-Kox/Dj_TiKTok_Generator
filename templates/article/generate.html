@@ -92,88 +92,18 @@
         </div>
         <small class="text-muted d-block mt-1">Клик по строке также выбирает идею.</small>
     </div>
-
-    <!-- === РАЗДЕЛ 3: ПРОМПТЫ ДЛЯ ИЗОБРАЖЕНИЙ === -->
-    <h5 class="text-bold text-blue mb-2 border-bottom pb-2 mt-4">3. Промпты для изображений</h5>
-
-    <!-- ГЛАВНЫЙ ПЕРЕКЛЮЧАТЕЛЬ -->
-    <div class="form-group mb-3 p-3 border rounded bg-dark d-flex justify-content-between align-items-center">
-        <div>
-            <label class="form-label text-bold d-block mb-0" style="font-size: 1.1rem;">
-                🎨 Генерировать промпты
-            </label>
-            <small class="text-muted">Если выключить, статья будет создана без промптов для картинок (экономия токенов).</small>
-        </div>
-        <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="enable-prompts-toggle" style="width: 3em; height: 1.5em;">
-        </div>
-    </div>
-
-    <!-- КОНТЕЙНЕР НАСТРОЕК (блокируется при выключении) -->
-    <div id="prompt-settings-container" class="transition-opacity">
-        
-        <div class="flex gap-2 mb-3">
-            <!-- РЕЖИМ ГЕНЕРАЦИИ -->
-            <div class="form-group flex-fill">
-                <label class="form-label d-block mb-2">Режим разбивки на сцены</label>
-                <div class="d-flex flex-column gap-2">
-                    <div class="form-check">
-                        <input type="radio" name="image_mode" value="auto" id="mode_auto" checked onchange="togglePromptSettings()">
-                        <label class="form-check-label" for="id_image_mode_auto">
-                            🤖 Автоматически (AI сам решит)
-                        </label>
-                    </div>
-                    <div class="form-check">
-                        <input type="radio" name="image_mode" value="manual" id="mode_manual" onchange="togglePromptSettings()">
-                        <label class="form-check-label" for="id_image_mode_manual">
-                            ✋ Вручную (указать кол-во)
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- РАЗМЕР -->
-            <div class="form-group flex-fill">
-                <label class="form-label">{{ form.aspect_ratio.label }}</label>
-                {{ form.aspect_ratio }}
-            </div>
-        </div>
-
-        <!-- Блок ручного ввода -->
-        <div id="manual-count-block" class="form-group mb-3 d-none">
-            <label class="form-label">{{ form.manual_scene_count.label }}</label>
-            {{ form.manual_scene_count }}
-        </div>
-
-        <div class="flex gap-2 mb-3">
-            <!-- СТИЛЬ -->
-            <div class="form-group flex-grow-2">
-                <label class="form-label">{{ form.art_style.label }}</label>
-                {{ form.art_style }}
-                <small class="text-muted">Например: anime style, realistic...</small>
-            </div>
-            
-            <!-- ВИДЕО ОПЦИЯ (тоже отключается) -->
-            <div class="form-group flex-fill d-flex align-items-end">
-                <div class="form-check p-2 border rounded w-100">
-                    {{ form.generate_video }}
-                    <label class="form-check-label" for="{{ form.generate_video.id_for_label }}">
-                        {{ form.generate_video.label }}
-                    </label>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Кнопки -->
     <div class="flex mt-4 border-top pt-3">
         <button type="submit" class="btn btn-success flex-fill">🚀 Запустить генерацию</button>
+        <!-- ТЕСТОВАЯ КНОПКА — УДАЛИТЬ ПОСЛЕ ПРОВЕРКИ -->
+
+        <button type="button" class="btn btn-warning" onclick="testProgressModal()">
+            🧪 Тест прогресс-бара
+        </button>
+
         <button type="button" id="btn-close-modal" class="btn btn-outline flex-fill">Отмена</button>
     </div>
 </form>
-{% include 'article/includes/modal_progress.html' %}
-{% include 'article/includes/modal_confirm.html' %}
-{% include 'article/includes/new_progress.html' %}
 <!-- Передаем URL-адреса из Django во внешний JS -->
 <script>
     window.GEN_API_URL = "{% url 'article:start_generation_api' %}";

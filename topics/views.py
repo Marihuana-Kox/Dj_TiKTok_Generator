@@ -1,15 +1,18 @@
-import json
-from django.core.cache import cache
-import time
-import threading
 import uuid
+import threading
+import time
+import json
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.core.cache import cache
+from django.db import connection
 from django.contrib import messages
 from django.http import StreamingHttpResponse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.shortcuts import render, redirect, get_object_or_404
 
 from topics.models import VideoProject
 from .forms import GenerateIdeasForm, VideoProjectEditForm
-from django.shortcuts import render, redirect, get_object_or_404
 from .services import generate_unique_ideas
 
 # Время жизни записи в кэше (секунды).
@@ -19,110 +22,85 @@ CACHE_TIMEOUT = 3600
 
 def generate_idea_view(request):
     """Основное view для генерации идей с прогресс-баром"""
-    task_id = None
-
     if request.method == 'POST':
-        form = GenerateIdeasForm(request.POST)
+        # 1. Сбор данных (JSON или POST)
+        if request.content_type == 'application/json':
+            try:
+                data = json.loads(request.body)
+                form = GenerateIdeasForm(data)
+            except json.JSONDecodeError:
+                return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
+        else:
+            form = GenerateIdeasForm(request.POST)
+
         if form.is_valid():
-            # 1. Генерируем уникальный ID для этой конкретной задачи
             task_id = str(uuid.uuid4())
 
-            # Подготовка данных из формы
-            provider_name = form.cleaned_data['ai_provider']
-            count = form.cleaned_data['count']
-            idea_style = form.cleaned_data.get('idea_style', 'random')
-            topics_raw = form.cleaned_data.get('topics_input', '')
-            focus_topics = [t.strip()
-                            for t in topics_raw.split('\n') if t.strip()]
-            main_topic = ", ".join(focus_topics) if focus_topics else "История"
+            # Извлекаем данные формы
+            cd = form.cleaned_data
+            provider_name = cd['ai_provider']
+            count = cd['count']
+            idea_style = cd.get('idea_style', 'random')
+            topics_raw = cd.get('topics_input', '')
 
-            refresh_old = form.cleaned_data.get('refresh_old', False)
-            refresh_period = int(form.cleaned_data.get(
-                'refresh_period', 30)) if refresh_old else None
-            allow_duplicates = form.cleaned_data.get('allow_duplicates', False)
-            duplicate_period = int(form.cleaned_data.get(
-                'duplicate_period', 30)) if not allow_duplicates else None
+            # Обработка тем
+            focus_topics = [t.strip() for t in topics_raw.replace(
+                '\n', ',').split(',') if t.strip()]
+            main_topic = ", ".join(
+                focus_topics) if focus_topics else "Общие темы"
 
-            # Генерируем уникальный ID задачи
-            task_id = str(uuid.uuid4())
+            # Настройки БД
+            refresh_old = cd.get('refresh_old', False)
+            refresh_period = int(cd.get('refresh_period', 30)
+                                 ) if refresh_old else None
+            allow_duplicates = cd.get('allow_duplicates', False)
+            duplicate_period = int(
+                cd.get('duplicate_period', 30)) if not allow_duplicates else None
 
-            # Сохраняем task_id в сессии для текущего пользователя
-            request.session['current_task_id'] = task_id
-            # 2. Инициализируем прогресс в КЭШЕ вместо глобальной переменной
-            initial_data = {
-                'current': 0,
-                'total': count,
+            # Инициализация кэша
+            cache.set(f"progress_{task_id}", {
+                'percent': 1,
                 'message': 'Инициализация...',
-                'percent': 0,
-                'status': 'starting',
-                'task_id': task_id
-            }
-            # Сохраняем в кэш под ключом, включающим task_id
-            cache.set(f"progress_{task_id}", initial_data, timeout=300)
+                'status': 'running',
+                'logs': ['🚀 Запуск генерации...']
+            }, timeout=600)
 
-            # Функция запуска в фоне
             def run_generation():
                 try:
-                    # 🚀 1. Мгновенный старт (чтобы не было 0%)
-                    cache.set(f"progress_{task_id}", {
-                        'current': 0,
-                        'total': count,
-                        'message': 'Запуск генерации...',
-                        'percent': 1,
-                        'status': 'running',
-                        'task_id': task_id
-                    }, timeout=300)
-                    # 🔁 Callback
+                    # Функция-помощник для обновления кэша без потери логов
+                    def update_cache(percent, message, status='running', final=False):
+                        current_data = cache.get(f"progress_{task_id}", {})
+                        logs = current_data.get('logs', [])
+                        if message and (not logs or logs[-1] != message):
+                            logs.append(message)
 
-                    def callback(current, total, step, message, idea_id):
-                        print("CALLBACK:", current, total)
-
-                        percent = int((current / total) *
-                                      100) if total > 0 else 0
-
-                        # ⚠️ ограничим до 95%, чтобы финал был плавный
-                        percent = min(percent, 76)
-
-                        progress_data = {
-                            'current': current,
-                            'total': total,
-                            'message': message or f"Обработка {current}/{total}",
+                        new_data = {
                             'percent': percent,
-                            'step': step,
-                            'idea_id': idea_id,
-                            'status': 'running',
+                            'message': message,
+                            'status': status,
+                            'logs': logs[-15:],  # Храним последние 15 записей
                             'task_id': task_id
                         }
+                        if final:
+                            new_data['redirect_url'] = '/topics/'
+                        cache.set(f"progress_{task_id}", new_data, timeout=600)
 
-                        cache.set(f"progress_{task_id}",
-                                  progress_data, timeout=300)
-                        # 🧠 2. Псевдо-прогресс (если AI тупит)
+                    # Вложенный callback для самой функции генерации
+                    def callback(current, total, step, message, idea_id):
+                        # Рассчитываем процент (макс 90% до финальной записи в БД)
+                        if total > 0:
+                            # Базовая часть: каждая идея дает вклад, но не до конца
+                            # Например, если 1/10, то base = 8%
+                            base_percent = int((current / total) * 85)
 
-                    def fake_progress():
-                        percent = 1
-                        while True:
-                            data = cache.get(f"progress_{task_id}")
-                            if not data or data.get('status') != 'running':
-                                break
-
-                            current_percent = data.get('percent', 1)
-
-                            # если реальный прогресс стоит — двигаем медленно
-                            if current_percent < percent + 5:
-                                percent = min(percent + 1, 90)
-
-                                data['percent'] = percent
-                                data['message'] = data.get(
-                                    'message') or "Генерация..."
-                                cache.set(
-                                    f"progress_{task_id}", data, timeout=300)
-
-                            time.sleep(0.5)
-
-                    # запускаем фейковый прогресс в фоне
-                    threading.Thread(target=fake_progress, daemon=True).start()
-                    # Запуск основной функции генерации
-                    # ⚙️ 3. Основная генерация
+                            # Добавим "смещение" в зависимости от текущей идеи,
+                            # чтобы бар не прыгал сразу на 20%, а рос внутри шага
+                            percent = max(5, base_percent)
+                        else:
+                            percent = 5
+                        update_cache(
+                            percent, message or f"Генерация идеи {current} из {total}...")
+                    # --- ЗАПУСК ГЕНЕРАЦИИ ---
                     generate_unique_ideas(
                         provider_name=provider_name,
                         count=count,
@@ -135,112 +113,92 @@ def generate_idea_view(request):
                         no_duplicate_days=duplicate_period,
                         callback=callback
                     )
+                    final_steps = [
+                        (92, "💾 Подготовка данных для сохранения..."),
+                        (94, "🔍 Валидация структуры идей..."),
+                        (97, "📝 Запись в базу данных..."),
+                        (99, "⚙️ Финализация транзакций..."),
+                    ]
 
-                    final_data = {
-                        'current': count,
-                        'total': count,
-                        'message': 'Готово! Запись в базу данных...',
-                        'percent': 100,
-                        'status': 'done',
-                        'task_id': task_id
-                    }
-                    cache.set(f"progress_{task_id}", final_data, timeout=60)
+                    for p, msg in final_steps:
+                        update_cache(p, msg)
+                        # Даем JS время "прокрутить" цифры до этих значений
+                        time.sleep(1.2)
 
-                    messages.success(
-                        request, f"✅ Успешно сгенерировано {count} идей!")
+                    # 4. Полное завершение
+                    update_cache(100, "✅ Все идеи успешно сохранены!",
+                                 status='done', final=True)
+
+                    print(f"🏁 Задача {task_id} завершена.")
 
                 except Exception as e:
-                    error_data = {
-                        'current': 0,
-                        'total': count,
-                        'message': f"Ошибка: {str(e)}",
-                        'percent': 0,
+                    print(f"❌ Ошибка в потоке: {e}")
+                    cache.set(f"progress_{task_id}", {
                         'status': 'error',
-                        'task_id': task_id
-                    }
-                    cache.set(f"progress_{task_id}", error_data, timeout=60)
-                    messages.error(request, f"❌ Ошибка генерации: {str(e)}")
+                        'message': f"Ошибка: {str(e)}",
+                        'percent': 0
+                    }, timeout=60)
+                finally:
+                    from django.db import connection
+                    connection.close()  # Важно для threading!
 
-            # Запуск потока
-            thread = threading.Thread(target=run_generation)
-            thread.daemon = True  # Поток умрет вместе с основным процессом при перезагрузке
+            # Запуск фонового процесса
+            thread = threading.Thread(target=run_generation, daemon=True)
             thread.start()
-            # Небольшая задержка чтобы поток успел создать запись в кэше
-            time.sleep(0.2)
 
-            # Возвращаем страницу с формой и task_id
+            # Ответ для фронтенда
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                return JsonResponse({'status': 'ok', 'task_id': task_id})
+
             return render(request, 'topics/generate.html', {'form': form, 'task_id': task_id})
+
         else:
-            messages.error(request, "Ошибка в форме. Проверьте данные.")
+            if request.content_type == 'application/json':
+                return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+            messages.error(request, "Ошибка в форме.")
+
     else:
         form = GenerateIdeasForm()
-        # При обычном заходе страницы task_id нет
-        return render(request, 'topics/generate.html', {'form': form})
 
-
-# def generate_stream(request):
-#     """SSE Endpoint для генерации идей"""
-#     task_id = request.GET.get('task_id')
-
-#     if not task_id:
-#         def empty(
-#         ): yield "data: {\"status\": \"error\", \"message\": \"No Task ID\"}\n\n"
-#         return StreamingHttpResponse(empty(), content_type='text/event-stream')
+    return render(request, 'topics/generate.html', {'form': form})
 
 
 def generate_stream(request):
-    """SSE Endpoint для генерации идей"""
+    """SSE поток, который РЕАЛЬНО читает прогресс из кэша"""
     task_id = request.GET.get('task_id')
 
-    # Вложенная функция-генератор
     def event_stream(t_id):
         last_percent = -1
-        last_message = ""
-        start_time = time.time()
-        timeout = 600  # 10 минут
 
         while True:
-            # 1. Проверка таймаута
-            if time.time() - start_time > timeout:
-                yield f"data: {json.dumps({'status': 'error', 'message': 'Timeout'})}\n\n"
-                break
-
-            # 2. Получаем данные из кэша
+            # Читаем то, что пишет функция run_generation
             data = cache.get(f"progress_{t_id}")
 
             if not data:
-                # Если данных нет, просто ждем. Не возвращаем None!
-                yield f"data: {json.dumps({'status': 'waiting', 'message': 'Подключение к задаче...'})}\n\n"
-                time.sleep(2)
+                # Если задача еще не успела создаться в кэше
+                yield f"data: {json.dumps({'status': 'waiting', 'message': 'Подключение...'})}\n\n"
+                time.sleep(1)
                 continue
 
             current_status = data.get('status')
             current_percent = data.get('percent', 0)
-            current_message = data.get('message', '')
 
-            # 3. Отправляем данные при изменениях
-            if current_percent != last_percent or current_message != last_message or current_status in ['done', 'error']:
+            # Отправляем данные только если есть изменения
+            if current_percent != last_percent or current_status in ['done', 'error']:
                 yield f"data: {json.dumps(data)}\n\n"
                 last_percent = current_percent
-                last_message = current_message
 
+                # Если сервер проставил 'done', закрываем поток SSE
                 if current_status in ['done', 'error']:
-                    time.sleep(1)
                     break
 
-            time.sleep(1)
+            time.sleep(1)  # Проверяем кэш раз в секунду
 
-    # ГАРАНТИРОВАННЫЙ ВОЗВРАТ ОБЪЕКТА
     if not task_id:
-        # Если task_id нет, возвращаем поток с ошибкой сразу
-        def error_gen():
-            yield f"data: {json.dumps({'status': 'error', 'message': 'No task_id provided'})}\n\n"
-        return StreamingHttpResponse(error_gen(), content_type='text/event-stream')
+        return JsonResponse({'error': 'No task_id'}, status=400)
 
-    # Основной рабочий поток
     response = StreamingHttpResponse(event_stream(
         task_id), content_type='text/event-stream')
-    response['Content-Type'] = 'text/event-stream'
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response

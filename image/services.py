@@ -3,6 +3,7 @@ import os
 import json
 import re
 from django.db import transaction
+import requests
 from .models import ImagePrompt, ImageProject
 from prompts.models import ImagePromptTemplate
 from ai_inspector.models import AIProvider  # Импортируем модель
@@ -338,6 +339,7 @@ def generate_image_from_prompt(prompt, provider_name: str, aspect_ratio: str = N
 
         # Генерация
         if provider_type == 'huggingface':
+            # HuggingFace возвращает PIL Image
             image = client.text_to_image(
                 final_prompt,
                 width=size['width'],
@@ -346,27 +348,47 @@ def generate_image_from_prompt(prompt, provider_name: str, aspect_ratio: str = N
                     'default_params', {}).get('num_inference_steps', 28)
             )
 
-            # Сохранение изображения
+            # Сохранение PIL Image
             filename = f"prompt_{prompt.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             rel_path = os.path.join(
                 'image_projects', str(prompt.project.id), filename)
             abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
-
-            # Создаём папку
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            image.save(abs_path)  # ✅ .save() для PIL
 
-            # Сохраняем файл
-            image.save(abs_path)
+        elif provider_type == 'replicate':
+            # Replicate возвращает URL
+            output = client.run(
+                "black-forest-labs/flux-dev",
+                input={
+                    "prompt": final_prompt,
+                    "aspect_ratio": aspect_ratio or "9:16",
+                    "num_inference_steps": config.get('default_params', {}).get('num_inference_steps', 28),
+                    "guidance_scale": config.get('default_params', {}).get('guidance_scale', 3.5)
+                }
+            )
 
-            # Обновляем промпт (сохраняем относительный путь)
-            prompt.image = rel_path
-            prompt.generation_status = 'success'
-            prompt.save()
+            response = requests.get(output[0])
 
-            print(f"✅ Изображение сохранено: {rel_path}")
-            return rel_path
+            # Сохранение байтов
+            filename = f"prompt_{prompt.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            rel_path = os.path.join(
+                'image_projects', str(prompt.project.id), filename)
+            abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            with open(abs_path, 'wb') as f:
+                f.write(response.content)  # ✅ write() для байтов
 
-        raise ValueError(f"Неподдерживаемый провайдер: {provider_name}")
+        else:
+            raise ValueError(f"Неподдерживаемый провайдер: {provider_name}")
+
+        # Обновляем промпт (ОБЩЕЕ для всех провайдеров)
+        prompt.image = rel_path
+        prompt.generation_status = 'success'
+        prompt.save()
+
+        print(f"✅ Изображение сохранено: {rel_path}")
+        return rel_path
 
     except Exception as e:
         prompt.generation_status = 'failed'
@@ -411,5 +433,9 @@ def _get_image_client(provider, api_key: str, config: dict):
         from huggingface_hub import InferenceClient
         client = InferenceClient(token=api_key, model=model_id)
         return client, model_id, 'huggingface'
+    elif provider.name == 'replicate':
+        import replicate
+        client = replicate.Client(api_token=api_key)
+        return client, model_id, 'replicate'
 
     raise ValueError(f"Неизвестный image-провайдер: {provider.name}")

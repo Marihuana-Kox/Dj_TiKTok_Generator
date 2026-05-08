@@ -501,6 +501,7 @@ def article_dashboard(request):
     # --- УДАЛЕНИЕ И СМЕНА СТАТУСА ---
     if request.method == 'POST':
         action = request.POST.get('action')
+
         selected_ids = request.POST.getlist('selected_articles')
 
         if selected_ids:

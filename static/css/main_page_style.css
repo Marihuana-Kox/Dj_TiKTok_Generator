@@ -1,0 +1,52 @@
+.subtitle {
+    text-align: lefrt;
+    margin-bottom: 40px;
+}
+.subtitle h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+.subtitle h3 {
+    font-size: 2em;
+    font-weight: normal;
+    color: var(--text-secondary);
+    margin-top: 10px;
+}
+.features {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 20px;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 50px;
+}
+.feature-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    min-width: 28%;
+    /* Фиксированная ширина для карточек */
+    text-align: center;
+}
+.feature-icon {
+    font-size: 3em;
+    margin-bottom: 15px;
+    color: var(--primary-color);
+}
+.feature-title {
+    font-size: 2em;
+    margin: 10px;
+    display: block;
+}
+.feature-desc {
+    margin-top: 10px;
+    font-size: 1.5em;
+    color: var(--text-secondary);
+}
+.btn-group {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}

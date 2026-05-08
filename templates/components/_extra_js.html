@@ -1,0 +1,19 @@
+ {% load static %}
+<script src="{% static 'js/utils.js' %}"></script>
+<script src="{% static 'js/modal.js' %}"></script>
+<script src="{% static 'js/word_counter.js' %}"></script>
+
+
+{% if request.resolver_match.namespace == 'images' %}
+    <script src="{% static 'js/image/image_dashboard.js' %}"></script>
+    <script src="{% static 'js/image/image_create.js' %}"></script>
+    <script src="{% static 'js/image/image_edit.js' %}"></script>
+{% elif request.resolver_match.namespace == 'audio' %}
+    <script src="{% static 'js/audio_edit.js' %}"></script> <!--topics images article-->
+{% elif request.resolver_match.namespace == 'topics' %}
+    <script src="{% static 'js/topics/topics_dashboard.js' %}"></script>
+{% elif request.resolver_match.namespace == 'article' %}
+    <script src="{% static 'js/article/article_create.js' %}"></script>
+    <script src="{% static 'js/article/article_edit.js' %}"></script>
+    <script src="{% static 'js/article/article_dashboard.js' %}"></script>
+{% endif %}

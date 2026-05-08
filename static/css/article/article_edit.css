@@ -1,0 +1,14 @@
+/* Textarea на странице редактирования */
+textarea.form-control {
+    min-height: 100px !important;
+    height: auto !important;
+    resize: vertical;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px;
+}
+
+/* Авто-высота при вводе */
+textarea.form-control.auto-height {
+    min-height: 150px;
+}

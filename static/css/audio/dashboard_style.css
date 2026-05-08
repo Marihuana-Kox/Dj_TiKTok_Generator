@@ -1,0 +1,26 @@
+/* Аудио плеер в таблице */
+.audio-player {
+    width: 100%;
+    height: 40px;
+    margin-top: 8px;
+}
+
+.audio-player audio {
+    width: 100%;
+    height: 100%;
+}
+
+/* Статусы треков */
+.track-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.track-status.pending { background: rgba(255, 217, 61, 0.2); color: #ffd93d; }
+.track-status.processing { background: rgba(102, 126, 234, 0.2); color: #667eea; }
+.track-status.success { background: rgba(56, 239, 125, 0.2); color: #38ef7d; }
+.track-status.failed { background: rgba(235, 51, 73, 0.2); color: #eb3349; }

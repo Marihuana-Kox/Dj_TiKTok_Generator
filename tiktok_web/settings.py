@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'ai_inspector',
     'topics',
     'prompts',
+    'audio',
 ]
 
 MIDDLEWARE = [
