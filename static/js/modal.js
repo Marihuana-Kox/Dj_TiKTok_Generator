@@ -66,27 +66,6 @@
         log.scrollTop = log.scrollHeight;
     };
 
-    function finishProgress(success, message, redirectUrl, minDelay) {
-        if (eventSource) { eventSource.close(); eventSource = null; }
-
-        const progressBar = document.getElementById('gen-progress-bar');
-        const statusText = document.getElementById('gen-progress-message');
-        
-        if (progressBar) {
-            progressBar.style.width = '100%';
-            progressBar.className = 'progress-bar ' + (success ? 'bg-success' : 'bg-danger');
-        }
-        if (statusText) statusText.textContent = message;
-
-        console.log("🏁 Завершение. Ждем редирект...");
-
-        setTimeout(() => {
-            if (success && redirectUrl) {
-                window.location.href = redirectUrl;
-            }
-        }, minDelay || 3000);
-    }
-
     window.startProgressTracking = function(streamUrl, taskId) {
         currentModalId = 'progress-modal';
         openModal(currentModalId); // Убеждаемся, что окно открывается
@@ -119,7 +98,7 @@
                 }
 
                 if (data.status === 'done') {
-                    finishProgress(true, data.message, data.redirect_url || '/topics/', 3000);
+                    finishProgress(true, data.message, null, 3000);
                 } else if (data.status === 'error') {
                     finishProgress(false, data.message, null, 0);
                 }
@@ -130,6 +109,30 @@
 
         eventSource.onerror = function() {
             console.warn("📡 Потеря связи с сервером...");
+        };
+    };
+   
+    window.startProgressTracking = function(streamUrl, taskId, callback, cancelUrl = null) {
+        currentTaskId = taskId;
+        currentCancelUrl = cancelUrl; // Запоминаем адрес для отмены
+        
+        // Сохраняем в hidden input (если он есть)
+        const input = document.getElementById('progress-task-id');
+        if (input) input.value = taskId;
+
+        const source = new EventSource(`${streamUrl}?task_id=${taskId}`);
+        window.activeEventSource = source;
+
+        source.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            updateProgress(data.percent, data.message, data.logs);
+
+            if (data.status === 'done') {
+                source.close();
+                // Вызываем финиш без редиректа, чтобы сработал callback страницы
+                finishProgress(true, data.message, null, 2000); 
+                if (callback) callback(data);
+            }
         };
     };
 
@@ -149,4 +152,5 @@
             });
         }
     });
+    // modal.js
 })();

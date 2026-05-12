@@ -109,7 +109,7 @@
                     <div class="flex items-center gap-2">
                         <input type="checkbox" name="selected_prompts" value="{{ prompt.id }}" 
                             class="prompt-checkbox form-control checkbox-fix" id="prompt-{{ prompt.id }}"
-                            {% if prompt.generation_status == 'success' %}checked{% endif %}>
+                            {% if prompt.generation_status == 'success' %} {% endif %}>
                         <label for="prompt-{{ prompt.id }}" class="text-bold text-blue">Сцена #{{ prompt.order }}</label>
                     </div>
                     <span class="badge 

@@ -2,12 +2,12 @@
 import os
 import json
 import re
-from django.db import transaction
 import requests
+from django.core.cache import cache
+from django.db import transaction
 from .models import ImagePrompt, ImageProject
 from prompts.models import ImagePromptTemplate
 from ai_inspector.models import AIProvider  # Импортируем модель
-from django.core.files.base import ContentFile
 from django.conf import settings
 from datetime import datetime
 
@@ -212,63 +212,37 @@ def parse_ai_response(raw_response):
         raise Exception(f"Ошибка обработки ответа AI: {e}")
 
 
-def generate_storyboard(project, scenes_count=10, provider_override=None):
+def generate_storyboard(project, scenes_count=10, provider_override=None, task_id=None):
     """
-    Главная функция генерации раскадровки.
+    Генерация раскадровки с реальным обновлением прогресса.
     """
+    def log_step(percent, message):
+        if task_id:
+            data = cache.get(f"progress_{task_id}", {})
+            logs = data.get('logs', [])
+            if message and (not logs or logs[-1] != message):
+                logs.append(message)
+            cache.set(f"progress_{task_id}", {
+                'percent': percent,
+                'message': message,
+                'status': 'running',
+                'logs': logs[-15:],
+                'task_id': task_id
+            }, timeout=3600)
 
-    print(f"\n>>> НАЧАЛО ГЕНЕРАЦИИ для проекта #{project.id}")
-
-    # 1. Проверка статьи
+    # --- 1. Подготовка промпта ---
     trans = project.article.translations.filter(
         language__code='ru').first() or project.article.translations.first()
     if not trans or not trans.content:
-        raise ValueError("В статье нет текста!")
+        raise ValueError("Текст статьи не найден.")
 
     source_text = trans.content[:4000]
-
-    # 2. Получение шаблона из БД
     template_obj = ImagePromptTemplate.objects.filter(
-        code_name='storyboard_generator',
-        is_active=True
-    ).first()
+        code_name='storyboard_generator', is_active=True).first()
+    if not template_obj:
+        raise Exception("Шаблон 'storyboard_generator' не найден.")
 
-    if template_obj:
-        print(f"ID: {template_obj.id}")
-        print(f"Name: {template_obj.name}")
-        print(f"Code Name: {template_obj.code_name}")
-
-        # Проверяем все возможные поля
-        print(f"\n--- ПРОВЕРКА ПОЛЕЙ ---")
-        print(
-            f"template_content: {'✅ ЕСТЬ' if hasattr(template_obj, 'template_content') else '❌ НЕТ'}")
-        print(f"text: {'✅ ЕСТЬ' if hasattr(template_obj, 'text') else '❌ НЕТ'}")
-        print(
-            f"content: {'✅ ЕСТЬ' if hasattr(template_obj, 'content') else '❌ НЕТ'}")
-
-        # Выводим содержимое
-        if hasattr(template_obj, 'template_content'):
-            print(f"\n--- TEMPLATE_CONTENT (первые 500 симв.) ---")
-            print(template_obj.template_content[:500])
-        elif hasattr(template_obj, 'text'):
-            print(f"\n--- TEXT (первые 500 симв.) ---")
-            print(template_obj.text[:500])
-        elif hasattr(template_obj, 'content'):
-            print(f"\n--- CONTENT (первые 500 симв.) ---")
-            print(template_obj.content[:500])
-        else:
-            print(f"\n❌ НЕ НАЙДЕНО ПОЛЕ С ТЕКСТОМ!")
-            print(
-                f"Все поля: {[f.name for f in template_obj._meta.get_fields()]}")
-
-        print(f"{'='*60}\n")
-    else:
-        print(f"❌ ПРОМПТ НЕ НАЙДЕН В БД!")
-        raise Exception("Промпт 'storyboard_generator' не найден в БД!")
-    template_text = template_obj.template_content
-
-    # 3. Заполнение шаблона
-    final_prompt = template_text.format(
+    final_prompt = template_obj.template_content.format(
         scenes_count=scenes_count,
         style_keywords=project.get_style_full(),
         aspect_ratio=project.aspect_ratio,
@@ -276,47 +250,59 @@ def generate_storyboard(project, scenes_count=10, provider_override=None):
         language="Russian"
     )
 
-    # 4. Вызов AI
+    # --- 2. Ожидание AI (самый долгий этап) ---
+    log_step(15, "🤖 AI формирует сюжетные линии (обычно 10-20 сек)...")
     raw_response = call_llm_universal(final_prompt, provider_override)
-    print(f"<<< ПОЛУЧЕН ОТВЕТ (длина: {len(raw_response)})")
 
-    # 5. Парсинг JSON (ВЫЗЫВАЕМ НОВЫЙ МЕТОД)
+    # --- 3. Парсинг ---
+    log_step(50, "📥 Обработка ответа и создание сцен...")
     scenes_data = parse_ai_response(raw_response)
+    total_scenes = len(scenes_data)
 
-    # 6. Сохранение в БД
+    # --- 4. Сохранение в БД (РЕАЛЬНЫЙ ПРОГРЕСС ТУТ) ---
     with transaction.atomic():
         project.prompts.all().delete()
-        count = 0
         for i, item in enumerate(scenes_data):
+            num = i + 1
             desc = item.get('scene_description', item.get(
-                'description', f'Scene {i+1}'))
+                'description', f'Scene {num}'))
             txt = item.get('prompt_text', item.get('prompt', ''))
 
             ImagePrompt.objects.create(
                 project=project,
-                order=i+1,
+                order=num,
                 scene_description=desc,
                 prompt_text=txt,
                 generation_status='pending'
             )
-            count += 1
+
+            # Динамический расчет: начинаем с 55% и доходим до 98%
+            progress_percent = 55 + int((num / total_scenes) * 40)
+            log_step(progress_percent,
+                     f"✅ Сцена {num}/{total_scenes} сохранена: {desc[:40]}...")
 
         project.prompts_generated = True
         project.status = 'prompts_ready'
         project.save()
 
-    print(f"✅ УСПЕХ! Создано {count} сцен.")
-    return count
+    return total_scenes
 
 
-def generate_image_from_prompt(prompt, provider_name: str, aspect_ratio: str = None, style_preset: str = 'current'):
+def generate_image_from_prompt(prompt, provider_name: str, aspect_ratio: str = None, style_preset: str = 'current', task_id=None, step_info=""):
     """
     Генерирует изображение для одного промпта.
     """
-
+    def log_image_step(message):
+        if task_id:
+            data = cache.get(f"progress_{task_id}", {})
+            logs = data.get('logs', [])
+            logs.append(f"{step_info} {message}")
+            data['logs'] = logs[-15:]
+            cache.set(f"progress_{task_id}", data, timeout=3600)
     # Обновляем статус
     prompt.generation_status = 'generating'
     prompt.save()
+    log_image_step("🔄 Запуск нейросети...")
 
     try:
         # Получаем провайдера

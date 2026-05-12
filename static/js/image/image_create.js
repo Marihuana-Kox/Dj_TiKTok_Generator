@@ -1,69 +1,79 @@
-// ============================================================================
-// IMAGE CREATE — форма создания проекта
-// Страница: /images/create/
-// ============================================================================
+// image_create.js
+
+/**
+ * Глобальная функция для переключения видимости настроек.
+ * Вызывается из HTML: onchange="toggleSettings(false/true)"
+ */
+window.toggleSettings = function(show) {
+    // Находим блок по ID, который указан у тебя в HTML
+    const settingsBlock = document.getElementById('manual-settings-block');
+    
+    if (settingsBlock) {
+        if (show) {
+            // Если "Ручной" (true) — убираем скрывающий класс Bootstrap d-none
+            settingsBlock.classList.remove('d-none');
+            console.log('Режим: Ручной (настройки показаны)');
+        } else {
+            // Если "Авто" (false) — добавляем класс d-none
+            settingsBlock.classList.add('d-none');
+            console.log('Режим: Авто (настройки скрыты)');
+        }
+    } else {
+        console.error('Ошибка: Элемент #manual-settings-block не найден');
+    }
+};
 
 (function() {
-    console.log('🔍 image_create.js инициализация...');
+    console.log('🔍 image_create.js инициализирован');
 
     const form = document.querySelector('#project-create-form');
     const submitBtn = form?.querySelector('button[type="submit"]');
 
-    if (!form || !submitBtn) {
-        console.log('⚠️ Форма не найдена, image_create.js не активен');
-        return;
-    }
+    if (!form || !submitBtn) return;
 
+    /**
+     * Обработка отправки формы
+     */
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '⏳ Генерация...';
+        submitBtn.innerHTML = '⏳ Запуск...';
         
         const formData = new FormData(form);
-        const actionUrl = form.dataset.actionUrl || '/images/create/';
+        const actionUrl = form.dataset.actionUrl || form.getAttribute('action');
         
         fetch(actionUrl, {
             method: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': getCookie('csrfmiddlewaretoken')
+                'X-CSRFToken': getCookie('csrftoken')
             },
             body: formData
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                openModal('global-progress-modal');
-                updateProgress(0, 'Инициализация...');
-                simulateProgress(data.redirect_url);
+            if (data.success && data.task_id) {
+                // Запуск универсального прогресс-бара из modal.js
+                if (typeof window.startProgressTracking === 'function') {
+                    window.startProgressTracking('/images/api/generation_progress/', data.task_id);
+                }
             } else {
-                showToast('❌ ' + data.error, 'error');
+                alert('❌ ' + (data.error || 'Ошибка запуска'));
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '🚀 Создать проект';
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            showToast('❌ Ошибка соединения', 'error');
+            console.error('Ошибка fetch:', error);
             submitBtn.disabled = false;
             submitBtn.innerHTML = '🚀 Создать проект';
         });
     });
 
-    function simulateProgress(redirectUrl) {
-        let width = 0;
-        const interval = setInterval(() => {
-            if (width >= 100) {
-                clearInterval(interval);
-                finishProgress(true, '✅ Готово!', redirectUrl, 500);
-            } else {
-                width += Math.floor(Math.random() * 8) + 2;
-                if (width > 100) width = 100;
-                updateProgress(width, 'Генерация...');
-            }
-        }, 150);
+    // Инициализация начального состояния при загрузке (если вдруг страница перезагружена с выбранным ручным режимом)
+    const manualRadio = form.querySelector('input[name="gen_mode"][value="manual"]');
+    if (manualRadio && manualRadio.checked) {
+        window.toggleSettings(true);
     }
-
-    console.log('✅ image_create.js готов');
 })();

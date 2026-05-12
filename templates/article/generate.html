@@ -3,10 +3,9 @@
 {% block title %}Генерация статей{% endblock %}
 
 {% block content %}
-<form id="article-gen-form">
+<form id="article-gen-form" action="{% url 'article:start_generation_api' %}" method="POST">
     {% csrf_token %}
     
-    <!-- === РАЗДЕЛ 1: ОСНОВНЫЕ НАСТРОЙКИ === -->
     <h5 class="mb-2 text-bold text-blue">1. Контент и Языки</h5>
     
     <div class="form-group mb-2">
@@ -25,7 +24,6 @@
         </div>
     </div>
 
-    <!-- Выбор языков -->
     <div class="form-group mb-3 p-2 border rounded bg-dark">
         <label class="form-label text-bold mb-2 d-block">{{ form.languages.label }}</label>
         <div class="d-flex flex-wrap gap-3">
@@ -38,6 +36,7 @@
                        class="form-check-input lang-checkbox"
                        {% if code == 'en' %}checked disabled{% endif %} 
                        {% if code in form.languages.initial %}checked{% endif %}>
+                {% if code == 'en' %}<input type="hidden" name="languages" value="en">{% endif %}
                 <label class="form-check-label" for="id_lang_{{ code }}">
                     {{ label }}
                     {% if code == 'en' %}<span class="text-muted text-small">(База)</span>{% endif %}
@@ -45,14 +44,11 @@
             </div>
             {% endfor %}
         </div>
-        <small class="text-muted d-block mt-1">English обязателен. Russian включен по умолчанию (можно отключить).</small>
     </div>
 
-    <!-- === РАЗДЕЛ 2: ВЫБОР ИДЕЙ === -->
     <h5 class="text-bold text-blue mb-2 border-bottom pb-2 mt-4">2. Идеи для статей</h5>
     
     <div class="form-group mb-2">
-        <!-- ЧЕКБОКС ПЕРЕНЕСЕН СЮДА -->
         <div class="d-flex justify-content-between align-items-center mb-2">
             <label class="form-label d-block mb-0">
                 <input type="checkbox" id="select-all-ideas" class="form-check-input me-2">
@@ -85,28 +81,19 @@
             {% else %}
                 <div class="text-center p-5 text-muted">
                     <h4>⚠️ Нет доступных идей</h4>
-                    <p>Сначала сгенерируйте идеи в разделе "Темы" и убедитесь, что у них статус <b>"pending"</b>.</p>
-                    <a href="{% url 'topics:generate' %}" class="btn btn-primary mt-2">Перейти к генерации идей</a>
                 </div>
             {% endif %}
         </div>
-        <small class="text-muted d-block mt-1">Клик по строке также выбирает идею.</small>
     </div>
-    <!-- Кнопки -->
-    <div class="flex mt-4 border-top pt-3">
+
+    <div class="flex mt-4 border-top pt-3 gap-2">
         <button type="submit" class="btn btn-success flex-fill">🚀 Запустить генерацию</button>
-        <!-- ТЕСТОВАЯ КНОПКА — УДАЛИТЬ ПОСЛЕ ПРОВЕРКИ -->
-
-        <button type="button" class="btn btn-warning" onclick="testProgressModal()">
-            🧪 Тест прогресс-бара
-        </button>
-
-        <button type="button" id="btn-close-modal" class="btn btn-outline flex-fill">Отмена</button>
+        <button type="button" onclick="history.back()" class="btn btn-outline flex-fill">Отмена</button>
     </div>
 </form>
-<!-- Передаем URL-адреса из Django во внешний JS -->
+
 <script>
-    window.GEN_API_URL = "{% url 'article:start_generation_api' %}";
+    // Используем эти переменные в JS файле
     window.GEN_STREAM_URL = "{% url 'article:generation_stream' %}";
 </script>
 {% endblock %}

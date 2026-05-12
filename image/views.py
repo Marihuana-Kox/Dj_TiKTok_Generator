@@ -1,6 +1,12 @@
 # image/views.py
+import json
+import time
+import uuid
+
+from django.db import connection
+import threading
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.urls import reverse
 from article.models import ArticleCluster
 from django.shortcuts import render, redirect, get_object_or_404
@@ -10,7 +16,6 @@ from django.contrib import messages
 from ai_inspector.models import AIProvider
 from .models import ImagePrompt, ImageProject
 from .services import generate_storyboard, generate_image_from_prompt
-import uuid
 from django.core.cache import cache
 from django.db import transaction
 
@@ -106,43 +111,92 @@ def image_dashboard(request):
 
 @login_required
 def project_create(request):
-    # Базовый контекст
-    context = {
-        'page_title': 'Новый проект',
-        'articles': [],
-        'show_modal': False,
-        'project_data': None,
-    }
-
-    # 1. Получаем провайдеров
-    providers_qs = AIProvider.objects.filter(is_active=True).order_by('name')
-    context['providers'] = providers_qs
-
-    # 2. Подготавливаем статьи
-    articles_qs = ArticleCluster.objects.all().order_by('-created_at')[:50]
-    articles_list = []
-    for art in articles_qs:
-        ru_trans = art.translations.filter(language__code='ru').first()
-        if ru_trans:
-            title = ru_trans.title
-        elif art.translations.exists():
-            first_trans = art.translations.first()
-            title = f"{first_trans.title} ({first_trans.language.code.upper()})"
-        else:
-            title = "Без названия"
-        articles_list.append({'id': art.id, 'title': title})
-
-    context['articles'] = articles_list
+    providers = AIProvider.objects.filter(is_active=True)
+    articles = ArticleCluster.objects.all().order_by('-created_at')[:50]
 
     if request.method == 'POST':
-        # Проверяем, это AJAX или обычная форма
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return _handle_ajax_create(request)
+        article_id = request.POST.get('article_id')
+        provider_name = request.POST.get('provider')
+        scenes_count = int(request.POST.get('scenes_count', 10))
 
-        # Обычная форма (оставляем как запасной вариант)
-        return _handle_form_create(request)
+        if not article_id or not provider_name:
+            return JsonResponse({'success': False, 'error': 'Заполните все поля'})
 
-    return render(request, 'image/project_create.html', context)
+        task_id = str(uuid.uuid4())
+        cluster = get_object_or_404(ArticleCluster, id=article_id)
+
+        project = ImageProject.objects.create(
+            article=cluster,
+            title=f"Проект для {cluster.id}",
+            style_preset=request.POST.get('style_preset', 'cinematic'),
+            custom_style_prompt=request.POST.get('custom_style', ''),
+            aspect_ratio=request.POST.get('aspect_ratio', '9:16'),
+            status='processing'
+        )
+
+        # Инициализация
+        cache.set(f"progress_{task_id}", {
+            'percent': 1,
+            'message': 'Инициализация проекта...',
+            'status': 'running',
+            'logs': ['🚀 Запуск генерации раскадровки...'],
+            'task_id': task_id
+        }, timeout=3600)
+        # 3. Фоновая задача
+
+        def run_image_task():
+            def update_img_progress(percent, message, status='running', final=False):
+                # Эта функция теперь используется только для Ошибок или Финала
+                data = cache.get(f"progress_{task_id}", {})
+                logs = data.get('logs', [])
+                if message and (not logs or logs[-1] != message):
+                    logs.append(message)
+                payload = {
+                    'percent': percent, 'message': message, 'status': status,
+                    'logs': logs[-15:], 'task_id': task_id
+                }
+                if final:
+                    payload['redirect_url'] = reverse(
+                        'image:project_edit', kwargs={'pk': project.id})
+                cache.set(f"progress_{task_id}", payload, timeout=3600)
+
+            try:
+                # Шаг 1: Только уведомляем о начале
+                update_img_progress(
+                    5, "🚀 Подготовка и отправка запроса в AI...")
+
+                # Шаг 2: Вызываем сервис и ПЕРЕДАЕМ task_id
+                # Теперь ВСЯ анимация прогресса будет идти ИЗНУТРИ этой функции
+                generate_storyboard(
+                    project=project,
+                    scenes_count=scenes_count,
+                    provider_override=provider_name,
+                    task_id=task_id  # <--- Передаем ID для реального прогресса
+                )
+
+                # Шаг 3: Финализация (выполнится, когда сервис закончит цикл)
+                update_img_progress(
+                    100, "✅ Все сцены успешно созданы!", status='done', final=True)
+
+            except Exception as e:
+                print(f"Ошибка генерации: {e}")
+                update_img_progress(0, f"Ошибка: {str(e)}", status='error')
+            finally:
+                connection.close()
+
+        threading.Thread(target=run_image_task, daemon=True).start()
+
+        return JsonResponse({
+            'success': True,
+            'task_id': task_id,
+            'project_id': project.id
+        })
+
+    return render(request, 'image/project_create.html', {
+        'providers': providers,
+        'articles': articles,
+        'page_title': 'Создать проект'
+    })
 
 
 def _handle_ajax_create(request):
@@ -264,162 +318,122 @@ def _handle_form_create(request):
 @login_required
 def project_edit(request, pk):
     """
-    Страница редактирования промптов + генерация изображений с прогрессом.
+    Страница редактирования промптов + генерация изображений с фоновым прогрессом.
     """
-
     project = get_object_or_404(ImageProject, id=pk)
     prompts = project.prompts.all().order_by('order')
-
-    # Получаем image-провайдеров
     image_providers = AIProvider.objects.filter(
-        is_active=True,
-        provider_type='image'
-    )
+        is_active=True, provider_type='image')
 
-    # AJAX: Запрос прогресса генерации (Polling)
+    # AJAX: Обработка генерации или проверки статуса
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
 
-        # GET-запрос → проверяем прогресс
+        # 1. Проверка прогресса (GET)
         if request.method == 'GET':
             task_id = request.GET.get('task_id')
-            if not task_id:
-                return JsonResponse({'error': 'No task_id'}, status=400)
-
-            progress = cache.get(f'gen_progress_{task_id}')
+            # Мы проверяем и gen_progress_ (старый ключ) и progress_ (новый ключ для стрима) для совместимости
+            progress = cache.get(f"progress_{task_id}") or cache.get(
+                f"gen_progress_{task_id}")
             if progress:
                 return JsonResponse(progress)
-            else:
-                # Если прогресса нет в кэше — считаем завершённым
-                return JsonResponse({
-                    'completed': True,
-                    'completed_count': 0,
-                    'total_count': 0,
-                    'prompts_status': []
-                })
+            return JsonResponse({'completed': True, 'percent': 100})
 
-        # POST-запрос → запускаем генерацию
+        # 2. Запуск генерации (POST)
         if request.method == 'POST':
             provider_name = request.POST.get('provider')
-            selected_ids = request.POST.get('selected_prompts', '')
+            selected_ids_str = request.POST.get('selected_prompts', '')
             aspect_ratio = request.POST.get(
                 'aspect_ratio', project.aspect_ratio)
             style_preset = request.POST.get('style_preset', 'current')
 
-            # Проверка провайдера
-            if not provider_name:
-                return JsonResponse({'success': False, 'error': 'Выберите провайдера'}, status=400)
+            if not provider_name or not selected_ids_str:
+                return JsonResponse({'success': False, 'error': 'Не выбраны промпты или провайдер'}, status=400)
 
-            # Парсим ID выбранных промптов
             try:
-                selected_ids = [int(x)
-                                for x in selected_ids.split(',') if x.isdigit()]
-            except (ValueError, AttributeError):
-                return JsonResponse({'success': False, 'error': 'Неверный формат ID'}, status=400)
+                selected_ids = [
+                    int(x) for x in selected_ids_str.split(',') if x.isdigit()]
+                # Превращаем в список для итерации в потоке
+                selected_prompts = list(prompts.filter(id__in=selected_ids))
+            except:
+                return JsonResponse({'success': False, 'error': 'Ошибка валидации ID'}, status=400)
 
-            selected_prompts = prompts.filter(id__in=selected_ids)
-
-            if not selected_prompts.exists():
-                return JsonResponse({'success': False, 'error': 'Выберите хотя бы один промпт'}, status=400)
-
-            # Создаём task_id для отслеживания прогресса
             task_id = str(uuid.uuid4())
 
-            # Инициализируем прогресс в кэше (таймаут 10 минут)
-            cache.set(f'gen_progress_{task_id}', {
-                'completed': False,
-                'completed_count': 0,
-                'total_count': selected_prompts.count(),
-                'prompts_status': [{'id': p.id, 'status': 'pending'} for p in selected_prompts],
-                'error': None
-            }, timeout=600)
+            # Инициализируем прогресс в кэше
+            cache.set(f"progress_{task_id}", {
+                'percent': 1,
+                'message': f'Подготовка очереди из {len(selected_prompts)} кадров...',
+                'status': 'running',
+                'logs': ['🚀 Запуск процесса генерации...'],
+                'task_id': task_id,
+                'total_count': len(selected_prompts),
+                'completed_count': 0
+            }, timeout=3600)
 
-            # Запускаем генерацию
-            try:
-                with transaction.atomic():
+            # ФОНОВАЯ ЗАДАЧА
+            def run_generation_task():
+                try:
+                    total = len(selected_prompts)
                     for i, prompt in enumerate(selected_prompts):
-                        # Пропускаем уже успешные
-                        if prompt.generation_status == 'success':
-                            # Обновляем статус в кэше
-                            progress = cache.get(f'gen_progress_{task_id}')
-                            if progress:
-                                progress['prompts_status'][i]['status'] = 'success'
-                                progress['completed_count'] = i + 1
-                                cache.set(
-                                    f'gen_progress_{task_id}', progress, timeout=600)
-                            continue
+                        current_num = i + 1
 
-                        # Статус: генерация
-                        progress = cache.get(f'gen_progress_{task_id}')
-                        if progress:
-                            progress['prompts_status'][i]['status'] = 'generating'
-                            cache.set(
-                                f'gen_progress_{task_id}', progress, timeout=600)
+                        # Обновляем статус в логах
+                        data = cache.get(f"progress_{task_id}", {})
+                        data['percent'] = int((i / total) * 100)
+                        data['message'] = f"Обработка кадра {current_num} из {total}"
+                        data['completed_count'] = i
+                        cache.set(f"progress_{task_id}", data, timeout=3600)
 
-                        # Генерируем изображение
+                        # Сама генерация (вызываем твой сервис)
                         generate_image_from_prompt(
                             prompt,
                             provider_name,
                             aspect_ratio=aspect_ratio,
-                            style_preset=style_preset
+                            style_preset=style_preset,
+                            task_id=task_id,  # Передаем для детальных логов внутри сервиса
+                            step_info=f"[{current_num}/{total}]"
                         )
 
-                        # Статус: успех
-                        progress = cache.get(f'gen_progress_{task_id}')
-                        if progress:
-                            progress['prompts_status'][i]['status'] = 'success'
-                            progress['completed_count'] = i + 1
-                            cache.set(
-                                f'gen_progress_{task_id}', progress, timeout=600)
+                    # Финализация
+                    cache.set(f"progress_{task_id}", {
+                        'percent': 100,
+                        'message': '✅ Все изображения успешно сгенерированы!',
+                        'status': 'done',
+                        'task_id': task_id,
+                        'completed': True
+                    }, timeout=3600)
 
-                # Завершено успешно
-                progress = cache.get(f'gen_progress_{task_id}')
-                if progress:
-                    progress['completed'] = True
-                    cache.set(f'gen_progress_{task_id}', progress, timeout=600)
+                except Exception as e:
+                    cache.set(f"progress_{task_id}", {
+                        'status': 'error',
+                        'message': f"Ошибка: {str(e)}",
+                        'percent': 0
+                    }, timeout=3600)
+                finally:
+                    connection.close()
 
-                return JsonResponse({
-                    'success': True,
-                    'task_id': task_id,
-                    'message': f'Сгенерировано {selected_prompts.count()} изображений'
-                })
+            threading.Thread(target=run_generation_task, daemon=True).start()
+            return JsonResponse({'success': True, 'task_id': task_id})
 
-            except Exception as e:
-                # Ошибка генерации
-                progress = cache.get(f'gen_progress_{task_id}')
-                if progress:
-                    progress['completed'] = True
-                    progress['error'] = str(e)
-                    cache.set(f'gen_progress_{task_id}', progress, timeout=600)
-
-                return JsonResponse({
-                    'success': False,
-                    'error': str(e),
-                    'task_id': task_id
-                }, status=500)
-
-    # ОБЫЧНАЯ ФОРМА: Сохранение промптов
+    # ОБЫЧНАЯ ФОРМА: Сохранение текста (кнопка "Сохранить")
     if request.method == 'POST':
         action = request.POST.get('action')
-
         if action == 'save':
             for prompt in prompts:
-                new_desc = request.POST.get(f'desc_{prompt.id}')
-                new_prompt_text = request.POST.get(f'prompt_{prompt.id}')
-                if new_desc:
-                    prompt.scene_description = new_desc
-                if new_prompt_text:
-                    prompt.prompt_text = new_prompt_text
+                prompt.scene_description = request.POST.get(
+                    f'desc_{prompt.id}', prompt.scene_description)
+                prompt.prompt_text = request.POST.get(
+                    f'prompt_{prompt.id}', prompt.prompt_text)
                 prompt.save()
             messages.success(request, "✅ Промпты сохранены!")
             return redirect('image:project_edit', pk=project.id)
 
     # GET: Отображение страницы
-    context = {
+    return render(request, 'image/project_edit.html', {
         'project': project,
         'prompts': prompts,
         'image_providers': image_providers,
-    }
-    return render(request, 'image/project_edit.html', context)
+    })
 
 
 @login_required
@@ -446,18 +460,46 @@ def project_settings(request, pk):
 
 @login_required
 def generation_progress(request, task_id):
-    """API для получения прогресса генерации"""
-    from django.core.cache import cache
+    """
+    Универсальное API для получения прогресса.
+    Поддерживает и создание промптов, и генерацию картинок.
+    """
 
-    # Получаем прогресс из cache
-    progress = cache.get(f'generation_progress_{task_id}')
+    # Проверяем основной ключ (который мы используем сейчас)
+    progress = cache.get(f"progress_{task_id}")
+
+    # Если не нашли, проверяем старый вариант ключа (для подстраховки)
+    if not progress:
+        progress = cache.get(f"gen_progress_{task_id}")
 
     if not progress:
+        # Если в кэше вообще ничего нет, значит задача либо не создана,
+        # либо уже удалена из кэша. Возвращаем структуру, которая не сломает JS.
         return JsonResponse({
             'completed': True,
+            'percent': 100,
+            'message': 'Завершено или не найдено',
+            'status': 'done',
             'completed_count': 0,
-            'total_count': 0,
-            'prompts_status': []
+            'total_count': 0
         })
 
+    # Добавляем флаг завершения для JS, если статус 'done'
+    if progress.get('status') == 'done':
+        progress['completed'] = True
+
     return JsonResponse(progress)
+
+
+def generation_stream(request):
+    task_id = request.GET.get('task_id')
+
+    def event_stream():
+        while True:
+            data = cache.get(f"progress_{task_id}")
+            if data:
+                yield f"data: {json.dumps(data)}\n\n"
+                if data.get('status') in ['done', 'error']:
+                    break
+            time.sleep(1)
+    return StreamingHttpResponse(event_stream(), content_type='text/event-stream')

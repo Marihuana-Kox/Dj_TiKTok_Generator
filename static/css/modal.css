@@ -177,6 +177,11 @@
 .progress-log-wrapper .text-muted{
     padding-left: 24px;
 }
+.progress-btn-wrapper {
+    margin: 0 24px;
+    text-align: end;
+
+}
 .progress-log {
     max-height: 200px;
     overflow-y: auto;

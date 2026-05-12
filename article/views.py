@@ -2,10 +2,13 @@ import json
 import re
 import time
 import threading
+import uuid
+from django.db import connection
 from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 # Импорт моделей
 from prompts.models import ArticlePrompt, SystemInstruction
@@ -19,6 +22,7 @@ from prompts.services import get_system_instruction, render_article_prompt, rend
 
 # Глобальное хранилище прогресса
 ARTICLE_GEN_PROGRESS = {}
+CACHE_TIMEOUT = 3600
 
 
 def article_generate_page(request):
@@ -28,360 +32,201 @@ def article_generate_page(request):
 
 def start_generation_api(request):
     """API endpoint для запуска генерации через AJAX"""
-    if request.method == 'POST':
-        form = ArticleGenerationForm(request.POST)
-        if not form.is_valid():
-            print(form.errors)  # Вывод ошибок в консоль
-            return JsonResponse({'status': 'error', 'message': 'Invalid form data'})
-        if form.is_valid():
-            session_key = request.session.session_key
-            if not session_key:
-                request.session.create()
-                session_key = request.session.session_key
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Метод не разрешен'}, status=405)
 
-            selected_ids = form.cleaned_data['idea_selection']
-            selected_lang_codes = form.cleaned_data['languages']
+    form = ArticleGenerationForm(request.POST)
+    if not form.is_valid():
+        # Возвращаем ошибки формы сразу
+        return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
 
-            # Гарантируем, что EN всегда есть
-            if 'en' not in selected_lang_codes:
-                selected_lang_codes.append('en')
+    # --- 1. ПОДГОТОВКА ДАННЫХ (Код выполняется) ---
+    task_id = str(uuid.uuid4())
+    cd = form.cleaned_data
+    selected_ids = cd['idea_selection']
+    selected_lang_codes = cd['languages']
 
-            # Получаем выбранный Промпт
-            prompt_code = form.cleaned_data['article_prompt']
+    if 'en' not in selected_lang_codes:
+        selected_lang_codes.append('en')
 
-            # Настройки картинок
-            img_mode = form.cleaned_data['image_mode']
-            manual_count = form.cleaned_data.get('manual_scene_count', 5)
-            aspect_ratio = form.cleaned_data['aspect_ratio']
-            art_style = form.cleaned_data['art_style']
-            provider = form.cleaned_data['ai_provider']
+    prompt_code = cd['article_prompt']
+    img_mode = cd['image_mode']
+    manual_count = cd.get('manual_scene_count', 5)
+    aspect_ratio = cd['aspect_ratio']
+    art_style = cd['art_style']
+    provider = cd['ai_provider']
+    generate_prompts = 'enable_prompts_toggle' in request.POST
 
-            # Проверка: включена ли генерация промптов?
-            generate_prompts = 'enable_prompts_toggle' in request.POST
+    # Оценка шагов
+    steps_per_idea = 2 + len(selected_lang_codes) + \
+        (2 if generate_prompts else 0)
+    total_steps_estimate = len(selected_ids) * steps_per_idea
 
-            # Оценка шагов
-            steps_per_idea = 1 + 1 + len(selected_lang_codes)
-            if generate_prompts:
-                steps_per_idea += 2
+    # Записываем в кэш стартовое состояние
+    cache.set(f"progress_{task_id}", {
+        'percent': 1,
+        'message': 'Инициализация...',
+        'status': 'running',
+        'logs': ['🚀 Запуск задачи...'],
+        'task_id': task_id
+    }, timeout=3600)
 
-            total_steps_estimate = len(selected_ids) * steps_per_idea
+    def run_task():
+        def update_task_progress(percent, message, status='running', final=False):
+            data = cache.get(f"progress_{task_id}", {})
+            logs = data.get('logs', [])
+            if message and (not logs or logs[-1] != message):
+                logs.append(message)
 
-            ARTICLE_GEN_PROGRESS[session_key] = {
-                'current': 0,
-                'total': total_steps_estimate,
-                'percent': 0,
-                'message': 'Инициализация...',
-                'status': 'starting',
-                'log': []
+            payload = {
+                'percent': percent,
+                'message': message,
+                'status': status,
+                'logs': logs[-15:],
+                'task_id': task_id
             }
+            if final:
+                payload['redirect_url'] = '/article/'
+            cache.set(f"progress_{task_id}", payload, timeout=3600)
 
-            def run_task():
-                current_step = 0
+        current_step = 0
+        try:
+            # Получаем объекты языков (из твоей модели Language)
+            languages_map = {lang.code: lang for lang in Language.objects.filter(
+                code__in=selected_lang_codes)}
 
+            for idea_id in selected_ids:
                 try:
-                    for idea_id in selected_ids:
-                        print(
-                            f"\n>>> [THREAD] Начало обработки идеи ID: {idea_id}")
-                        update_progress(session_key, current_step,
-                                        f"Загрузка идеи {idea_id}...")
+                    # VideoProject — это модель твоей идеи
+                    idea = VideoProject.objects.get(id=idea_id)
+                except VideoProject.DoesNotExist:
+                    continue
 
-                        try:
-                            idea = VideoProject.objects.get(id=idea_id)
-                        except VideoProject.DoesNotExist:
-                            raise ValueError(f"Idea ID {idea_id} not found!")
+                # У VideoProject используем 'angle' вместо 'title'
+                display_name = idea.angle if idea.angle else f"Idea {idea_id}"
 
-                        # 1. Кластер
-                        cluster = ArticleCluster.objects.create(
-                            source_idea=idea)
-                        current_step += 1
-                        update_progress(session_key, current_step,
-                                        f"Кластер создан: {idea.angle[:30]}")
+                update_task_progress(
+                    int((current_step / total_steps_estimate) * 100),
+                    f"📝 Начинаем работу над: {display_name[:30]}..."
+                )
 
-                        # --- ПОДГОТОВКА ТЕМЫ И КОНТЕКСТА (ДВУЯЗЫЧНАЯ ЛОГИКА) ---
-                        raw_topic = idea.angle
-                        ai_topic_en = raw_topic
-                        additional_context = ""
+                # 1. Создаем Кластер (ArticleCluster)
+                cluster = ArticleCluster.objects.create(source_idea=idea)
 
-                        # Извлекаем данные из notes
-                        if idea.notes and "AI_TOPIC_EN:" in idea.notes:
-                            lines = idea.notes.split('\n')
-                            # Первая строка - тема
-                            ai_topic_en = lines[0].replace(
-                                "AI_TOPIC_EN:", "").strip()
-                            # Остальные строки - контекст (факты, вопросы)
-                            additional_context = "\n".join(lines[1:]).strip()
+                # 2. Подготовка промпта для EN версии
+                # Тема берется из idea.angle, доп. контекст из idea.notes (согласно твоему коду)
+                topic_context = idea.angle
+                additional_context = idea.notes if idea.notes else ""
 
-                        print(f">>> [DEBUG] Тема для AI (EN): {ai_topic_en}")
-                        print(additional_context)
-                        print(
-                            f">>> [DEBUG] Контекст (факты): {additional_context[:100]}...")
+                # Ищем промпт (ArticlePrompt)
+                if prompt_code == 'random':
+                    selected_prompt_obj = ArticlePrompt.objects.filter(
+                        is_active=True).order_by('?').first()
+                else:
+                    selected_prompt_obj = ArticlePrompt.objects.filter(
+                        code_name=prompt_code, is_active=True).first()
 
-                        # --- ПРОМПТ СТАТЬИ (ИСПРАВЛЕНО: template_content + .render()) ---
+                if not selected_prompt_obj:
+                    raise ValueError(f"Промпт '{prompt_code}' не найден в БД")
 
-                        selected_prompt_obj = None
-                        prompt_name = ""
+                # Рендерим промпт через твой сервис render_article_prompt
+                # (Он принимает объект промпта, тему, язык и контекст)
+                en_prompt_text = selected_prompt_obj.render(
+                    topic=topic_context,
+                    language="English",
+                    old_context=additional_context
+                )
 
-                        if prompt_code == 'random':
-                            selected_prompt_obj = ArticlePrompt.objects.filter(
-                                is_active=True).order_by('?').first()
-                            prompt_name = f"Случайный ({selected_prompt_obj.code_name if selected_prompt_obj else 'None'})"
-                        else:
-                            selected_prompt_obj = ArticlePrompt.objects.filter(
-                                code_name=prompt_code, is_active=True).first()
-                            prompt_name = prompt_code
+                # 3. Генерация основной статьи (English)
+                update_task_progress(
+                    int((current_step / total_steps_estimate) * 100),
+                    f"🤖 AI генерирует статью (EN)..."
+                )
 
-                        if selected_prompt_obj:
-                            print(
-                                f"✅ [DEBUG] НАЙДЕН ПРОМПТ: {selected_prompt_obj.code_name}")
+                en_content_raw = generate_text(
+                    provider, en_prompt_text, max_tokens=3000)
+                en_data = parse_ai_json(en_content_raw)
 
-                            # Используем встроенный метод .render() из базового класса BasePrompt
-                            # Он сам подставит topic, language и т.д. в шаблон template_content
-                            try:
-                                en_prompt_text = selected_prompt_obj.render(
-                                    topic=ai_topic_en,
-                                    language="English",
-                                    banned_topics="",
-                                    old_context=additional_context
-                                )
-                                print(
-                                    f"📝 [DEBUG] Промпт успешно отрендерен. Длина: {len(en_prompt_text)}")
-                                print(
-                                    f"📝 [DEBUG] Начало текста: {en_prompt_text[:60]}...")
+                if not en_data or not en_data.get('content'):
+                    raise ValueError(
+                        "AI вернул пустой контент для основной статьи")
 
-                            except Exception as render_err:
-                                print(f"⚠️ Ошибка рендеринга: {render_err}")
-                                # Фоллбэк: просто берем сырой текст, если форматирование сломалось
-                                en_prompt_text = selected_prompt_obj.template_content
-                        else:
-                            print(
-                                f"⚠️ [DEBUG] Промпт '{prompt_code}' НЕ НАЙДЕН!")
-                            en_prompt_text = f"Write an article about {ai_topic_en}. Context: {additional_context}"
-                            prompt_name = "Заглушка (Default)"
+                # 4. Сохраняем английский перевод в кластер (ArticleTranslation)
+                lang_en = languages_map.get('en')
+                if lang_en:
+                    ArticleTranslation.objects.create(
+                        cluster=cluster,
+                        language=lang_en,
+                        title=en_data.get('title', display_name),
+                        content=en_data.get('content', ''),
+                        description=en_data.get('description', '')[:200],
+                        hashtags=en_data.get('hashtags', ''),
+                        status='draft'
+                    )
 
-                        update_progress(session_key, current_step,
-                                        f"Шаблон: {prompt_name}")
-                        final_system_message = en_prompt_text
+                current_step += 1
 
-                        # 2. Генерация ОСНОВНОЙ статьи (EN)
-                        print(f">>> [THREAD] Генерация EN статьи...")
-                        try:
-                            print(
-                                f">>> [DEBUG] Отправка промпта (длина: {len(final_system_message)})...")
-                            en_content_raw = generate_text(
-                                provider, final_system_message, max_tokens=3000)
+                # 5. Переводы на остальные выбранные языки
+                for code in selected_lang_codes:
+                    if code == 'en':
+                        continue
 
-                            print(
-                                f">>> [DEBUG] === СЫРОЙ ОТВЕТ МОДЕЛИ (первые 500 символов) ===")
-                            print(en_content_raw[:500])
-                            print(f">>> [DEBUG] === КОНЕЦ СЫРОГО ОТВЕТА ===")
+                    lang_obj = languages_map.get(code)
+                    if not lang_obj:
+                        continue
 
-                            if "Topic unknown" in en_content_raw or "insufficiently studied" in en_content_raw:
-                                raise ValueError(
-                                    "AI отказался писать: тема неизвестна.")
+                    update_task_progress(
+                        int((current_step / total_steps_estimate) * 100),
+                        f"🌍 Перевод на {lang_obj.name}..."
+                    )
 
-                            if len(en_content_raw.strip()) < 20:
-                                raise ValueError(
-                                    f"Модель вернула пустой ответ: '{en_content_raw}'")
+                    # Используем твой сервис get_system_instruction для перевода
+                    context = {
+                        'target_lang': lang_obj.name,
+                        'original_title': en_data.get('title'),
+                        'article_content': en_data['content']
+                    }
+                    trans_prompt = get_system_instruction(
+                        'translation_strict', context)
 
-                            en_data = parse_ai_json(en_content_raw)
+                    trans_raw = generate_text(
+                        provider, trans_prompt, max_tokens=2500)
+                    trans_data = parse_ai_json(trans_raw)
 
-                            if not en_data.get('content') or len(en_data['content']) < 50:
-                                print(
-                                    f">>> [DEBUG] Распарсенные данные: {en_data}")
-                                raise ValueError(
-                                    f"Контент слишком короткий. Получено: {en_data.get('content', 'NONE')}")
+                    ArticleTranslation.objects.create(
+                        cluster=cluster,
+                        language=lang_obj,
+                        title=trans_data.get('title', en_data['title']),
+                        content=trans_data.get('content', en_data['content']),
+                        description=trans_data.get('description', ''),
+                        hashtags=trans_data.get('hashtags', ''),
+                        status='draft'
+                    )
+                    current_step += 1
 
-                        except Exception as e:
-                            print(f">>> [THREAD] ❌ ОШИБКА ГЕНЕРАЦИИ: {e}")
-                            update_progress(
-                                session_key, 0, f"Ошибка генерации: {str(e)}", status='error')
-                            return  # Прерываем выполнение задачи
+                # Обновляем статус исходной идеи и кластера
+                idea.status = 'completed'
+                idea.save()
+                cluster.is_complete = True
+                cluster.save()
 
-                        main_article = Article.objects.create(
-                            title=en_data.get('title', 'Untitled'),
-                            content=en_data.get('content', ''),
-                            description=en_data.get('description', '')[:200],
-                            hashtags=en_data.get('hashtags', ''),
-                            status='draft'
-                        )
-                        print(
-                            f">>> [THREAD] Статья создана: ID {main_article.id}")
+            # Завершение
+            update_task_progress(
+                100, "✅ Готово! Статьи созданы.", status='done', final=True)
 
-                        # 3. Переводы (ЦИКЛ)
-                        lang_en = Language.objects.get(code='en')
-                        ArticleTranslation.objects.create(
-                            cluster=cluster, language=lang_en,
-                            title=main_article.title,
-                            content=main_article.content,
-                            description=main_article.description,
-                            hashtags=main_article.hashtags,
-                            status='draft'
-                        )
-                        current_step += 1
-                        update_progress(session_key, current_step,
-                                        "EN версия сохранена")
+        except Exception as e:
+            print(f"ОШИБКА ГЕНЕРАЦИИ: {e}")
+            update_task_progress(0, f"Ошибка: {str(e)}", status='error')
+        finally:
+            connection.close()
 
-                        for code in selected_lang_codes:
-                            if code == 'en':
-                                continue
+    # --- 3. ЗАПУСК ПОТОКА ---
+    thread = threading.Thread(target=run_task, daemon=True)
+    thread.start()
 
-                            try:
-                                lang_obj = Language.objects.get(code=code)
-                                update_progress(
-                                    session_key, current_step, f"Перевод на {lang_obj.name}...")
-
-                                # --- ПРОВЕРКА: Есть ли данные для перевода? ---
-                                if not en_data or not en_data.get('content'):
-                                    raise ValueError(
-                                        "Нет данных статьи (en_data) для перевода!")
-
-                                # --- ПОДГОТОВКА ДАННЫХ ДЛЯ ПЕРЕВОДА ---
-
-                                # Берем оригинальный английский заголовок
-                                original_en_title = en_data.get(
-                                    'title', 'Unknown Topic')
-
-                                context = {
-                                    'target_lang': lang_obj.name,
-                                    'original_title': original_en_title,  # <-- Новая переменная для промпта
-                                    # <-- Только текст статьи, заголовок отдельно
-                                    'article_content': en_data['content']
-                                }
-
-                                # Получаем промпт из БД
-                                trans_prompt = get_system_instruction(
-                                    'translation_strict', context)
-
-                                # Генерируем перевод
-                                trans_raw = generate_text(
-                                    provider, trans_prompt, max_tokens=2500)
-
-                                # Парсим ответ
-                                trans_data = parse_ai_json(trans_raw)
-
-                                # Если парсинг не удался, используем оригинал
-                                if not trans_data.get('content'):
-                                    print(
-                                        f"⚠️ Парсинг перевода {code} не удался, используем EN текст.")
-                                    trans_data = {
-                                        'title': en_data['title'],
-                                        'content': en_data['content'],
-                                        'description': en_data.get('description', ''),
-                                        'hashtags': en_data.get('hashtags', '')
-                                    }
-
-                                # Сохраняем перевод
-                                ArticleTranslation.objects.create(
-                                    cluster=cluster, language=lang_obj,
-                                    title=trans_data.get(
-                                        'title', en_data['title']),
-                                    content=trans_data.get('content', ''),
-                                    description=trans_data.get(
-                                        'description', ''),
-                                    hashtags=trans_data.get('hashtags', ''),
-                                    status='draft'
-                                )
-                                current_step += 1
-                                print(f">>> [THREAD] Перевод {code} готов.")
-
-                            except Exception as trans_err:
-                                print(
-                                    f">>> [THREAD] ❌ Ошибка перевода {code}: {trans_err}. Пропускаем язык.")
-                                import traceback
-                                traceback.print_exc()
-                                continue
-
-                        # 4. Промпты для картинок
-                        if generate_prompts:
-                            try:
-                                update_progress(
-                                    session_key, current_step, "Генерация промптов для сцен...")
-                                scene_count = manual_count if img_mode == 'manual' else 4
-                                context = en_data['content'][:2500]
-
-                                splitter_prompt = f"""
-Analyze the text below. Extract {scene_count} visual scenes.
-Write image prompts STRICTLY IN ENGLISH.
-Return JSON list: [{{"scene_description": "...", "prompt": "English prompt here --ar {aspect_ratio}"}}]
-
-Text: {context}
-"""
-                                scenes_raw = generate_text(
-                                    provider, splitter_prompt, max_tokens=1500)
-
-                                clean = scenes_raw.replace(
-                                    "```json", "").replace("```", "").strip()
-                                scenes_data = json.loads(clean)
-
-                                if isinstance(scenes_data, list):
-                                    stype = SceneType.objects.first()
-                                    count = 0
-                                    for sc in scenes_data:
-                                        p_text = sc.get('prompt', '')
-                                        if p_text:
-                                            ImagePrompt.objects.create(
-                                                article=main_article, scene_type=stype,
-                                                prompt_text=p_text, is_generated=False
-                                            )
-                                            count += 1
-                                    print(
-                                        f">>> [THREAD] ✅ Создано промптов: {count}")
-                                    update_progress(
-                                        session_key, current_step, f"Создано {count} промптов")
-                                else:
-                                    raise ValueError("AI вернул не список")
-
-                            except Exception as p_err:
-                                print(f">>> ⚠️ Ошибка промптов: {p_err}")
-                                import traceback
-                                traceback.print_exc()
-                                update_progress(
-                                    session_key, current_step, "Промпты не созданы (ошибка AI)")
-
-                        # Финализация идеи
-                        idea.status = 'completed'
-                        idea.save()
-                        cluster.is_complete = True
-                        cluster.save()
-                        print(
-                            f">>> [THREAD] Идея {idea.id} завершена успешно.")
-
-                    # ВСЕ УСПЕШНО
-                    update_progress(
-                        session_key, 100, "Готово! Перенаправление...", status='done')
-                    print(">>> THREAD SUCCESS")
-
-                except Exception as global_err:
-                    print(
-                        f">>> [THREAD] 💀 GLOBAL CRITICAL ERROR: {global_err}")
-                    import traceback
-                    traceback.print_exc()
-                    update_progress(
-                        session_key, 0, f"Критический сбой: {str(global_err)}", status='error')
-
-            # Запуск потока
-            threading.Thread(target=run_task, daemon=True).start()
-            return JsonResponse({'status': 'started'})
-
-    return JsonResponse({'status': 'error', 'message': 'Invalid request'})
-
-
-def update_progress(session_key, current_step, message, status='running'):
-    if session_key in ARTICLE_GEN_PROGRESS:
-        total = ARTICLE_GEN_PROGRESS[session_key]['total']
-        percent = int((current_step / total) * 100) if total > 0 else 0
-        if percent > 100:
-            percent = 100
-
-        ARTICLE_GEN_PROGRESS[session_key].update({
-            'current': current_step,
-            'percent': percent,
-            'message': message,
-            'status': status,
-            'log': ARTICLE_GEN_PROGRESS[session_key].get('log', []) + [f"{time.strftime('%H:%M:%S')}: {message}"]
-        })
-
-# 1. ОТДЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ПОДСЧЕТА (в самом верху или рядом с другими хелперами)
+    # --- 4. ОТВЕТ КЛИЕНТУ (Только теперь!) ---
+    # Теперь JS получит task_id и тут же откроет модалку
+    return JsonResponse({'status': 'ok', 'task_id': task_id})
 
 
 def count_text_stats(text):
@@ -394,44 +239,45 @@ def count_text_stats(text):
 
 
 def generation_stream(request):
+    # Получаем task_id из параметров запроса (его пришлет JS из modal.js)
+    task_id = request.GET.get('task_id')
+
     def event_stream():
-        session_key = request.session.session_key
-        if not session_key:
+        if not task_id:
+            yield f"data: {json.dumps({'status': 'error', 'message': 'No task_id'})}\n\n"
             return
+
         last_percent = -1
         last_msg = ""
 
         while True:
-            data = ARTICLE_GEN_PROGRESS.get(session_key)
+            # Читаем из кэша по task_id (это работает между всеми процессами сервера)
+            data = cache.get(f"progress_{task_id}")
+
             if data:
-                # Отправляем только если изменились данные или это финал
+                # Отправляем только при изменениях
                 if (data['percent'] != last_percent or
                     data['message'] != last_msg or
                         data['status'] in ['done', 'error']):
 
-                    # ВАЖНО: Формат SSE строго "data: JSON\n\n"
                     yield f"data: {json.dumps(data)}\n\n"
 
                     last_percent = data['percent']
                     last_msg = data['message']
 
                 if data['status'] in ['done', 'error']:
-                    time.sleep(1)  # Даем браузеру время получить пакет
-                    if session_key in ARTICLE_GEN_PROGRESS:
-                        del ARTICLE_GEN_PROGRESS[session_key]
+                    # Не удаляем кэш сразу, даем JS время получить финальный статус
                     break
             else:
-                # Если данные удалились, но статус не был done/error - выходим
-                if last_percent == 100 or last_msg.startswith("Критическая"):
-                    break
+                # Если задача еще не началась или кэш пуст
+                yield f"data: {json.dumps({'status': 'waiting', 'message': 'Ожидание запуска...'})}\n\n"
 
-            time.sleep(0.5)
+            time.sleep(0.8)  # Чуть реже опрос, чтобы не нагружать процессор
 
     response = StreamingHttpResponse(
         event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
-    # response['Connection'] = 'keep-alive'
     return response
 
 

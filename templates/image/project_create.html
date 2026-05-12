@@ -3,132 +3,128 @@
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="auto_center">
-            
-            <div class="card">
-                <!-- Заголовок карточки -->
-                <div class="flex flex-between align-items-end mb-2" style="border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
-                    <h4 class="mb-0">✨ Новый проект генерации</h4>
-                    <span class="text-small text-muted">Шаг 1: Настройка</span>
-                </div>
-
-                <div class="card-body">
-                    <form method="post" id="project-create-form" data-action-url="{% url 'image:project_create' %}">
-                        {% csrf_token %}
-                        <!-- 1. ВЫБОР AI ПРОВАЙДЕРА (ИЗ БД) -->
-                        <div class="form-group mb-3">
-                            <label class="form-label" for="provider_select">
-                                <span class="text-blue">●</span> Выберите AI провайдера:
-                            </label>
-                            <select name="provider" id="provider_select" class="form-control" required>
-                                <option value="" disabled selected>-- Нажмите для выбора --</option>
-                                   {% for provider in providers %}
-                                        <option value="{{ provider.name }}">
-                                            {{ provider.display_name }}
-                                        </option>
-                                    {% empty %}
-                                        <option value="" disabled>Нет провайдеров</option>
-                                    {% endfor %}
-                            </select>
-                            <small class="text-muted mt-1 d-block">
-                                Список формируется автоматически из активных записей в базе.
-                            </small>
-                        </div>
-
-                        <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0;">
-                        <!-- 1. ВЫБОР СТАТЬИ -->
-                        <div class="form-group mb-3">
-                            <label class="form-label" for="article_select">Выберите статью-источник:</label>
-                            <select name="article_id" id="article_select" class="form-control" required>
-                                <option value="" disabled selected>-- Нажмите для выбора --</option>
-                                {% for item in articles %}
-                                    <option value="{{ item.id }}">
-                                        {{ item.id }} | {{ item.title|truncatechars:60 }}
-                                    </option>
-                                {% empty %}
-                                    <option disabled>В базе нет статей.</option>
-                                {% endfor %}
-                            </select>
-                            <small class="text-muted mt-1 d-block">
-                                Отображены последние 50 статей.
-                            </small>
-                        </div>
-
-                        <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0;">
-
-                        <!-- 2. РЕЖИМ ГЕНЕРАЦИИ (Radio Buttons) -->
-                        <div class="form-group mb-3">
-                            <label class="form-label">Режим создания промптов:</label>
-                            
-                            <div class="flex gap-3 flex-wrap">
-                                <label class="form-check">
-                                    <input type="radio" name="gen_mode" value="auto" class="form-check-input" checked onchange="toggleSettings(false)">
-                                    <span class="form-check-label text-bold">🤖 Авто (AI решит)</span>
-                                </label>
-                                
-                                <label class="form-check">
-                                    <input type="radio" name="gen_mode" value="manual" class="form-check-input" onchange="toggleSettings(true)">
-                                    <span class="form-check-label text-bold">⚙️ Ручной (Я задам параметры)</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- 3. БЛОК РУЧНЫХ НАСТРОЕК (Скрыт по умолчанию через d-none) -->
-                        <div id="manual-settings-block" class="d-none mt-3 p-3 rounded bg-light-blue border">
-                            
-                            <div class="row">
-                                <!-- Колонка: Стиль -->
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Визуальный стиль:</label>
-                                    <select name="style_preset" class="form-control">
-                                        <option value="cinematic">Cinematic Dark (Кино)</option>
-                                        <option value="realistic">Photorealistic (Фото)</option>
-                                        <option value="comic">Comic Book (Комикс)</option>
-                                        <option value="anime">Anime Style</option>
-                                        <option value="oil_painting">Oil Painting</option>
-                                        <option value="cyberpunk">Cyberpunk</option>
-                                    </select>
-                                </div>
-
-                                <!-- Колонка: Формат -->
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Формат кадра:</label>
-                                    <select name="aspect_ratio" class="form-control">
-                                        <option value="9:16">9:16 (TikTok / Shorts)</option>
-                                        <option value="16:9">16:9 (YouTube)</option>
-                                        <option value="1:1">1:1 (Post)</option>
-                                        <option value="21:9">21:9 (Ultrawide)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Количество сцен -->
-                            <div class="form-group mb-3">
-                                <label class="form-label">Количество сцен (кадров):</label>
-                                <input type="number" name="scenes_count" class="form-control" value="10" min="3" max="50">
-                                <small class="text-muted mt-1 d-block">Укажите точное количество кадров.</small>
-                            </div>
-
-                            <!-- Доп. описание стиля -->
-                            <div class="form-group">
-                                <label class="form-label">Детали стиля (опционально):</label>
-                                <textarea name="custom_style" class="form-control" rows="2" placeholder="Например: dark atmosphere, neon lights..."></textarea>
-                            </div>
-                        </div>
-
-                        <!-- КНОПКИ -->
-                        <div class="flex gap-2 mt-4 pt-3 border-top">
-                            <a href="{% url 'image:dashboard' %}" class="btn btn-outline">Отмена</a>
-                            <button type="submit" class="btn btn-primary flex-fill">
-                                🚀 Создать проект
-                            </button>
-                    </form>
-                </div>
+<div class="row justify-content-center">
+    <div class="auto_center">
+        
+        <div class="card">
+            <!-- Заголовок карточки -->
+            <div class="flex flex-between align-items-end mb-2" style="border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+                <h4 class="mb-0">✨ Новый проект генерации</h4>
+                <span class="text-small text-muted">Шаг 1: Настройка</span>
             </div>
 
+            <div class="card-body">
+                <form method="post" id="project-create-form" data-action-url="{% url 'image:project_create' %}">
+                    {% csrf_token %}
+                    <!-- 1. ВЫБОР AI ПРОВАЙДЕРА (ИЗ БД) -->
+                    <div class="form-group mb-3">
+                        <label class="form-label" for="provider_select">
+                            <span class="text-blue">●</span> Выберите AI провайдера:
+                        </label>
+                        <select name="provider" id="provider_select" class="form-control" required>
+                            <option value="" disabled selected>-- Выберите текстовую модель --</option>
+                            {% for provider in providers %}
+                                {% if provider.provider_type == 'llm' %} {# Фильтр по типу 'text' #}
+                                    <option value="{{ provider.name }}">{{ provider.display_name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted mt-1 d-block">
+                            Список формируется автоматически из активных записей в базе.
+                        </small>
+                    </div>
+
+                    <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0;">
+                    <!-- 1. ВЫБОР СТАТЬИ -->
+                    <div class="form-group mb-3">
+                        <label class="form-label" for="article_select">Выберите статью-источник:</label>
+                        <select name="article_id" id="article_select" class="form-control" required>
+                            <option value="" disabled selected>-- Нажмите для выбора --</option>
+                            {% for item in articles %}
+                                <option value="{{ item.id }}">
+                                    {{ item.id }} | {{ item | truncatechars:40 }}
+                                </option>
+                            {% empty %}
+                                <option disabled>В базе нет статей.</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted mt-1 d-block">
+                            Отображены последние 50 статей.
+                        </small>
+                    </div>
+
+                    <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0;">
+
+                    <!-- 2. РЕЖИМ ГЕНЕРАЦИИ (Radio Buttons) -->
+                    <div class="form-group mb-3">
+                        <label class="form-label">Режим создания промптов:</label>
+                        
+                        <div class="flex gap-3 flex-wrap">
+                            <label class="form-check">
+                                <input type="radio" name="gen_mode" value="auto" class="form-check-input" checked onchange="toggleSettings(false)">
+                                <span class="form-check-label text-bold">🤖 Авто (AI решит)</span>
+                            </label>
+                            
+                            <label class="form-check">
+                                <input type="radio" name="gen_mode" value="manual" class="form-check-input" onchange="toggleSettings(true)">
+                                <span class="form-check-label text-bold">⚙️ Ручной (Я задам параметры)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 3. БЛОК РУЧНЫХ НАСТРОЕК (Скрыт по умолчанию через d-none) -->
+                    <div id="manual-settings-block" class="d-none mt-3 p-3 rounded bg-light-blue border">
+                        
+                        <div class="row">
+                            <!-- Колонка: Стиль -->
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Визуальный стиль:</label>
+                                <select name="style_preset" class="form-control">
+                                    <option value="cinematic">Cinematic Dark (Кино)</option>
+                                    <option value="realistic">Photorealistic (Фото)</option>
+                                    <option value="comic">Comic Book (Комикс)</option>
+                                    <option value="anime">Anime Style</option>
+                                    <option value="oil_painting">Oil Painting</option>
+                                    <option value="cyberpunk">Cyberpunk</option>
+                                </select>
+                            </div>
+
+                            <!-- Колонка: Формат -->
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Формат кадра:</label>
+                                <select name="aspect_ratio" class="form-control">
+                                    <option value="9:16">9:16 (TikTok / Shorts)</option>
+                                    <option value="16:9">16:9 (YouTube)</option>
+                                    <option value="1:1">1:1 (Post)</option>
+                                    <option value="21:9">21:9 (Ultrawide)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Количество сцен -->
+                        <div class="form-group mb-3">
+                            <label class="form-label">Количество сцен (кадров):</label>
+                            <input type="number" name="scenes_count" class="form-control" value="10" min="3" max="50">
+                            <small class="text-muted mt-1 d-block">Укажите точное количество кадров.</small>
+                        </div>
+
+                        <!-- Доп. описание стиля -->
+                        <div class="form-group">
+                            <label class="form-label">Детали стиля (опционально):</label>
+                            <textarea name="custom_style" class="form-control" rows="2" placeholder="Например: dark atmosphere, neon lights..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- КНОПКИ -->
+                    <div class="flex gap-2 mt-4 pt-3 border-top">
+                        <a href="{% url 'image:dashboard' %}" class="btn btn-outline">Отмена</a>
+                        <button type="submit" class="btn btn-primary flex-fill">
+                            🚀 Создать проект
+                        </button>
+                </form>
+            </div>
         </div>
+
     </div>
 </div>
 {% endblock %}

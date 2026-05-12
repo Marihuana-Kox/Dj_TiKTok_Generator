@@ -10,4 +10,6 @@ urlpatterns = [
     path('<int:pk>/edit/', views.project_edit, name='project_edit'),
     path('api/generation-progress/<str:task_id>/',
          views.generation_progress, name='generation_progress'),
+    path('api/generation-stream/', views.generation_stream,
+         name='generation_stream'),
 ]
