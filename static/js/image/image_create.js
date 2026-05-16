@@ -1,5 +1,3 @@
-// image_create.js
-
 /**
  * Глобальная функция для переключения видимости настроек.
  * Вызывается из HTML: onchange="toggleSettings(false/true)"
@@ -56,7 +54,9 @@ window.toggleSettings = function(show) {
             if (data.success && data.task_id) {
                 // Запуск универсального прогресс-бара из modal.js
                 if (typeof window.startProgressTracking === 'function') {
-                    window.startProgressTracking('/images/api/generation_progress/', data.task_id);
+                    window.openModal('progress-modal');
+                    window.startProgressTracking('/images/api/generation-stream/', data.task_id, 'progress-modal');
+                    // window.startProgressTracking('/images/api/generation-progress/', data.task_id);
                 }
             } else {
                 alert('❌ ' + (data.error || 'Ошибка запуска'));

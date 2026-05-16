@@ -16,6 +16,9 @@
             <div class="card-body">
                 <form method="post" id="project-create-form" data-action-url="{% url 'image:project_create' %}">
                     {% csrf_token %}
+                    <!-- В project_create.html -->
+                    <!-- <input type="checkbox" name="dry_run" id="dry-run-check"> 
+                    <label for="dry-run-check">🧪 Тестовый режим (без отправки в AI)</label> -->
                     <!-- 1. ВЫБОР AI ПРОВАЙДЕРА (ИЗ БД) -->
                     <div class="form-group mb-3">
                         <label class="form-label" for="provider_select">
@@ -53,6 +56,21 @@
                         </small>
                     </div>
 
+                    <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0;">
+                    
+                    <div class="form-group mb-3">
+                        <label class="form-label" for="article_select">📜 Шаблон промпта:</label>
+                        <select name="prompt_template" class="form-control">
+                            {% for p in scenes_prompt %}
+                                <option value="{{ p.code_name }}" {% if p.code_name %}selected{% endif %}>
+                                    {{ p.name }}
+                                </option>
+                            {% empty %}
+                                <option value="DEFAULT_STORYBOARD" selected>🎬 Стандартная раскадровка</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
                     <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0;">
 
                     <!-- 2. РЕЖИМ ГЕНЕРАЦИИ (Radio Buttons) -->

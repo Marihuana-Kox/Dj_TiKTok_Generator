@@ -14,6 +14,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.contrib import messages
 from ai_inspector.models import AIProvider
+from prompts.models import ImagePromptTemplate
 from .models import ImagePrompt, ImageProject
 from .services import generate_storyboard, generate_image_from_prompt
 from django.core.cache import cache
@@ -113,11 +114,28 @@ def image_dashboard(request):
 def project_create(request):
     providers = AIProvider.objects.filter(is_active=True)
     articles = ArticleCluster.objects.all().order_by('-created_at')[:50]
+    scenes_prompt = ImagePromptTemplate.objects.filter(
+        is_active=True)  # ← 1. Для шаблона
 
     if request.method == 'POST':
         article_id = request.POST.get('article_id')
         provider_name = request.POST.get('provider')
         scenes_count = int(request.POST.get('scenes_count', 10))
+        prompt_code = request.POST.get(
+            'prompt_template', 'storyboard_generator')
+
+        prompt_content = None
+        try:
+            prompt_obj = ImagePromptTemplate.objects.get(
+                code_name__iexact=prompt_code, is_active=True)
+            prompt_content = prompt_obj.template_content
+        except ImagePromptTemplate.DoesNotExist:
+            fallback = ImagePromptTemplate.objects.filter(
+                is_active=True).first()
+            prompt_content = fallback.template_content if fallback else None
+
+        if not prompt_content:
+            return JsonResponse({'success': False, 'error': 'В БД нет активных шаблонов промптов.'})
 
         if not article_id or not provider_name:
             return JsonResponse({'success': False, 'error': 'Заполните все поля'})
@@ -134,50 +152,56 @@ def project_create(request):
             status='processing'
         )
 
-        # Инициализация
         cache.set(f"progress_{task_id}", {
-            'percent': 1,
-            'message': 'Инициализация проекта...',
-            'status': 'running',
-            'logs': ['🚀 Запуск генерации раскадровки...'],
-            'task_id': task_id
+            'percent': 1, 'message': 'Инициализация проекта...', 'status': 'running',
+            'logs': ['🚀 Запуск генерации раскадровки...'], 'task_id': task_id
         }, timeout=3600)
-        # 3. Фоновая задача
 
         def run_image_task():
             def update_img_progress(percent, message, status='running', final=False):
-                # Эта функция теперь используется только для Ошибок или Финала
                 data = cache.get(f"progress_{task_id}", {})
                 logs = data.get('logs', [])
                 if message and (not logs or logs[-1] != message):
                     logs.append(message)
-                payload = {
-                    'percent': percent, 'message': message, 'status': status,
-                    'logs': logs[-15:], 'task_id': task_id
-                }
+                payload = {'percent': percent, 'message': message,
+                           'status': status, 'logs': logs[-15:], 'task_id': task_id}
                 if final:
                     payload['redirect_url'] = reverse(
                         'image:project_edit', kwargs={'pk': project.id})
                 cache.set(f"progress_{task_id}", payload, timeout=3600)
 
             try:
-                # Шаг 1: Только уведомляем о начале
                 update_img_progress(
                     5, "🚀 Подготовка и отправка запроса в AI...")
 
-                # Шаг 2: Вызываем сервис и ПЕРЕДАЕМ task_id
-                # Теперь ВСЯ анимация прогресса будет идти ИЗНУТРИ этой функции
+                # ← 2. ИЗВЛЕКАЕМ ТЕКСТ ИЗ ПЕРЕВОДА (ArticleCluster не хранит текст напрямую)
+                translation = cluster.translations.filter(
+                    language__code='ru').first()
+                if not translation:
+                    translation = cluster.translations.first()
+
+                source_text = (
+                    getattr(translation, 'content', None) or
+                    getattr(translation, 'body', None) or
+                    getattr(translation, 'text', None) or ''
+                )
+                if not source_text.strip():
+                    update_img_progress(
+                        0, "❌ Текст статьи пуст в выбранном переводе.", status='error')
+                    return
+
+                # ← 3. ВЫЗОВ СЕРВИСА (исправлено имя параметра + добавлен текст)
                 generate_storyboard(
                     project=project,
                     scenes_count=scenes_count,
                     provider_override=provider_name,
-                    task_id=task_id  # <--- Передаем ID для реального прогресса
+                    task_id=task_id,
+                    prompt_template=prompt_content,  # ← БЫЛО scenes_prompt=
+                    source_text=source_text          # ← ОБЯЗАТЕЛЬНО
                 )
 
-                # Шаг 3: Финализация (выполнится, когда сервис закончит цикл)
                 update_img_progress(
                     100, "✅ Все сцены успешно созданы!", status='done', final=True)
-
             except Exception as e:
                 print(f"Ошибка генерации: {e}")
                 update_img_progress(0, f"Ошибка: {str(e)}", status='error')
@@ -186,15 +210,12 @@ def project_create(request):
 
         threading.Thread(target=run_image_task, daemon=True).start()
 
-        return JsonResponse({
-            'success': True,
-            'task_id': task_id,
-            'project_id': project.id
-        })
+        return JsonResponse({'success': True, 'task_id': task_id, 'project_id': project.id})
 
     return render(request, 'image/project_create.html', {
         'providers': providers,
         'articles': articles,
+        'scenes_prompt': scenes_prompt,  # ← 1. ТЕПЕРЬ ПЕРЕДАЁТСЯ В ШАБЛОН
         'page_title': 'Создать проект'
     })
 
@@ -497,9 +518,25 @@ def generation_stream(request):
     def event_stream():
         while True:
             data = cache.get(f"progress_{task_id}")
-            if data:
-                yield f"data: {json.dumps(data)}\n\n"
-                if data.get('status') in ['done', 'error']:
-                    break
-            time.sleep(1)
-    return StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+            if not data:
+                yield f"data: {json.dumps({'percent': 0, 'message': 'Ожидание задачи...', 'status': 'processing'})}\n\n"
+                time.sleep(1)
+                continue
+            # Явно формируем payload для модалки
+            payload = {
+                'percent': data.get('percent', 0),
+                'message': data.get('message', ''),
+                'status': data.get('status', 'processing'),
+                'redirect_url': data.get('redirect_url')
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
+
+            if data.get('status') in ('done', 'error'):
+                break
+            time.sleep(0.8)
+
+    response = StreamingHttpResponse(
+        event_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response

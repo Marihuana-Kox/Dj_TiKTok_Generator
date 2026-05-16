@@ -51,15 +51,46 @@ function startGeneration() {
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success && data.task_id) {
-            // ✅ Правильный вызов глобального трекера (url, taskId, modalId)
-            if (typeof window.startProgressTracking === 'function') {
-                window.startProgressTracking(
-                    '/images/api/generation-stream/', 
-                    data.task_id, 
-                    'progress-modal'
-                );
-            }
+        if (typeof window.startProgressTracking === 'function') {
+            window.startProgressTracking(
+                '/images/api/generation-stream/', 
+                data.task_id, 
+                'progress-modal',
+                function(result) {
+                    if (result.success) {
+                        console.log('🔄 Генерация завершена. Обновляем блоки без перезагрузки...');
+                        
+                        fetch(window.location.href)
+                            .then(res => res.text())
+                            .then(html => {
+                                const parser = new DOMParser();
+                                const doc = parser.parseFromString(html, 'text/html');
+                                
+                                // 🔑 Используем КЛАСС вместо ID. Замени '.gallery-block' на свой реальный класс контейнера
+                                const newBlocks = doc.querySelectorAll('.thumbnail-empty');
+                                const currentBlocks = document.querySelectorAll('.thumbnail-empty');
+                                
+                                if (newBlocks.length > 0 && currentBlocks.length === newBlocks.length) {
+                                    currentBlocks.forEach((block, i) => {
+                                        block.innerHTML = newBlocks[i].innerHTML;
+                                    });
+                                    
+                                    // Перепривязка лайтбокса ко всем новым изображениям
+                                    document.querySelectorAll('.thumbnail-empty img, .thumbnail-empty a[data-lightbox]').forEach(el => {
+                                        el.addEventListener('click', function(e) {
+                                            e.preventDefault();
+                                            openLightbox(this.src || this.getAttribute('href'), this.alt || '');
+                                        });
+                                    });
+                                } else {
+                                    // Если структура изменилась (добавились/удалились блоки) → безопасный reload
+                                    window.location.reload();
+                                }
+                            })
+                            .catch(() => window.location.reload());
+                    }
+                }
+            );
         } else {
             console.error('❌ Ошибка: ' + (data.error || 'Неизвестная ошибка'));
             if (typeof closeModal === 'function') closeModal('progress-modal');

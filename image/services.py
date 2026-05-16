@@ -170,21 +170,6 @@ def parse_ai_response(raw_response):
                     scenes_data = [scenes_data]
             else:
                 raise ValueError(f"Неожиданный формат: {type(scenes_data)}")
-        # 4. Нормализуем формат (чтобы всегда был список сцен)
-        # if not isinstance(scenes_data, list):
-        #     if isinstance(scenes_data, dict):
-        #         if 'prompts' in scenes_data:
-        #             scenes_data = [{"scene_description": f"Scene {i+1}", "prompt_text": p}
-        #                            for i, p in enumerate(scenes_data['prompts'])]
-        #         elif 'scenes' in scenes_data:
-        #             scenes_data = scenes_data['scenes']
-        #         elif 'data' in scenes_data:
-        #             scenes_data = scenes_data['data']
-        #         else:
-        #             scenes_data = [scenes_data]
-        #     else:
-        #         raise ValueError(
-        #             f"Неожиданный формат ответа: {type(scenes_data)}")
 
         # 5. Проверяем каждую сцену на наличие нужных полей
         normalized = []
@@ -212,10 +197,14 @@ def parse_ai_response(raw_response):
         raise Exception(f"Ошибка обработки ответа AI: {e}")
 
 
-def generate_storyboard(project, scenes_count=10, provider_override=None, task_id=None):
+# def generate_storyboard(project, scenes_count=10, provider_override=None, task_id=None):
+def generate_storyboard(project, scenes_count, provider_override, task_id, prompt_template=None, source_text=None, **kwargs):
     """
     Генерация раскадровки с реальным обновлением прогресса.
     """
+    if not prompt_template:
+        raise ValueError("prompt_template не передан")
+
     def log_step(percent, message):
         if task_id:
             data = cache.get(f"progress_{task_id}", {})
@@ -242,12 +231,12 @@ def generate_storyboard(project, scenes_count=10, provider_override=None, task_i
     if not template_obj:
         raise Exception("Шаблон 'storyboard_generator' не найден.")
 
-    final_prompt = template_obj.template_content.format(
+    final_prompt = prompt_template.format(
         scenes_count=scenes_count,
-        style_keywords=project.get_style_full(),
         aspect_ratio=project.aspect_ratio,
-        source_text=source_text,
-        language="Russian"
+        language="Russian",
+        style_preset=project.style_preset,
+        source_text=source_text
     )
 
     # --- 2. Ожидание AI (самый долгий этап) ---
@@ -345,11 +334,11 @@ def generate_image_from_prompt(prompt, provider_name: str, aspect_ratio: str = N
         elif provider_type == 'replicate':
             # Replicate возвращает URL
             output = client.run(
-                "black-forest-labs/flux-dev",
+                "black-forest-labs/flux-schnell",
                 input={
                     "prompt": final_prompt,
                     "aspect_ratio": aspect_ratio or "9:16",
-                    "num_inference_steps": config.get('default_params', {}).get('num_inference_steps', 28),
+                    "num_inference_steps": config.get('default_params', {}).get('num_inference_steps', 4),
                     "guidance_scale": config.get('default_params', {}).get('guidance_scale', 3.5)
                 }
             )

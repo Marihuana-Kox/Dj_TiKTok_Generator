@@ -1,64 +1,59 @@
 (function() {
-    console.log('✅ modal.js загружен');
+    console.log('✅ modal.js загружен (глобальная унифицированная версия)');
 
     let eventSource = null;
     let currentModalId = 'progress-modal';
+    let currentTaskId = null;
+    let currentCancelUrl = null;
 
-    // --- Функции открытия/закрытия ---
-    window.openModal = window.openModal || function(modalId) {
+    // --- Открытие/Закрытие ---
+    window.openModal = function(modalId) {
         const modal = document.getElementById(modalId || 'progress-modal');
         if (!modal) return;
         modal.classList.remove('d-none');
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
-        console.log('🔓 Модалка открыта:', modalId);
+        currentModalId = modalId || 'progress-modal';
     };
 
-    window.closeModal = window.closeModal || function(modalId) {
-        const modal = document.getElementById(modalId || 'progress-modal');
+    window.closeModal = function(modalId) {
+        const modal = document.getElementById(modalId || currentModalId);
         if (!modal) return;
         modal.classList.add('d-none');
         modal.style.display = 'none';
         document.body.style.overflow = '';
-        console.log('🔒 Модалка закрыта:', modalId);
     };
 
-    // --- Плавное обновление прогресса и БЕГУЩИЕ ЦИФРЫ ---
-    window.updateProgress = window.updateProgress || function(targetPercent, message) {
+    // --- Плавное обновление прогресса + БЕГУЩИЕ ЦИФРЫ ---
+    window.updateProgress = function(targetPercent, message) {
         const progressBar = document.getElementById('gen-progress-bar');
         const progressPercent = document.getElementById('gen-progress-percent');
         const progressMessage = document.getElementById('gen-progress-message');
-        
-        if (progressMessage && message) progressMessage.textContent = message;
 
+        if (progressMessage && message) progressMessage.textContent = message;
         if (progressBar) {
-            progressBar.style.transition = "width 1s linear"; 
+            progressBar.style.transition = "width 0.8s linear";
             progressBar.style.width = targetPercent + '%';
         }
-
         if (progressPercent) {
             const startPercent = parseInt(progressPercent.textContent) || 0;
-            const duration = 1000; 
+            const duration = 800;
             const startTime = performance.now();
-
             function animate(currentTime) {
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
                 const currentNum = Math.floor(startPercent + (targetPercent - startPercent) * progress);
-                
                 progressPercent.textContent = currentNum + '%';
-
-                if (progress < 1) {
-                    requestAnimationFrame(animate);
-                }
+                if (progress < 1) requestAnimationFrame(animate);
             }
             requestAnimationFrame(animate);
         }
     };
 
-    window.addProgressLog = window.addProgressLog || function(message, type = 'info') {
+    // --- Логирование ---
+    window.addProgressLog = function(message, type = 'info') {
         const log = document.getElementById('gen-progress-log');
-        if (!log) return;
+        if (!log || !message) return;
         const li = document.createElement('li');
         li.textContent = message;
         li.className = type;
@@ -66,73 +61,81 @@
         log.scrollTop = log.scrollHeight;
     };
 
-    window.startProgressTracking = function(streamUrl, taskId) {
-        currentModalId = 'progress-modal';
-        openModal(currentModalId); // Убеждаемся, что окно открывается
+    // --- Финализация (Зелёная полоса, задержка, редирект/колбэк) ---
+    window.finishProgress = function(success, message, redirectUrl = null, delay = 3000, callback = null) {
+        const progressBar = document.getElementById('gen-progress-bar');
+        const progressMessage = document.getElementById('gen-progress-message');
+
+        if (progressBar) {
+            progressBar.style.transition = 'width 0.5s ease, background-color 0.5s ease';
+            progressBar.style.width = '100%';
+            progressBar.style.backgroundColor = success ? '#4caf50' : '#ef4444';
+            progressBar.classList.remove('progress-bar-animated');
+        }
+
+        const finalMsg = success ? (message || '✅ Все успешно сгенерировалось!') : (message || '❌ Ошибка выполнения');
+        if (progressMessage) progressMessage.textContent = finalMsg;
+        window.addProgressLog(finalMsg, success ? 'success' : 'error');
+
+        setTimeout(() => {
+            if (callback && typeof callback === 'function') callback({ success, redirectUrl });
+            if (success && redirectUrl) {
+                window.location.href = redirectUrl;
+            } else if (!redirectUrl) {
+                window.closeModal(currentModalId);
+            }
+        }, delay);
+    };
+
+    // --- ГЛОБАЛЬНЫЙ SSE ТРЕКЕР (УНИФИЦИРОВАННЫЙ) ---
+    window.startProgressTracking = function(streamUrl, taskId, modalId = 'progress-modal', callback = null, cancelUrl = null) {
+        currentModalId = modalId || 'progress-modal';
+        currentTaskId = taskId;
+        currentCancelUrl = cancelUrl;
+
+        window.openModal(currentModalId);
+        window.updateProgress(0, 'Инициализация...');
+        window.addProgressLog('🚀 Генерация запущена', 'info');
+
+        if (eventSource) eventSource.close();
 
         const url = new URL(streamUrl, window.location.origin);
         if (taskId) url.searchParams.set('task_id', taskId);
-        
-        if (eventSource) eventSource.close();
+
         eventSource = new EventSource(url.toString());
 
         eventSource.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
-                
+
                 if (data.percent !== undefined) {
-                    updateProgress(data.percent, data.message);
+                    window.updateProgress(data.percent, data.message);
                 }
 
                 if (data.logs && Array.isArray(data.logs)) {
                     const logContainer = document.getElementById('gen-progress-log');
                     if (logContainer) {
-                        logContainer.innerHTML = ''; 
-                        data.logs.forEach(msg => {
-                            const li = document.createElement('li');
-                            li.textContent = msg;
-                            logContainer.appendChild(li);
-                        });
-                        logContainer.scrollTop = logContainer.scrollHeight;
+                        logContainer.innerHTML = '';
+                        data.logs.forEach(msg => window.addProgressLog(msg, 'info'));
                     }
+                } else if (data.message) {
+                    window.addProgressLog(data.message, data.status === 'error' ? 'error' : 'info');
                 }
 
                 if (data.status === 'done') {
-                    finishProgress(true, data.message, null, 3000);
+                    eventSource.close();
+                    window.finishProgress(true, data.message, data.redirect_url || null, 3000, callback);
                 } else if (data.status === 'error') {
-                    finishProgress(false, data.message, null, 0);
+                    eventSource.close();
+                    window.finishProgress(false, data.message || 'Ошибка генерации', null, 0, callback);
                 }
             } catch (e) {
-                console.error('Ошибка SSE:', e);
+                console.error('❌ Ошибка парсинга SSE:', e, event.data);
             }
         };
 
         eventSource.onerror = function() {
-            console.warn("📡 Потеря связи с сервером...");
-        };
-    };
-   
-    window.startProgressTracking = function(streamUrl, taskId, callback, cancelUrl = null) {
-        currentTaskId = taskId;
-        currentCancelUrl = cancelUrl; // Запоминаем адрес для отмены
-        
-        // Сохраняем в hidden input (если он есть)
-        const input = document.getElementById('progress-task-id');
-        if (input) input.value = taskId;
-
-        const source = new EventSource(`${streamUrl}?task_id=${taskId}`);
-        window.activeEventSource = source;
-
-        source.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            updateProgress(data.percent, data.message, data.logs);
-
-            if (data.status === 'done') {
-                source.close();
-                // Вызываем финиш без редиректа, чтобы сработал callback страницы
-                finishProgress(true, data.message, null, 2000); 
-                if (callback) callback(data);
-            }
+            console.warn('⚠️ SSE: потеря связи с сервером');
         };
     };
 
@@ -143,14 +146,38 @@
         }
     };
 
+    // --- Обработчики кнопок закрытия/отмены ---
     document.addEventListener('DOMContentLoaded', function() {
         const closeBtn = document.getElementById('close-progress-modal');
         if (closeBtn) {
             closeBtn.addEventListener('click', function() {
-                closeModal(currentModalId);
-                stopProgressTracking();
+                window.closeModal(currentModalId);
+                window.stopProgressTracking();
             });
         }
+
+        const cancelBtn = document.getElementById('cancel-progress-btn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function() {
+                if (confirm('⚠️ Отменить генерацию?')) {
+                    window.closeModal(currentModalId);
+                    window.stopProgressTracking();
+                    if (currentCancelUrl && currentTaskId) {
+                        const csrf = typeof window.getCookie === 'function' ? window.getCookie('csrftoken') : '';
+                        fetch(currentCancelUrl, { method: 'POST', headers: { 'X-CSRFToken': csrf } }).catch(()=>{});
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const activeModal = document.querySelector('.modal-overlay:not(.d-none)');
+                if (activeModal) {
+                    window.closeModal(activeModal.id);
+                    window.stopProgressTracking();
+                }
+            }
+        });
     });
-    // modal.js
 })();
