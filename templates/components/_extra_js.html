@@ -8,12 +8,19 @@
 <script src="{% static 'js/image/image_create.js' %}"></script>
 <script src="{% static 'js/image/image_edit.js' %}"></script>
 {% elif request.resolver_match.namespace == 'audio' %}
+<!-- {{ request.resolver_match.url_name }} -->
+<script src="{% static 'js/audio/audio_dashboard.js' %}"></script>
+    {% if request.resolver_match.url_name == 'audio_edit' %}
+<script src="{% static 'js/audio/audio_edit.js' %}"></script>
+    {% elif request.resolver_match.url_name == 'audio_create' %}
 <script src="{% static 'js/audio/audio_create.js' %}"></script>
-<!-- <script src="{% static 'js/audio/audio_edit.js' %}"></script> -->
+    {% endif %}
 {% elif request.resolver_match.namespace == 'topics' %}
 <script src="{% static 'js/topics/topics_dashboard.js' %}"></script>
 {% elif request.resolver_match.namespace == 'article' %}
 <script src="{% static 'js/article/article_create.js' %}"></script>
 <script src="{% static 'js/article/article_edit.js' %}"></script>
 <script src="{% static 'js/article/article_dashboard.js' %}"></script>
+{% elif request.resolver_match.namespace == 'videoeditor' %}
+<script src="{% static 'js/videoeditor/video_editor.js' %}"></script>
 {% endif %}

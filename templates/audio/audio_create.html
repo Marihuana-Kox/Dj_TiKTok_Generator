@@ -6,42 +6,27 @@
     <div class="card">
       <div class="flex flex-between align-items-end mb-2" style="border-bottom: 1px solid var(--border-color); padding-bottom: 15px">
         <h4 class="mb-0">🎙️ Новый проект озвучки</h4>
-        <span class="text-small text-muted">Шаг 1: Настройка</span>
+        <span class="text-small text-muted">Шаг 1: Подготовка материала</span>
       </div>
 
       <div class="card-body">
-        <form method="post" id="audio-create-form" data-action-url="{% url 'audio:audio_create' %}">
+        <form method="post" id="audio-create-form" action="{% url 'audio:audio_create' %}">
           {% csrf_token %}
-
-          <!-- 1. ПРОВАЙДЕР -->
-          <div class="form-group mb-3">
-            <label class="form-label" for="provider_select">
-              <span class="text-blue">●</span> Выберите AI провайдера:
-            </label>
-            <select name="provider" id="provider_select" class="form-control" required>
-              <option value="" disabled selected>-- Выберите TTS провайдера --</option>
-              {% for provider in providers %}
-              {% if provider.name == 'testprovider' %}
-              <option value="{{ provider.name }}" selected>{{ provider.display_name }}</option>
-              {% else %}
-              <option value="{{ provider.name }}">{{ provider.display_name }}</option>
-              {% endif %}
-              {% empty %}
-              <option disabled>Нет активных TTS провайдеров</option>
-              {% endfor %}
-            </select>
-          </div>
 
           <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0" />
 
-          <!-- 2. СТАТЬЯ + СТАТИСТИКА ПЕРЕВОДОВ -->
+          <div class="form-group mb-3">
+            <label class="form-label" for="article_search">🔍 Быстрый поиск статьи:</label>
+            <input type="text" id="article_search" class="form-control" placeholder="Введите название или ID для фильтрации..." autocomplete="off">
+          </div>
+
           <div class="form-group mb-3">
             <label class="form-label" for="article_select">📄 Выберите статью:</label>
             <select name="article_id" id="article_select" class="form-control" required>
               <option value="" disabled selected>-- Нажмите для выбора --</option>
               {% for item in articles %}
               <option value="{{ item.id }}" data-translations='{{ item.translations_json|safe }}'>
-                {{ item.id }} | {{ item.title|truncatechars:30 }}
+                {{ item.id }} | {{ item.title|truncatechars:45 }}
                 {% if item.translations %}
                 [{{ item.translations|length }} пер. |
                 {% for tr in item.translations %}
@@ -62,79 +47,51 @@
 
           <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0" />
 
-          <!-- 3. ЯЗЫК (фильтруется по статье) -->
           <div class="form-group mb-3">
             <label class="form-label" for="language_select">🌍 Язык озвучки:</label>
             <select name="language" id="language_select" class="form-control" required disabled>
               <option value="" disabled selected>-- Сначала выберите статью --</option>
-              {% for lang in languages %}
-              <option value="{{ lang.code }}" {% if lang.code == 'ru-RU' %}selected{% endif %}>
-                {{ lang.name }} ({{ lang.code }})
-              </option>
-              {% endfor %}
             </select>
           </div>
 
           <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0" />
 
-          <!-- 4. ГОЛОС (фильтруется по языку) -->
+
           <div class="form-group mb-3">
-            <label class="form-label" for="voice_select">🗣️ Выберите голос:</label>
-            <!-- <select name="voice_id" id="voice_select" class="form-control" required disabled> -->
-              <option value="" disabled selected>-- Сначала выберите язык --</option>
-              <select name="voice_id" id="voice_select" class="form-control" required disabled>
-                <option value="" disabled selected>-- Сначала выберите язык --</option>
-              </select>
+            <label class="form-label" for="words_per_iteration">✂️ Количество слов в сюжете (итерации):</label>
+            <select name="words_per_iteration" id="words_per_iteration" class="form-control">
+              <option value="30">Короткие сцены (~30 слов)</option>
+              <option value="50" selected>Стандартные сюжеты (~50 слов)</option>
+              <option value="75">Развернутые абзацы (~75 слов)</option>
+              <option value="100">Длинные блоки (~100 слов)</option>
             </select>
+            <small class="text-muted d-block mt-1">
+              Текст автоматически разобьется на логические куски указанной длины, округляя строго до ближайшей точки.
+            </small>
           </div>
 
           <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0" />
 
-          <!-- Настройки (твои — не меняю) -->
-          <div class="form-group mb-3">
-            <label class="form-label">Параметры озвучки:</label>
-            <div class="flex gap-3 flex-wrap">
-              <label class="form-check">
-                <input type="radio" name="voice_mode" value="standard" id="mode_standard" class="form-check-input" checked onchange="toggleVoiceSettings(false)" />
-                <span class="form-check-label text-bold">⚙️ Стандартные</span>
-              </label>
-              <label class="form-check">
-                <input type="radio" name="voice_mode" value="custom" id="mode_custom" class="form-check-input" onchange="toggleVoiceSettings(true)" />
-                <span class="form-check-label text-bold">🎛️ Расширенные</span>
-              </label>
-            </div>
-          </div>
-          <div id="voice-settings-block" class="d-none mt-3 p-3 rounded bg-light-blue border">
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label class="form-label" for="speed_select">⏱️ Скорость речи:</label>
-                <select name="speaking_rate" id="speed_select" class="form-control">
-                  <option value="0.8">Медленно (0.8x)</option>
-                  <option value="1.0" selected>Нормально (1.0x)</option>
-                  <option value="1.2">Быстро (1.2x)</option>
-                  <option value="1.5">Очень быстро (1.5x)</option>
-                </select>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label class="form-label" for="stability_select">🎭 Стабильность:</label>
-                <select name="stability" id="stability_select" class="form-control">
-                  <option value="0.3">Эмоциональный</option>
-                  <option value="0.5" selected>Сбалансированный</option>
-                  <option value="0.8">Стабильный</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Кнопки -->
           <div class="flex gap-2 mt-4 pt-3 border-top">
             <a href="{% url 'audio:dashboard' %}" class="btn btn-outline">Отмена</a>
-            <button type="submit" class="btn btn-primary flex-fill">🎤 Создать озвучку</button>
+            <button type="submit" class="btn btn-primary flex-fill">🛠️ Сформировать проект</button>
           </div>
         </form>
       </div>
     </div>
   </div>
 </div>
+
 {{ voices|json_script:"voices-data" }}
+
+<script>
+  function toggleVoiceSettings(show) {
+    const block = document.getElementById('voice-settings-block');
+    if (show) {
+      block.classList.remove('d-none');
+    } else {
+      block.classList.add('d-none');
+    }
+  }
+</script>
 {% endblock %}

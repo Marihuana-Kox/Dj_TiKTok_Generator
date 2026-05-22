@@ -1,0 +1,479 @@
+/* Основной темный фон в стиле CapCut / Premiere */
+body {
+    /* background-color: #0c0c0e !important; */
+    overflow-x: hidden;
+}
+
+.capcut-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Ровно 100% высоты видимого экрана */
+    color: #e1e1e6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #0c0c0e;
+    overflow: hidden;
+}
+
+/* ШАПКА РЕДАКТОРА */
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #141418;
+    border-bottom: 1px solid #222227;
+}
+
+.project-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-badge {
+    background-color: #2c2c35;
+    color: #03dac6;
+    font-size: 10px;
+    font-weight: bold;
+    text-uppercase: true;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+}
+
+.project-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    color: #ffffff;
+}
+
+/* Кнопка экспорта с неоновым градиентом */
+.capcut-btn-primary {
+    background: linear-gradient(135deg, #00b4db, #0083b0);
+    color: #fff;
+    border: none;
+    font-weight: bold;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: filter 0.2s, transform 0.1s;
+}
+
+.capcut-btn-primary:hover {
+    filter: brightness(1.2);
+}
+
+.capcut-btn-primary:active {
+    transform: scale(0.97);
+}
+
+/* РАБОЧАЯ ОБЛАСТЬ (ВЕРХНЯЯ ПОЛОВИНА) */
+.editor-workspace {
+    display: flex;
+    flex: 1; /* Жадно забирает всё пространство от шапки до таймлайна */
+    min-height: 0; /* Важнейший хак для флекс-боксов, чтобы контент не выдавливал блок вниз */
+    border-bottom: 1px solid #222227;
+}
+
+/* ЛЕВАЯ ПАНЕЛЬ: РЕСУРСЫ */
+.media-library-panel {
+    width: 45%;
+    background-color: #141418;
+    border-right: 1px solid #222227;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-title {
+    font-size: 12px;
+    font-weight: bold;
+    color: #8f8f9d;
+    padding: 12px 16px;
+    margin: 0;
+    border-bottom: 1px solid #1c1c22;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.media-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 12px;
+    max-height: 48vh;
+}
+
+.media-item-card {
+    background-color: #1c1c22;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #2c2c35;
+    transition: border-color 0.2s;
+}
+
+.media-item-card:hover {
+    border-color: #00b4db;
+}
+
+.media-thumb-wrapper {
+    position: relative;
+    aspect-ratio: 16/9;
+    background-color: #0c0c0e;
+}
+
+.media-thumb-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.no-thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #ef4444;
+}
+
+.media-order-tag {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background-color: rgba(0,0,0,0.75);
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #03dac6;
+}
+
+.media-info-mini {
+    padding: 6px;
+}
+
+.media-text-preview {
+    font-size: 11px;
+    margin: 0;
+    color: #aaa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ПРАВАЯ ПАНЕЛЬ: МОНИТОР (ПЛЕЕР) */
+.preview-monitor-panel {
+    width: 55%;
+    background-color: #18181c;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    box-sizing: border-box;
+    min-height: 0; /* Позволяет панели адаптироваться без провисания */
+}
+
+.monitor-screen {
+    /* flex: 1; */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80%;
+    padding: 20px;
+}
+
+.video-ratio-box {
+    width: 100%;
+    height: 100%; /* Занимает всю доступную высоту монитора */
+    max-height: calc(100% - 40px); /* Оставляем зазор для панели заголовка */
+    aspect-ratio: 16/9;
+    background-color: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border: 1px solid #2d2d35;
+}
+
+.video-ratio-box video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.empty-monitor-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: #666;
+}
+
+.monitor-icon { font-size: 40px; }
+.monitor-text { color: #e1e1e6; margin-top: 10px; font-weight: 500; }
+.monitor-subtext { font-size: 12px; color: #777; }
+
+/* PROGRESS BAR ПОД ПЛЕЕРОМ */
+.render-overlay-status {
+    width: 90%;
+    max-width: 640px;
+    background-color: #141418;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #2c2c35;
+}
+
+.render-info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+#render-status-title { color: #f1c40f; font-weight: 500; }
+
+.render-progress-track {
+    height: 6px;
+    background-color: #0a0a0d;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.render-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #00b4db, #00ff87);
+    transition: width 0.3s ease;
+}
+
+.render-log-subtext {
+    font-size: 11px;
+    color: #7f8c8d;
+    margin: 6px 0 0 0;
+}
+
+/* НИЖНЯЯ ПАНЕЛЬ: ГОРИЗОНТАЛЬНЫЙ ТАЙМЛАЙН */
+.editor-timeline-panel {
+    height: 38vh;
+    background-color: #141418;
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline-controls-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 16px;
+    background-color: #0f0f12;
+    border-bottom: 1px solid #1c1c22;
+}
+
+.timecode-display {
+    font-family: monospace;
+    color: #03dac6;
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+
+.timeline-tools {
+    display: flex;
+    gap: 15px;
+    color: #888;
+}
+
+.tool-icon {
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.tool-icon:hover { color: #fff; }
+
+/* ДОРОЖКИ */
+.timeline-tracks-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    padding: 10px 0;
+}
+
+.timeline-grid-sync {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: max-content;
+    padding-bottom: 10px;
+}
+
+.timeline-track {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.track-header-title {
+    width: 120px;
+    min-width: 120px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8f8f9d;
+    padding-left: 16px;
+    border-right: 2px solid #222227;
+}
+
+.track-content-flow {
+    display: flex;
+    gap: 3px;
+    padding-left: 10px;
+}
+
+/* КЛИПЫ (БЛОКИ) НА ТАЙМЛАЙНЕ */
+.timeline-clip {
+    position: relative;
+    width: 160px; /* Фиксированная ширина шага */
+    height: 55px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: transform 0.15s, border-color 0.15s;
+}
+
+.timeline-clip:hover {
+    transform: translateY(-2px);
+    border-color: #00b4db;
+}
+
+/* Специфика видео-клипа */
+.clip-video {
+    background-color: #2c3e50;
+}
+
+.clip-video img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.6;
+}
+
+/* Специфика аудио-клипа */
+.clip-audio {
+    background-color: #16a085;
+    height: 40px; /* Чуть тоньше видео-клипа */
+}
+
+.audio-wave-vector {
+    font-size: 9px;
+    text-align: center;
+    margin-top: 6px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 1px;
+    font-family: monospace;
+}
+
+/* Пустая аудиодорожка */
+.clip-audio-empty {
+    width: 160px;
+    height: 40px;
+    background-color: #222227;
+    border: 1px dashed #3a3a45;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-label {
+    color: #777 !important;
+    font-size: 10px !important;
+}
+/* Шапка панели монитора для выравнивания заголовка и кнопки */
+.panel-header-with-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    border-bottom: 1px solid #1c1c22;
+    padding-right: 15px;
+}
+
+/* Стили кнопки переключения */
+.aspect-ratio-selector {
+    display: flex;
+    align-items: center;
+}
+
+.ratio-btn {
+    background-color: #2c2c35;
+    color: #e1e1e6;
+    border: 1px solid #3a3a45;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.ratio-btn:hover {
+    background-color: #3a3a45;
+    border-color: #00b4db;
+}
+
+/* МАГИЯ ТРАНСФОРМАЦИИ ПЛЕЕРА */
+
+/* Если выбран режим 16:9 (Горизонтальный YouTube) */
+.video-ratio-box.aspect-16x9 {
+    aspect-ratio: 16/9;
+    max-width: 640px;
+    width: 100%;
+    height: auto;
+}
+
+/* Если выбран режим 9:16 (Вертикальный Shorts/TikTok) */
+.video-ratio-box.aspect-9x16 {
+    aspect-ratio: 9/16;
+    max-height: calc(100% - 40px); /* Чтобы по высоте не вылез за рамки */
+    width: auto;
+    height: 100%;
+}
+
+/* Обеспечиваем, чтобы видео внутри бокса всегда заполняло экран правильно */
+.video-ratio-box video {
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+}
+
+/* Подписи поверх клипов */
+.clip-label {
+    position: absolute;
+    bottom: 3px;
+    left: 6px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+}
+
+/* Скроллбары */
+.timeline-tracks-container::-webkit-scrollbar,
+.media-grid::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
+.timeline-tracks-container::-webkit-scrollbar-track,
+.media-grid::-webkit-scrollbar-track {
+    background: #0f0f12;
+}
+.timeline-tracks-container::-webkit-scrollbar-thumb,
+.media-grid::-webkit-scrollbar-thumb {
+    background: #2c2c35;
+    border-radius: 3px;
+}
+.d-none { display: none !important; }

@@ -44,57 +44,89 @@
             
             <!-- Настройки генерации -->
             <div class="row mb-3">
-                <!-- 1. Выбор провайдера -->
-                <div class="col-md-4 mb-2">
-                    <label class="form-label text-small">🤖 Провайдер:</label>
-                    <select id="image-provider-select" class="form-control">
-                        <option value="" disabled selected>Выберите провайдера...</option>
-                        {% for provider in image_providers %}
-                            <option value="{{ provider.name }}" 
-                                    data-model="{{ provider.config.model_id|default:'' }}">
-                                {{ provider.display_name }}
-                            </option>
-                        {% empty %}
-                            <option value="" disabled>⚠️ Нет image-провайдеров</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <!-- 2. Выбор размера -->
-                <div class="col-md-3 mb-2">
-                    <label class="form-label text-small">📐 Размер:</label>
-                    <select id="image-size-select" class="form-control">
-                        <option value="9:16" {% if project.aspect_ratio == '9:16' %}selected{% endif %}>9:16 (TikTok/Reels)</option>
-                        <option value="16:9" {% if project.aspect_ratio == '16:9' %}selected{% endif %}>16:9 (YouTube)</option>
-                        <option value="1:1" {% if project.aspect_ratio == '1:1' %}selected{% endif %}>1:1 (Square)</option>
-                        <option value="21:9" {% if project.aspect_ratio == '21:9' %}selected{% endif %}>21:9 (Cinema)</option>
-                    </select>
-                </div>
-                
-                <!-- 3. Применение стиля -->
-                <div class="col-md-5 mb-2">
-                    <label class="form-label text-small">🎨 Стиль:</label>
-                    <div class="flex gap-2">
-                        <select id="style-preset-select" class="form-control">
-                            <option value="current">Текущий ({{ project.get_style_preset_display }})</option>
-                            <option value="cinematic">🎬 Cinematic Dark</option>
-                            <option value="anime">🎌 Anime</option>
-                            <option value="realistic">📷 Photorealistic</option>
-                            <option value="artistic">🎨 Artistic</option>
-                            <option value="custom">✏️ Свой (из промпта)</option>
+                <div class="colom-custom">
+                    <!-- 1. Выбор провайдера -->
+                    <div class="pading-0">
+                        <label for="image-provider-select" class="form-label text-small">🤖 Провайдер:</label>
+                        <select id="image-provider-select" class="form-control">
+                            <option value="" disabled selected>Выберите провайдера...</option>
+                            {% for provider in image_providers %}
+                                <option value="{{ provider.name }}" 
+                                        data-model="{{ provider.config.model_id|default:'' }}">
+                                    {{ provider.display_name }}
+                                </option>
+                            {% empty %}
+                                <option value="" disabled>⚠️ Нет image-провайдеров</option>
+                            {% endfor %}
                         </select>
+                    </div>
+                    
+                    <!-- 2. Выбор размера -->
+                    <div class="col-md-3 mb-2">
+                        <label for="image-size-select" class="form-label text-small">📐 Размер:</label>
+                        <select id="image-size-select" class="form-control">
+                            <option value="9:16" {% if project.aspect_ratio == '9:16' %}selected{% endif %}>9:16 (TikTok/Reels)</option>
+                            <option value="16:9" {% if project.aspect_ratio == '16:9' %}selected{% endif %}>16:9 (YouTube)</option>
+                            <option value="1:1" {% if project.aspect_ratio == '1:1' %}selected{% endif %}>1:1 (Square)</option>
+                            <option value="21:9" {% if project.aspect_ratio == '21:9' %}selected{% endif %}>21:9 (Cinema)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 3. Применение стиля -->
+                    <div class="col-md-5 mb-2">
+                        <label for="style-preset-select" class="form-label text-small">🎨 Стиль:</label>
+                        <div class="flex gap-2">
+                            <select id="style-preset-select" class="form-control">
+                                <option value="current">Текущий ({{ project.get_style_preset_display }})</option>
+                                <option value="cinematic">🎬 Cinematic Dark</option>
+                                <option value="anime">🎌 Anime</option>
+                                <option value="realistic">📷 Photorealistic</option>
+                                <option value="artistic">🎨 Artistic</option>
+                                <option value="custom">✏️ Свой (из промпта)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Прогрессбар готовности проекта -->
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label text-small fw-bold">📊 Готовность кадров ({{ success_tracks }} из {{ total_tracks }}):</label>
+                        <div class="progress" style="height: 38px; background-color: #e9ecef; border-radius: 6px; overflow: hidden; border: 1px solid #ced4da; box-shadow: inset 0 1px 2px rgba(0,0,0,.1);">
+                            <div class="progress-bar {% if project_ready %}bg-success{% else %}bg-primary{% endif %} progress-bar-striped progress-bar-animated" 
+                                role="progressbar" 
+                                style="width: {{ progress_percent }}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.95rem; transition: width 0.4s ease;" 
+                                aria-valuenow="{{ progress_percent }}" 
+                                aria-valuemin="0" 
+                                aria-valuemax="100">
+                                {% if progress_percent > 0 %}{{ progress_percent }}%{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="colom-custom">
+                    <div class="colom-custom position-right width-streach">
+                        <div class="col-md-3 mb-2 flex flex-column justify-content-end video-button-create ">
+                        <label class="form-label text-small">🎞️ Финальный шаг ролика:</label>
+                        <a href="/video/project/{{ audio_project }}/edit/" 
+                        id="go-to-video-editor-btn" 
+                        class="btn btn-success w-100 flex items-center justify-content-center gap-2 fw-bold {% if not project_ready %}disabled{% endif %}"
+                        {% if not project_ready %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}>
+                            🎬 Собрать видео ролик
+                        </a>
                     </div>
                 </div>
             </div>
             
             <!-- Кнопка генерации -->
-            <div class="flex flex-between items-center">
-                <p class="text-muted text-small mb-0">
-                    ℹ️ Выберите промпты выше и нажмите кнопку для генерации
-                </p>
-                <button type="button" id="generate-images-btn" class="btn btn-primary" disabled>
-                    🎨 Генерировать выбранные (<span id="btn-count">0</span>)
-                </button>
+            <div class="colom-custom-100">
+                <div class="colom-custom">
+                    <p class="text-muted text-small mb-0">
+                        ℹ️ Выберите промпты выше и нажмите кнопку для генерации
+                    </p>
+                </div>
+                <div class="colom-custom">
+                    <button type="button" id="generate-images-btn" class="btn btn-primary" disabled>
+                        🎨 Генерировать выбранные (<span id="btn-count">0</span>)
+                    </button>
+                </div>
             </div>
         </div>
     <!-- 3. ФОРМА РЕДАКТИРОВАНИЯ -->
@@ -109,7 +141,7 @@
                     <div class="flex items-center gap-2">
                         <input type="checkbox" name="selected_prompts" value="{{ prompt.id }}" 
                             class="prompt-checkbox form-control checkbox-fix" id="prompt-{{ prompt.id }}"
-                            {% if prompt.generation_status == 'success' %} {% endif %}>
+                            {% if prompt.generation_status == 'success' %} disabled {% endif %}>
                         <label for="prompt-{{ prompt.id }}" class="text-bold text-blue">Сцена #{{ prompt.order }}</label>
                     </div>
                     <span class="badge 
@@ -138,21 +170,38 @@
                     <!-- Правая колонка: Миниатюра -->
                     <div class="prompt-image">
                         <label class="form-label">Результат:</label>
-                        {% if prompt.image %}
-                            <div class="thumbnail-wrapper" onclick="openLightbox('{{ prompt.image.url }}', 'Сцена #{{ prompt.order }}')">
-                                <img src="{{ prompt.image.url }}" alt="Scene {{ prompt.order }}" class="thumbnail-img">
-                                <div class="thumbnail-overlay">
-                                    <span class="thumbnail-icon">🔍</span>
-                                </div>
+                    
+                        {% if prompt.smart_image_url %}
+                        <div class="thumbnail-wrapper" onclick="openLightbox('{{ prompt.smart_image_url }}', 'Сцена #{{ prompt.order }}')">
+                            <img src="{{ prompt.smart_image_url }}" alt="Scene {{ prompt.order }}" class="thumbnail-img">
+                            <div class="thumbnail-overlay">
+                                <span class="thumbnail-icon">🔍</span>
                             </div>
+                        </div>
+                            <button type="button" 
+                                class="btn btn-custom btn-success btn-regenerate-image"
+                                onclick="generateSingleImage('{{ prompt.id }}')">
+                                🔄 Обновить кадр
+                            </button>
                         {% else %}
-                            <div class="thumbnail-empty">
-                                <span class="text-muted">❌ Нет изображения</span>
+                        <div class="thumbnail-empty custom-upload-image" data-order-id="{{ prompt.id }}" onclick="triggerManualUpload(this)">
+                            <form class="manual-upload-form" data-prompt-id="{{ prompt.id }}" style="display: none;" onclick="event.stopPropagation();">
+                                <input type="file" name="manual_image" data-prompt-id="{{ prompt.id }}" hidden accept="image/jpeg,image/png" onchange="handleManualUpload(this)">
+                            </form>
+
+                            <div class="upload-center-icon flex flex-column align-items-center justify-content-center text-muted transition-all">
+                                <span class="fs-2 m-0" style="opacity: 0.6; line-height: 1;">📥</span>
+                                <span class="text-mini mt-1 fw-semibold text-uppercase tracking-wider" style="font-size: 10px; opacity: 0.5;">Загрузить</span>
                             </div>
+                            <!-- <button type="button" class="btn btn-outline-secondary btn-sm" onclick="triggerManualUpload(this)">
+                                📥 Загрузить картинку
+                                ❌ Нет изображения
+                            </button> -->
+                        </div>
                         {% endif %}
-                        
+                    
                         {% if prompt.error_message %}
-                            <div class="alert alert-error mt-2 text-small">{{ prompt.error_message|truncatechars:100 }}</div>
+                        <div class="alert alert-error mt-2 text-small">{{ prompt.error_message|truncatechars:100 }}</div>
                         {% endif %}
                     </div>
                 </div>

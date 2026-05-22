@@ -1,0 +1,32 @@
+.voice-empty {
+  width: 100%;
+  max-width: 200px;
+  height: 100px;
+  border: 2px dashed #333;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.02);
+}
+.track-textarea {
+  resize: vertical; /* Разрешаем растягивать текстовое поле только по вертикали */
+  min-height: 100px;
+}
+.colom-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 46%;
+  padding: 20px;
+}
+.position-right {
+  align-items: end;
+}
+.video-button-create {
+    display: flex;
+    align-content: flex-start;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    width: 60%;
+}

@@ -1,3 +1,8 @@
+.btn-custom {
+    margin: 15px 0 0;
+    width: 150px;
+}
+
 /* Сетка: слева текст, справа картинка */
 .prompt-grid {
     display: grid;
@@ -144,7 +149,42 @@
     color: #fff;
     font-size: 14px;
 }
-
+.pading-0 {
+    padding: 0;
+}
+.colom-custom-100 {
+    display: flex;
+    width: 100%;
+}
+.colom-custom-100 > .colom-custom {
+    align-items: end;
+    align-self: anchor-center;
+}
+.width-streach {
+    width: auto!important;
+}
+.border-dashed {
+        border: 2px dashed #ced4da;
+        transition: all 0.25s ease-in-out;
+}
+/* Эффект при наведении на всю область кадра */
+.thumbnail-empty:hover.border-dashed {
+    border-color: #0d6efd; /* Цвет Bootstrap Primary при наведении */
+    background-color: #f1f5f9 !important;
+}
+.thumbnail-empty:hover .upload-center-icon {
+    color: #0d6efd !important;
+    transform: scale(1.08);
+}
+.thumbnail-empty:hover .upload-center-icon span {
+    opacity: 1 !important;
+}
+.transition-all {
+    transition: all 0.25s ease-in-out;
+}
+.custom-upload-image {
+    cursor: pointer;
+}
 /* Адаптив для мобильных */
 @media (max-width: 768px) {
     .prompt-grid {

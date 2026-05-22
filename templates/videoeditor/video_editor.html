@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/video_editor_capcut.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="capcut-container" data-project-id="{{ project.id }}">
+    
+    <header class="editor-header">
+        <div class="project-info">
+            <span class="status-badge">киностудия v2.0</span>
+            <h1 class="project-title">{{ project.title }}</h1>
+        </div>
+        <div class="editor-actions">
+            <button id="render-video-btn" class="capcut-btn-primary">
+                🎬 Экспорт (.mp4)
+            </button>
+        </div>
+    </header>
+
+    <main class="editor-workspace">
+        
+        <section class="media-library-panel">
+            <h3 class="panel-title">📁 Ресурсы проекта</h3>
+            <div class="media-grid">
+                {% for item in timeline_data %}
+                    <div class="media-item-card" data-order="{{ item.order }}">
+                        <div class="media-thumb-wrapper">
+                            {% if item.prompt.smart_image_url or item.prompt.image %}
+                                <img src="{{ item.prompt.smart_image_url }}" alt="Сцена {{ item.order }}">
+                            {% else %}
+                                <div class="no-thumb-placeholder">❌</div>
+                            {% endif %}
+                            <span class="media-order-tag">#{{ item.order }}</span>
+                        </div>
+                        <div class="media-info-mini">
+                            <p class="media-text-preview">{{ item.track.text|default:"Без текста" }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+
+       <section class="preview-monitor-panel">
+    <div class="panel-header-with-actions">
+        <h3 class="panel-title">🖥️ Монитор композиции</h3>
+        
+        <div class="aspect-ratio-selector">
+            <button type="button" id="ratio-toggle-btn" class="ratio-btn" data-current-ratio="16x9">
+                <span class="ratio-icon">📺</span> 
+                <span id="ratio-text-label">Формат: 16:9 (YouTube)</span>
+            </button>
+        </div>
+    </div>
+    
+    <div class="monitor-screen">
+        <div id="video-preview-container" class="video-ratio-box aspect-16x9">
+            {% if video_render and video_render.status == 'success' %}
+                <video id="main-editor-player" controls>
+                    <source src="{{ video_render.video_file.url }}" type="video/mp4">
+                </video>
+            {% else %}
+                <div class="empty-monitor-state">
+                    <span class="monitor-icon">📺</span>
+                    <p class="monitor-text">Видео готово к сборке</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    </section>
+
+    </main>
+
+    <footer class="editor-timeline-panel">
+        
+        <div class="timeline-controls-bar">
+            <div class="timecode-display">00:00:00:00</div>
+            <div class="timeline-tools">
+                <span class="tool-icon" title="Выделение">🔲</span>
+                <span class="tool-icon" title="Разрезать клип">✂️</span>
+                <span class="tool-icon" title="Масштаб">🔍</span>
+            </div>
+        </div>
+
+        <div class="timeline-tracks-container">
+            
+            <div class="timeline-grid-sync">
+                
+                <div class="timeline-track video-track">
+                    <div class="track-header-title">
+                        <span>📹 Видео (V1)</span>
+                    </div>
+                    <div class="track-content-flow">
+                        {% for item in timeline_data %}
+                            <div class="timeline-clip clip-video" data-order="{{ item.order }}">
+                                {% if item.prompt.smart_image_url or item.prompt.image %}
+                                    <img src="{{ item.prompt.smart_image_url }}" alt="">
+                                {% endif %}
+                                <div class="clip-label">Сцена {{ item.order }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="timeline-track audio-track">
+                    <div class="track-header-title">
+                        <span>🎤 Озвучка (A1)</span>
+                    </div>
+                    <div class="track-content-flow">
+                        {% for item in timeline_data %}
+                            {% if item.track.audio_file %}
+                                <div class="timeline-clip clip-audio play-audio-btn" data-src="{{ item.track.audio_file.url }}" data-order="{{ item.order }}">
+                                    <div class="audio-wave-vector">⚡🎵⚡ Waveform ⚡🎵⚡</div>
+                                    <div class="clip-label">Аудио {{ item.order }}</div>
+                                </div>
+                            {% else %}
+                                <div class="timeline-clip clip-audio-empty" data-order="{{ item.order }}">
+                                    <div class="clip-label empty-label">⚠️ Нет звука</div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div> </div>
+    </footer>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+
+{% endblock %}

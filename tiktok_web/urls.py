@@ -14,6 +14,7 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -22,22 +23,21 @@ from django.views.generic import RedirectView
 
 urlpatterns = [
     path(
-        'admin/article/',
-        RedirectView.as_view(
-            pattern_name='admin:article_article_changelist', permanent=False),
+        "admin/article/",
+        RedirectView.as_view(pattern_name="admin:article_article_changelist", permanent=False),
     ),
-    path('admin/', admin.site.urls),
-    path('', include('core.urls', namespace='core')),
+    path("admin/", admin.site.urls),
+    path("", include("core.urls", namespace="core")),
     # Подключаем наши URL
-    path('generator/', include('generator.urls', namespace='generator')),
-    path('config/', include('config.urls', namespace='config')),
-    path('article/', include('article.urls', namespace='article')),
-    path('images/', include('image.urls', namespace='images')),
-    path('topics/', include('topics.urls', namespace='topics')),
-    path('audio/', include('audio.urls', namespace='audio')),
+    path("generator/", include("generator.urls", namespace="generator")),
+    path("config/", include("config.urls", namespace="config")),
+    path("article/", include("article.urls", namespace="article")),
+    path("images/", include("image.urls", namespace="images")),
+    path("topics/", include("topics.urls", namespace="topics")),
+    path("audio/", include("audio.urls", namespace="audio")),
+    path("video/", include("videoeditor.urls", namespace="videoeditor")),
 ]
 
 # Чтобы отдавать медиа-файлы (картинки/видео) в режиме разработки
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL,
-                          document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

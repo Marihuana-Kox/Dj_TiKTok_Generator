@@ -1,17 +1,16 @@
 {% extends 'base.html' %}
 
-{% block title %}Генератор Голоса озвучки{% endblock %}
+{% block title %}Генератор Озвучки{% endblock %}
 
 {% block content %}
-<!-- 1. ЗАГОЛОВОК И КНОПКА СОЗДАНИЯ -->
 <div class="flex flex-between mb-2">
     <div>
-        <h1>🎨 Генератор Голоса озвучки</h1>
-        <p class="text-muted">Создание аудио проектов и озвучка статей.</p>
+        <h1>🎙️ Генератор Озвучки</h1>
+        <p class="text-muted">Разбиение статей на сюжеты и поабзацная генерация аудиодорожек.</p>
     </div>
     <a href="{% url 'audio:audio_create' %}" class="btn btn-primary">✨ Новый проект</a>
 </div>
-<!-- 2. СТАТИСТИКА -->
+
 <div class="flex mb-2">
     <div class="card stat-card blue">
         <span class="stat-value">{{ stats.total|default:0 }}</span>
@@ -23,29 +22,25 @@
     </div>
     <div class="card stat-card green">
         <span class="stat-value">{{ stats.completed|default:0 }}</span>
-        <span class="stat-label">Готово к скачиванию</span>
+        <span class="stat-label">Успешно завершено</span>
     </div>
 </div>
 
-<!-- 3. ТАБЛИЦА ПРОЕКТОВ -->
 <form method="post" id="bulk-action-form">
     {% csrf_token %}
     <div class="card" style="padding: 0;">
-        <!-- Панель управления (Выбрать все / Удалить) -->
         <div class="flex flex-between mb-2 pt-2" style="padding: 0 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 0;">
             <div class="flex items-center">
                 <input type="checkbox" id="select-all" class="form-control checkbox-fix">
                 <label for="select-all" class="text-bold ml-1">Выбрать все</label>
                 <span id="selection-count" class="ml-2 text-muted" style="display:none;">(выбрано: <span id="count-val">0</span>)</span>
             </div>
-            
+
             <div class="flex items-center gap-2">
-                <!-- Кнопка удаления проектов -->
-                <button type="submit" name="action" value="delete_selected" id="btn-delete" class="btn btn-outline" disabled onclick="return confirm('Удалить выбранные проекты генерации? Это действие нельзя отменить.');">
+                <button type="submit" name="action" value="delete_selected" id="btn-delete" class="btn btn-outline" disabled onclick="return confirm('Удалить выбранные проекты озвучки? Все аудиофайлы и треки будут стерты.');">
                     🗑️ Удалить проекты
                 </button>
-                
-                <!-- Кнопка массовой перегенерации (опционально) -->
+
                 <div class="separator" style="width:1px; height:20px; background:var(--border-color); margin:0 5px;"></div>
                 <button type="submit" name="action" value="regenerate_failed" id="btn-regen" class="btn btn-primary" disabled>
                     ↻ Перегенерировать ошибки
@@ -57,128 +52,111 @@
             <thead>
                 <tr>
                     <th>#</th>
-                    <th></th> <!-- Чекбокс -->
+                    <th></th>
                     <th>ID</th>
                     <th>Статья (Источник)</th>
-                    <th>Стиль</th>
-                    <th>Кадры</th>
+                    <th>Голос / Язык</th>
+                    <th>Сюжеты (Аудио)</th>
                     <th>Прогресс</th>
                     <th>Статус</th>
-                    <th>Обновлено</th>
+                    <th>Создан</th>
                     <th>Действие</th>
                 </tr>
             </thead>
             <tbody>
                 {% if projects %}
-                    {% for project in projects %} 
-                        <tr class="idea-row">
-                            <!-- 1. НОМЕР СТРОКИ (ОБРАТНЫЙ СЧЁТ) -->
-                            <td class="text-center">
-                                <td class="text-center">{{ project.reverse_num }}</td>
-                            </td>
-                            
-                            <!-- 2. ЧЕКБОКС -->
-                            <td class="text-center">
-                                {% if project.status == 'failed' %}
-                                <input type="checkbox" name="selected_projects" value="{{ project.instance.id }}" checked class="idea-checkbox form-control checkbox-fix">
-                                {% else %}
-                                <input type="checkbox" name="selected_projects" value="{{ project.instance.id }}" class="idea-checkbox form-control checkbox-fix">
-                                {% endif %}
-                            </td>
-                            
-                            <!-- 3. ID -->
-                            <td class="text-center">#{{ project.instance.id }}</td>
-                            
-                            <!-- 4. СТАТЬЯ -->
-                            <td class="text-bold">
-                                {% if project.article_title %}
-                                    {{ project.article_title|truncatechars:40 }}
-                                {% else %}
-                                    <span class="text-danger">⚠️ Статья удалена</span>
-                                {% endif %}
-                            </td>
+                {% for project in projects %}
+                <tr class="idea-row">
+                    <td class="text-center">{{ project.reverse_num }}</td>
 
-                            <!-- 5. СТИЛЬ -->
-                            <td>
-                                <span class="badge badge-work" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa;">
-                                    {{ project.style_name|default:"Default" }}
-                                </span>
-                            </td>
+                    <td class="text-center">
+                        {% if project.status == 'failed' %}
+                        <input type="checkbox" name="selected_projects" value="{{ project.id }}" checked class="idea-checkbox form-control checkbox-fix">
+                        {% else %}
+                        <input type="checkbox" name="selected_projects" value="{{ project.id }}" class="idea-checkbox form-control checkbox-fix">
+                        {% endif %}
+                    </td>
 
-                            <!-- 6. КАДРЫ (Прогресс бар мини) -->
-                            <td style="min-width: 150px;">
-                                <div class="flex text-small mb-1" style="justify-content: space-between;">
-                                    <span>{{ project.completed_count|default:0 }}/{{ project.total_prompts|default:0 }}</span>
-                                    <span class="text-muted">{{ project.progress_percent|default:0 }}%</span>
-                                </div>
-                                <div class="progress-track" style="height: 6px;">
-                                    <div class="progress-fill" style="width: {{ project.progress_percent|default:0 }}%;"></div>
-                                </div>
-                            </td>
+                    <td class="text-center">#{{ project.id }}</td>
 
-                            <!-- 7. ОБЩИЙ ПРОГРЕСС (Текстовый статус) -->
-                            <td>
-                                {% if project.status == 'completed' %}
-                                    <span class="text-success text-bold">✓ Готово</span>
-                                {% elif project.status == 'processing' %}
-                                    <span class="text-blue text-bold">⟳ Генерация...</span>
-                                {% elif project.status == 'failed' %}
-                                    <span class="text-danger text-bold">⚠ Ошибки</span>
-                                {% else %}
-                                    <span class="text-muted">Черновик</span>
-                                {% endif %}
-                            </td>
+                    <td class="text-bold">
+                        {% if project.title %}
+                        {{ project.title|truncatechars:40 }}
+                        {% else %}
+                        <span class="text-danger">⚠️ Статья удалена</span>
+                        {% endif %}
+                    </td>
 
-                            <!-- 8. СТАТУС БАДЖ -->
-                            <td>
-                                {% if project.status == 'completed' %}
-                                    <span class="badge badge-done">Архив готов</span>
-                                {% elif project.status == 'processing' %}
-                                    <span class="badge badge-work">В работе</span>
-                                {% else %}
-                                    <span class="badge badge-new">Черновик</span>
-                                {% endif %}
-                            </td>
+                    <td>
+                        <span class="badge badge-work" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa;">
+                            {{ project.instance.voice_preset|default:"Default" }} ({{ project.language_code|upper }})
+                        </span>
+                    </td>
 
-                            <!-- 9. ДАТА -->
-                            <td class="text-muted text-small">{{ project.instance.created_at|date:"d.m.Y H:i" }}</td>
+                    <td style="min-width: 150px;">
+                        <div class="flex text-small mb-1" style="justify-content: space-between;">
+                            <span>{{ project.completed_count|default:0 }}/{{ project.tracks_count|default:0 }}</span>
+                            <span class="text-muted">{{ project.progress_percent|default:0 }}%</span>
+                        </div>
+                        <div class="progress-track" style="height: 6px;">
+                            <div class="progress-fill" style="width: {{ project.progress_percent|default:0 }}%;"></div>
+                        </div>
+                    </td>
 
-                            <!-- 10. ДЕЙСТВИЕ -->
-                            <td>
-                                <div class="flex gap-2">
-                                    {% if project.instance %}
-                                        <!-- Кнопка Редактировать промпты -->
-                                        <a href="{% url 'image:project_edit' project.id %}" 
-                                        class="text-bold link-blue" 
-                                        title="Редактировать промпты">
-                                            ✏️ Ред.
-                                        </a>
-                                        <!-- Кнопка Скачать (только если готово) -->
-                                        {% if project.instance.status == 'completed' %}
-                                            <a href="{% url 'image:download_project' project.id %}" 
-                                            class="text-bold link-blue" 
-                                            title="Скачать ZIP">
-                                                ⬇️ ZIP
-                                            </a>
-                                        {% endif %}
-                                    {% else %}
-                                        <span class="text-muted text-small">-</span>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
+                    <td>
+                        {% if project.status == 'completed' %}
+                        <span class="text-success text-bold">✓ Готово</span>
+                        {% elif project.status == 'processing' %}
+                        <span class="text-blue text-bold">⟳ Нарезка...</span>
+                        {% elif project.status == 'failed' %}
+                        <span class="text-danger text-bold">⚠ Ошибки</span>
+                        {% else %}
+                        <span class="text-muted">Черновик</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if project.status == 'completed' %}
+                        <span class="badge badge-done">Аудио готово</span>
+                        {% elif project.status == 'processing' %}
+                        <span class="badge badge-work">В работе</span>
+                        {% else %}
+                        <span class="badge badge-new">Черновик</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-muted text-small">{{ project.created_at|date:"d.m.Y H:i" }}</td>
+
+                    <td>
+                        <div class="flex gap-2">
+                            {% if project.id %}
+                            <a href="/audio/{{ project.id }}/edit/" class="text-bold link-blue" title="Редактировать аудио-сюжеты">
+                                ✏️ Ред.
+                            </a>
+
+                            {% if project.audio_url %}
+                            <a href="{{ project.audio_url }}" target="_blank" class="text-bold link-blue" title="Открыть файл">
+                                ▶ Аудио
+                            </a>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted text-small">-</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
                 {% else %}
-                    <tr><td colspan="10" class="text-muted text-center" style="padding: 40px;">
-                        Список проектов пуст. Создайте первый проект генерации!
-                    </td></tr>
+                <tr>
+                    <td colspan="10" class="text-muted text-center" style="padding: 40px;">
+                        Список проектов пуст. Сформируйте первый проект озвучки!
+                    </td>
+                </tr>
                 {% endif %}
             </tbody>
         </table>
-        
-        <!-- Пагинация (если есть) -->
         {% if page_obj.has_other_pages %}
-            {% include 'topics/includes/pagination.html' %}
+        {% include 'topics/includes/pagination.html' %}
         {% endif %}
     </div>
 </form>

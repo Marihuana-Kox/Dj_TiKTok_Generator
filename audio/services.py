@@ -1,4 +1,5 @@
-import base64
+import re
+import json
 import logging
 import os
 from pathlib import Path
@@ -7,88 +8,173 @@ import requests
 from ai_inspector.models import AIProvider
 from elevenlabs import ElevenLabs, Voice, VoiceSettings
 from elevenlabs.core import ApiError
+from django.core.cache import cache
 from django.conf import settings
+from asgiref.sync import async_to_sync
+from inworld_tts import InworldTTS
+
+from image.services import get_or_create_project_dir
 
 logger = logging.getLogger(__name__)
+
+
+def split_text_by_words_and_dots(text: str, target_word_count: int = 50) -> list:
+    """
+    Разбивает текст на сюжеты примерно по target_word_count слов,
+    но делает срез строго на окончаниях предложений (. ! ?).
+    """
+    # Регулярка делит текст на предложения, сохраняя знаки препинания
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    chunks = []
+    current_chunk = []
+    current_word_count = 0
+
+    for sentence in sentences:
+        sentence_words = sentence.split()
+        if not sentence_words:
+            continue
+
+        current_chunk.append(sentence)
+        current_word_count += len(sentence_words)
+
+        # Если набрали нужный лимит слов — закрываем сюжет
+        if current_word_count >= target_word_count:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = []
+            current_word_count = 0
+
+    # Дописываем остаток, если он есть
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+
+    return chunks
 
 
 def generate_voiceover_inworld(
     text: str,
     provider_instance,
-    voice_id: str,
-    language: str,
+    voice_id: str,  # Имя спикера, например 'Nikolay'
+    language: str,  # Локаль, например 'ru'
+    project_title: str,  # Название статьи
+    article_id: int,  # ID проекта/статьи для get_or_create_project_dir
+    track_order: int = 1,  # 🔥 НАШ ОРДНУНГ: Порядковый номер фрагмента текста!
     speaking_rate: float = 1.0,
-    folder_name: str = "default",
+    task_id: str = None,
 ) -> str:
-    print("🔥 [SERVICE START] Функция вызвана!", flush=True)
+    cache_key = f"progress_{task_id}" if task_id else None
+
+    def log_to_modal(message: str, percent: int = None):
+        if cache_key:
+            current_data = cache.get(cache_key, {})
+            if "logs" not in current_data:
+                current_data["logs"] = []
+            current_data["logs"].append(message)
+            if percent:
+                current_data["percent"] = percent
+            cache.set(cache_key, current_data, 3600)
 
     try:
-        print(f"🔍 Проверка провайдера: '{provider_instance.name}...'")
-        print(f"🔍 Проверка провайдера: '{provider_instance.display_name}...'")
-
-        # Логируем начало текста
         if not text or not text.strip():
             raise ValueError("Текст пуст")
 
-        # URL и API ключ берем из основных полей модели
-        url = provider_instance.base_url or "https://api.inworld.ai/tts/v1/voice333"
+        log_to_modal("🛠 Сбор конфигурации провайдера из БД...", percent=25)
+
         api_key = provider_instance.api_key
-        print(f"🔑  Это наш: {url}")
-        # Достаем твой JSON-конфиг
         config = getattr(provider_instance, "config", {}) or {}
+        if not api_key:
+            raise ValueError("Ключ API в базе не найден")
+        clean_key = api_key.strip()
 
-        # БЕРЕМ ДАННЫЕ ИЗ ТВОЕГО КОНФИГА (с защитой от отсутствия ключей)
         model_id = config.get("model_id", "inworld-tts-2")
-        delivery_mode = config.get("delivery_mode", "BALANCED")
-        timestamp_type = config.get("timestamp_type", "WORD")
 
-        headers = {
-            "Authorization": f"Basic {api_key}",
-            "Content-Type": "application/json",
-        }
+        # === ОГРАНИЧЕНИЕ НА 10 СЛОВ ДЛЯ ТЕСТИРОВАНИЯ ===
+        short_text = " ".join(text.split())
+        print(f"📤 Payload для теста (10 слов): {short_text}")
+        # ===============================================
 
-        payload = {
-            "text": " ".join(text.split()[:10]),
-            "voiceId": voice_id,
-            "modelId": model_id,
-            "timestampType": timestamp_type,
-            "audioConfig": {"speakingRate": speaking_rate},
-            "deliveryMode": delivery_mode,
-            "language": language,
-        }
-        print("📤 Payload для:", payload["text"])
-        # Для отладки в терминале VS Code при запросе к "пустому" серверу
-        print(f"📡 Отправка запроса на: {url}")
+        async def _async_stream_generate():
+            log_to_modal(
+                f"📡 Инициализация Inworld SDK ({model_id}). Подключение к стриму...",
+                percent=57,
+            )
+            tts = InworldTTS(api_key=clean_key)
+            chunks = []
 
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
-        response.raise_for_status()
+            async for chunk in tts.stream(
+                text=short_text,
+                voice=voice_id,
+                encoding="WAV",
+                sample_rate=48000,
+            ):
+                chunks.append(chunk)
+                log_to_modal(f"📥 Получен аудио-пакет: {len(chunk)} байт")
 
-        # ... (дальше логика сохранения файла)
-        result = response.json()
+            if not chunks:
+                raise ValueError("Сервер Inworld вернул пустой аудио-поток.")
 
-        if "audioContent" not in result:
-            raise ValueError("Ответ API не содержит audioContent")
+            return b"".join(chunks)
 
-        # Декодируем аудио
-        audio_content = base64.b64decode(result["audioContent"])
+        print("🔥 [INWORLD SDK] Запуск асинхронного генератора", flush=True)
+        audio_content = async_to_sync(_async_stream_generate)()
 
-        # --- ЛОГИКА ПАПОК ---
-        # media/voice/название_статьи/
-        save_dir = Path(settings.MEDIA_ROOT) / "voice" / folder_name
-        save_dir.mkdir(parents=True, exist_ok=True)
+        log_to_modal("💾 Сохранение файлов в структуру проекта...", percent=69)
 
-        filename = f"{voice_id}_{language}_{os.urandom(2).hex()}.mp3"
-        file_path = save_dir / filename
+        # 1. Находим/создаем главную папку проекта по РУССКОМУ названию статьи
+        project_dir, folder_name = get_or_create_project_dir(project_title, article_id)
 
+        # 2. Динамически формируем имя подпапки: voice_ru, voice_en
+        voice_folder_name = f"voice_{language}" if language else "voice"
+        voice_dir = Path(project_dir) / voice_folder_name
+        voice_dir.mkdir(parents=True, exist_ok=True)
+
+        # 3. 🔥 ИСПРАВЛЕНО: Сразу формируем имя файла с порядковым номером (Орднунгом)
+        # Получится: Nikolay_1_ru
+        file_base_name = f"{voice_id}_{track_order}_{language}"
+        filename = f"{file_base_name}.wav"
+        json_filename = f"voices_meta_{language}.json"
+
+        file_path = voice_dir / filename
+        json_path = voice_dir / json_filename
+
+        # Записываем аудиофайл
         with open(file_path, "wb") as f:
             f.write(audio_content)
 
-        logger.info(f"✅ Аудио сохранено: {file_path}")
+        # Читаем существующий файл или создаем новый скелет
+        if json_path.exists():
+            try:
+                with open(json_path, "r", encoding="utf-8") as jf:
+                    meta_data = json.load(jf)
+            except Exception:
+                meta_data = {"paragraphs": {}}
+        else:
+            meta_data = {"paragraphs": {}}
 
-        # Возвращаем относительный путь для сохранения в БД/вывода в шаблон
-        return f"voice/{folder_name}/{filename}"
-    except requests.exceptions.RequestException as e:
-        logger.error(f"❌ Ошибка запроса к Inworld: {e}")
+        if "paragraphs" not in meta_data:
+            meta_data["paragraphs"] = {}
+        # 4. Создаем конфигурационный .json для субтитров текущего фрагмента
+        meta_data["paragraphs"][str(track_order)] = {
+            "article_title": project_title,
+            "article_id": article_id,
+            "track_order": track_order,
+            "speaker": voice_id,
+            "language": language,
+            "model": model_id,
+            "speed": speaking_rate,
+            "full_text": text,
+        }
+
+        with open(json_path, "w", encoding="utf-8") as jf:
+            json.dump(meta_data, jf, ensure_ascii=False, indent=4, sort_keys=True)
+
+        logger.info(f"✅ Аудио и конфиг успешно сохранены в: {voice_dir}", percent=89)
+
+        log_to_modal(f"🎉 Озвучка сохранена в проект: {voice_folder_name}/{filename}", percent=95)
+
+        return f"projects/{folder_name}/{voice_folder_name}/{filename}"
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка генерации озвучки: {e}")
         raise RuntimeError(f"Ошибка генерации озвучки: {e}")
 
 
@@ -112,9 +198,7 @@ def generate_voiceover_elevenlabs(
     similarity_boost = float(config.get("similarity_boost", 0.75))
 
     client = ElevenLabs(api_key=api_key)
-    voice_settings = VoiceSettings(
-        stability=stability, similarity_boost=similarity_boost
-    )
+    voice_settings = VoiceSettings(stability=stability, similarity_boost=similarity_boost)
 
     try:
         audio_stream = client.generate(
