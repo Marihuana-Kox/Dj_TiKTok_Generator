@@ -498,3 +498,108 @@ function checkProjectVideoReady() {
     }
   }
 }
+function uploadManualAudioFile(inputElement, trackId) {
+    const file = inputElement.files[0];
+    if (!file) return;
+
+    // Валидация расширений на фронтенде
+    const allowedExtensions = /(\.wav|\.mp3|\.mpeg)$/i;
+    if (!allowedExtensions.exec(inputElement.value)) {
+        alert('Ошибка: Допускаются только аудиофайлы форматов .wav, .mp3 или .mpeg');
+        inputElement.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('track_id', trackId);
+    formData.append('audio_file', file);
+    
+    // Безопасный поиск CSRF-токена внутри текущей формы
+    let csrfToken = '';
+    const csrfInput = document.querySelector('#audio-tracks-form [name=csrfmiddlewaretoken]');
+    if (csrfInput) {
+        csrfToken = csrfInput.value;
+    } else {
+        const match = document.cookie.match(/csrftoken=([^;]+)/);
+        if (match) csrfToken = match[1];
+    }
+
+    if (!csrfToken) {
+        alert('Ошибка безопасности: Не найден CSRF токен.');
+        return;
+    }
+
+    // Поиск кнопки для отображения прогресса (она идет сразу после инпута)
+    const button = inputElement.nextElementSibling;
+    const originalText = button.innerHTML;
+    
+    button.innerHTML = '⏳ Загрузка...';
+    button.disabled = true;
+    button.classList.add('loading-state');
+
+    fetch('/audio/track/upload-manual/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        },
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Ошибка сервера: ' + response.status);
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            inputElement.value = '';
+            
+            // Обновляем плеер динамически с обходом кэша браузера
+            const playerContainer = document.querySelector(`.audio-player-container-${trackId}`);
+            if (playerContainer) {
+                const timestamp = new Date().getTime();
+                playerContainer.innerHTML = `
+                    <div class="audio-container-box flex align-items-center justify-content-center">
+                        <audio src="${data.audio_url}?t=${timestamp}" controls class="w-100"></audio>
+                    </div>
+                `;
+            }
+            
+            // Меняем статус бэйджа карточки на Успешно
+            const card = document.getElementById(`track-card-${trackId}`);
+            if (card) {
+                const badge = card.querySelector('.badge');
+                if (badge) {
+                    badge.className = 'badge badge-done';
+                    badge.innerHTML = 'Успешно'; // Или соответствующий текст get_status_display
+                }
+                // Разблокируем чекбокс если необходимо
+                const checkbox = document.getElementById(`track-${trackId}`);
+                if (checkbox) checkbox.disabled = true;
+            }
+
+            button.innerHTML = '✅ Обновлено';
+            button.classList.remove('loading-state');
+            button.classList.add('success-state');
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.classList.remove('success-state');
+                button.disabled = false;
+            }, 2000);
+
+        } else {
+            alert('Ошибка: ' + data.error);
+            resetUploadButton(button, originalText);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Критическая ошибка соединения с сервером.');
+        resetUploadButton(button, originalText);
+    });
+}
+
+function resetUploadButton(button, originalText) {
+    button.innerHTML = originalText;
+    button.classList.remove('loading-state', 'success-state');
+    button.disabled = false;
+}

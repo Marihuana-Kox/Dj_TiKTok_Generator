@@ -104,13 +104,24 @@
                 <div class="colom-custom">
                     <div class="colom-custom position-right width-streach">
                         <div class="col-md-3 mb-2 flex flex-column justify-content-end video-button-create ">
-                        <label class="form-label text-small">🎞️ Финальный шаг ролика:</label>
-                        <a href="/video/project/{{ audio_project }}/edit/" 
-                        id="go-to-video-editor-btn" 
-                        class="btn btn-success w-100 flex items-center justify-content-center gap-2 fw-bold {% if not project_ready %}disabled{% endif %}"
-                        {% if not project_ready %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}>
-                            🎬 Собрать видео ролик
-                        </a>
+                        
+                        {% if audio_project is None %}
+                            <label class="form-label text-small">🎞️ Создать аудио:</label>
+                            <a href="/audio/create/?article_id={{ project.article.id }}" 
+                            id="go-to-video-editor-btn" 
+                            class="btn btn-success w-100 flex items-center justify-content-center gap-2 fw-bold {% if audio_project is None %}disabled{% endif %}"
+                            {% if not project_ready %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}>
+                                🎬 Создать аудио проект
+                            </a>
+                        {% elif audio_project %}
+                            <label class="form-label text-small">🎞️ Финальный шаг ролика:</label>
+                            <a href="/video/project/{{ audio_project }}/edit/" 
+                            id="go-to-video-editor-btn" 
+                            class="btn btn-success w-100 flex items-center justify-content-center gap-2 fw-bold"
+                            {% if not project_ready %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}>
+                                🎬 Собрать видео ролик
+                            </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>

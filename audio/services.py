@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 
+import mutagen
 import requests
 from ai_inspector.models import AIProvider
 from elevenlabs import ElevenLabs, Voice, VoiceSettings
@@ -87,10 +88,8 @@ def generate_voiceover_inworld(
 
         model_id = config.get("model_id", "inworld-tts-2")
 
-        # === ОГРАНИЧЕНИЕ НА 10 СЛОВ ДЛЯ ТЕСТИРОВАНИЯ ===
         short_text = " ".join(text.split())
         print(f"📤 Payload для теста (10 слов): {short_text}")
-        # ===============================================
 
         async def _async_stream_generate():
             log_to_modal(
@@ -119,16 +118,15 @@ def generate_voiceover_inworld(
 
         log_to_modal("💾 Сохранение файлов в структуру проекта...", percent=69)
 
-        # 1. Находим/создаем главную папку проекта по РУССКОМУ названию статьи
+        # 1. Находим/создаем главную папку проекта
         project_dir, folder_name = get_or_create_project_dir(project_title, article_id)
 
-        # 2. Динамически формируем имя подпапки: voice_ru, voice_en
+        # 2. Формируем имя подпапки: voice_ru
         voice_folder_name = f"voice_{language}" if language else "voice"
         voice_dir = Path(project_dir) / voice_folder_name
         voice_dir.mkdir(parents=True, exist_ok=True)
 
-        # 3. 🔥 ИСПРАВЛЕНО: Сразу формируем имя файла с порядковым номером (Орднунгом)
-        # Получится: Nikolay_1_ru
+        # 3. Имя файла по твоему стандарту
         file_base_name = f"{voice_id}_{track_order}_{language}"
         filename = f"{file_base_name}.wav"
         json_filename = f"voices_meta_{language}.json"
@@ -140,7 +138,16 @@ def generate_voiceover_inworld(
         with open(file_path, "wb") as f:
             f.write(audio_content)
 
-        # Читаем существующий файл или создаем новый скелет
+        # 🔥 ВЫЧИСЛЯЕМ ДЛИТЕЛЬНОСТЬ КЛИПА ДЛЯ ТАЙМЛАЙНА
+        duration = 0.0
+        try:
+            audio_info = mutagen.File(file_path)
+            if audio_info is not None and audio_info.info is not None:
+                duration = round(audio_info.info.length, 2)
+        except Exception as audio_err:
+            print(f"⚠️ Ошибка подсчета длины при генерации: {audio_err}")
+
+        # Читаем существующий JSON
         if json_path.exists():
             try:
                 with open(json_path, "r", encoding="utf-8") as jf:
@@ -152,7 +159,8 @@ def generate_voiceover_inworld(
 
         if "paragraphs" not in meta_data:
             meta_data["paragraphs"] = {}
-        # 4. Создаем конфигурационный .json для субтитров текущего фрагмента
+
+        # 4. Записываем метаданные СТРОГО по орднунгу + добавляем duration
         meta_data["paragraphs"][str(track_order)] = {
             "article_title": project_title,
             "article_id": article_id,
@@ -162,13 +170,13 @@ def generate_voiceover_inworld(
             "model": model_id,
             "speed": speaking_rate,
             "full_text": text,
+            "duration": duration,  # 🔥 Добавлено для таймлайна клипа!
         }
 
         with open(json_path, "w", encoding="utf-8") as jf:
             json.dump(meta_data, jf, ensure_ascii=False, indent=4, sort_keys=True)
 
         logger.info(f"✅ Аудио и конфиг успешно сохранены в: {voice_dir}", percent=89)
-
         log_to_modal(f"🎉 Озвучка сохранена в проект: {voice_folder_name}/{filename}", percent=95)
 
         return f"projects/{folder_name}/{voice_folder_name}/{filename}"

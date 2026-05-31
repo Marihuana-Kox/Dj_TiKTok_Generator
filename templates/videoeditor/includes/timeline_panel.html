@@ -1,0 +1,56 @@
+<footer class="editor-timeline-panel capcut-style">
+    <div class="timeline-scroll-container">
+        
+       <div id="dynamic-timebar" class="timeline-timebar"></div>
+
+        <div class="capcut-tracks-container">
+            
+            <div class="timeline-track video-track">
+                {% for item in timeline_data %}
+                    {% if item.prompt and item.prompt.image %}
+                        <div class="image-asset-card capcut-clip video-block" 
+                             data-id="{{ item.prompt.id }}"
+                             data-type="video"
+                             data-order="{{ item.order }}"
+                             data-duration="5.0"
+                             data-effect="zoom_in"
+                             data-filter="none"
+                             data-text=""
+                             data-font="Arial"
+                             data-font-color="#FFFFFF"
+                             data-position="bottom">
+                            
+                            <img src="{% if item.prompt.smart_image_url %}{{ item.prompt.smart_image_url }}{% else %}{{ item.prompt.image.url }}{% endif %}" alt="">
+                            <span class="capcut-badge">Кадр {{ item.order }}</span>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+           <div class="timeline-track audio-track">
+                {% for item in timeline_data %}
+                    {% if item.track and item.track.audio_file %}
+                        <div class="capcut-clip audio-block play-audio-btn" 
+                            data-id="{{ item.track.id }}"
+                            data-type="audio"
+                            data-src="{{ item.track.audio_file.url }}"
+                            data-order="{{ item.order }}"
+                            data-duration="{{ item.audio_duration }}"
+                            data-volume="100"
+                            data-fade-in="0.0"
+                            data-fade-out="0.0">
+                            <div class="audio-wave-line">
+                                <span class="play-status-icon">▶</span> 
+                                Озвучка {{ item.order }} ({{ item.audio_duration }}s)
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <audio id="global-timeline-player" style="display: none;"></audio>
+
+        </div>
+
+    </div>
+</footer>

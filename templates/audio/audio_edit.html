@@ -80,18 +80,16 @@
                                 {% if progress_percent > 0 %}{{ progress_percent }}%{% endif %}
                             </div>
                         </div>
-                        <!-- <div class="text-muted text-small p-2 bg-muted rounded w-100 border text-center">⏳ Ожидает полной сборки</div> -->
-                    
                 </div>
             </div>
             <div class="colom-custom position-right">
-                <div class="col-md-3 mb-2 flex flex-column justify-content-end video-button-create ">
+                <div class="col-md-3 mb-2 flex flex-column justify-content-end video-button-create">
                 <label class="form-label text-small">🎞️ Финальный шаг ролика:</label>
                 <a href="/video/project/{{ project.id }}/edit/" 
                 id="go-to-video-editor-btn" 
                 class="btn btn-success w-100 flex items-center justify-content-center gap-2 fw-bold {% if not project_ready %}disabled{% endif %}"
                 {% if not project_ready %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}>
-                    🎬 Собрать видео ролик
+                    🎬 Собрать video ролик
                 </a>
             </div>
 
@@ -150,18 +148,34 @@
                     <div class="prompt-image flex flex-column justify-content-between">
                         <div class="audio-player-wrapper">
                             <label class="form-label text-small text-muted">Аудиозапись фрагмента:</label>
-                            {% if track.audio_file %}
-                            <div class="audio-container-box flex align-items-center justify-content-center">
-                                <audio src="{{ track.audio_file.url }}" controls class="w-100"></audio>
+                            <div class="audio-player-container-{{ track.id }}">
+                                {% if track.audio_file %}
+                                <div class="audio-container-box flex align-items-center justify-content-center">
+                                    <audio src="{{ track.audio_file }}" controls class="w-100"></audio>
+                                </div>
+                                {% else %}
+                                <div class="voice-empty flex align-items-center justify-content-center">
+                                    <span class="text-muted text-small">🔇 Нет звука</span>
+                                </div>
+                                {% endif %}
                             </div>
-                            {% else %}
-                            <div class="voice-empty flex align-items-center justify-content-center">
-                                <span class="text-muted text-small">🔇 Нет звука</span>
-                            </div>
-                            {% endif %}
                         </div>
 
-                        <div class="audio-action-wrapper mt-auto">
+                        <div class="manual-upload-wrapper">
+                            <input type="file" 
+                                   id="manual-file-{{ track.id }}" 
+                                   class="manual-audio-input-hidden" 
+                                   accept=".mp3,.wav,.mpeg" 
+                                   onchange="uploadManualAudioFile(this, '{{ track.id }}')">
+                            
+                            <button type="button" 
+                                    class="btn btn-outline btn-small w-100 manual-upload-trigger-btn" 
+                                    onclick="document.getElementById('manual-file-{{ track.id }}').click();">
+                                📁 Загрузить аудио файл
+                            </button>
+                        </div>
+
+                        <div class="audio-action-wrapper">
                             <button type="submit" name="action" value="synthesize_track_ajax" class="btn btn-outline btn-small w-100 single-generate-btn" onclick="synthesizeTrack(event, this, {{ track.id }})">
                                 🔊 Синтезировать фрагмент
                             </button>
@@ -182,14 +196,4 @@
     </form>
 </div>
 
-<style>
-    .btn-success:not(.disabled) {
-        animation: pulse-green 2s infinite;
-    }
-    @keyframes pulse-green {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
-        70% { transform: scale(1.02); box-shadow: 0 0 0 8px rgba(40, 167, 69, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
-    }
-</style>
 {% endblock %}

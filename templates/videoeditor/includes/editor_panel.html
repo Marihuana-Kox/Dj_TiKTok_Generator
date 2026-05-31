@@ -1,0 +1,160 @@
+<div class="properties-editor-panel" id="clipSettingsPanel">
+    <h4 class="panel-subtitle-editor">🎛️ Настройки сцен <span id="selectedClipTitle" class="selected-clip-marker">(Выделено: 0)</span></h4>
+    
+    <nav class="settings-tabs-nav">
+        <button type="button" class="tab-trigger-btn active" data-target="effects-tab">🎬 Эффекты</button>
+        <button type="button" class="tab-trigger-btn" data-target="text-tab">📝 Текст</button>
+        <button type="button" class="tab-trigger-btn" data-target="audio-tab">🎵 Аудио</button>
+    </nav>
+
+    <div class="settings-tabs-content">
+        
+        <div class="tab-content-pane active" id="effects-tab">
+            <div class="setting-control-group">
+                <label>⏱️ Длительность выделенных сцен (сек)</label>
+                <div class="editor-range-row">
+                    <input type="range" id="clipDurationInput" min="0.5" max="30" step="0.1" value="5">
+                    <span class="range-value-indicator" id="durationVal">5.0s</span>
+                </div>
+            </div>
+
+            <div class="setting-control-group">
+                <label>🎥 Анимация камеры (FX)</label>
+                <select id="clipEffectType" class="editor-select-input">
+                    <option value="none">❌ Без анимации</option>
+                    <option value="zoom_in">🔎 Плавное приближение (Zoom In)</option>
+                    <option value="zoom_out">🔍 Плавное отдаление (Zoom Out)</option>
+                    <option value="scroll_down">📜 Прокрутка вниз (Scroll)</option>
+                </select>
+            </div>
+
+            <div class="setting-control-group">
+                <label>🎨 Цветовой фильтр</label>
+                <select id="clipFilterType" class="editor-select-input">
+                    <option value="none">Оригинальные цвета</option>
+                    <option value="grayscale">🔘 Черно-белый (Grayscale)</option>
+                    <option value="sepia">🟤 Сепия (Винтаж)</option>
+                </select>
+            </div>
+
+            <div class="setting-control-group">
+                <label>🔀 Переход к следующему клипу</label>
+                <select id="clipTransitionType" class="editor-select-input">
+                    <option value="none">⚡ Жесткая склейка</option>
+                    <option value="crossfade">🌫️ Плавный наплыв (Crossfade)</option>
+                    <option value="fade_black">⬛ Выцветание в черный</option>
+                </select>
+            </div>
+            <div class="inspector-section">
+                <label class="inspector-label">Отражение кадра</label>
+                <div class="mirror-buttons-group" style="display: flex; gap: 10px; margin-top: 5px;">
+                    <button type="button" id="clipMirrorX" class="capcut-btn-secondary" style="flex: 1; padding: 6px; font-size: 13px;">
+                        ↔ По горизонтали
+                    </button>
+                    <button type="button" id="clipMirrorY" class="capcut-btn-secondary" style="flex: 1; padding: 6px; font-size: 13px;">
+                        ↕ По вертикали
+                    </button>
+                </div>
+            </div>
+
+            <div class="inspector-section" style="margin-top: 15px;">
+                <button type="button" id="clipDuplicateBtn" class="capcut-btn-primary" style="width: 100%; padding: 8px; font-size: 14px; background-color: #4CAF50;">
+                    📋 Дублировать кадр
+                </button>
+            </div>
+
+            <div class="inspector-section" style="margin-top: 10px; display: flex; gap: 10px;">
+                <button type="button" id="clipDeleteBtn" class="capcut-btn-danger" style="flex: 1; padding: 8px; font-size: 14px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    🗑️ Удалить кадр
+                </button>
+                <button type="button" id="clipUndoBtn" class="capcut-btn-secondary" style="flex: 1; padding: 8px; font-size: 14px; background-color: #555555; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    ↩️ Отменить
+                </button>
+            </div>
+
+            <div class="timeline-controls">
+                <div class="form-check form-switch d-inline-block ms-3 align-middle">
+                    <input class="form-check-input" type="checkbox" id="auto-align-audio" checked>
+                    <label class="form-check-label" for="auto-align-audio">🔗 Автоподгон под длину аудио</label>
+                </div>
+                <div class="badge bg-primary fs-6">
+                    🎵 Длина аудио: <span id="total-audio-display">0.00</span> сек
+                </div>
+                <div class="badge bg-video-duration fs-6" id="video-duration-badge" style="background-color: #6f42c1; color: white;">
+                    📹 Длина видео: <span id="total-video-display">0.00</span> сек
+                </div>
+            </div>
+            <div class="timeline_control">
+                <div id="timeline-warning" class="text-danger fw-bold d-none">
+                    ⚠️ Внимание: в конце ролика будет черный экран!
+                </div>
+            </div>
+
+        </div>
+
+        <div class="tab-content-pane" id="text-tab">
+            <div class="setting-control-group">
+                <label>💬 Текст поверх клипа</label>
+                <textarea id="clipTextOverlay" class="editor-text-input" rows="2" placeholder="Введите текст..."></textarea>
+            </div>
+
+            <div class="setting-control-group">
+                <label>🔤 Выбор шрифта</label>
+                <select id="clipTextFont" class="editor-select-input">
+                    <option value="Arial">Arial (Классический)</option>
+                    <option value="Impact">Impact (Жирный кино)</option>
+                    <option value="Montserrat">Montserrat (Современный)</option>
+                </select>
+            </div>
+
+            <div class="setting-control-group">
+                <label>🎨 Цвет текста</label>
+                <select id="clipTextColor" class="editor-select-input">
+                    <option value="#FFFFFF">⬜ Белый</option>
+                    <option value="#FFFF00">🟨 Желтый субтитр</option>
+                    <option value="#00FF66">🟩 Зеленый акцент</option>
+                </select>
+            </div>
+
+            <div class="setting-control-group">
+                <label>📍 Позиция на экране</label>
+                <select id="clipTextPosition" class="editor-select-input">
+                    <option value="bottom">Снизу по центру</option>
+                    <option value="center">Строго по центру</option>
+                    <option value="top">Сверху</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="tab-content-pane" id="audio-tab">
+            <div class="setting-control-group">
+                <label>🔊 Громкость дорожки</label>
+                <div class="editor-range-row">
+                    <input type="range" id="audioVolumeInput" min="0" max="200" step="10" value="100">
+                    <span class="range-value-indicator" id="volumeVal">100%</span>
+                </div>
+            </div>
+
+            <div class="setting-control-group">
+                <label>📈 Плавное появление (Fade In)</label>
+                <select id="audioFadeIn" class="editor-select-input">
+                    <option value="0">Выкл</option>
+                    <option value="0.5">0.5 сек</option>
+                    <option value="1.0">1.0 сек</option>
+                    <option value="2.0">2.0 сек</option>
+                </select>
+            </div>
+
+            <div class="setting-control-group">
+                <label>📉 Плавное затухание (Fade Out)</label>
+                <select id="audioFadeOut" class="editor-select-input">
+                    <option value="0">Выкл</option>
+                    <option value="0.5">0.5 сек</option>
+                    <option value="1.0">1.0 сек</option>
+                    <option value="2.0">2.0 сек</option>
+                </select>
+            </div>
+        </div>
+
+    </div>
+</div>

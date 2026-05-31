@@ -6,38 +6,47 @@ document.addEventListener("DOMContentLoaded", function () {
   // ==========================================
   // 1. ТВОЙ ИСХОДНЫЙ БЛОК (Динамические языки) - ОСТАВЛЕН БЕЗ ИЗМЕНЕНИЙ
   // ==========================================
-  if (articleSelect) {
-    articleSelect.addEventListener("change", function () {
-      const clusterId = this.value;
-      if (!clusterId) return;
+ function fetchLanguages(clusterId) {
+  if (!clusterId) return;
 
-      languageSelect.disabled = true;
-      languageSelect.innerHTML =
-        '<option value="" disabled selected>Загрузка языков...</option>';
+  languageSelect.disabled = true;
+  languageSelect.innerHTML =
+    '<option value="" disabled selected>Загрузка языков...</option>';
 
-      fetch(`?action=get_languages&cluster_id=${clusterId}`, {
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.languages.length > 0) {
-            languageSelect.innerHTML =
-              '<option value="" disabled selected>-- Выберите язык перевода --</option>';
-            data.languages.forEach((lang) => {
-              languageSelect.innerHTML += `<option value="${lang.code}">${lang.name} (${lang.words} слов)</option>`;
-            });
-            languageSelect.disabled = false;
-          } else {
-            languageSelect.innerHTML =
-              '<option value="" disabled>Нет доступных переводов</option>';
-          }
-        })
-        .catch(() => {
-          languageSelect.innerHTML =
-            '<option value="" disabled>Ошибка загрузки</option>';
+  fetch(`?action=get_languages&cluster_id=${clusterId}`, {
+    headers: { "X-Requested-With": "XMLHttpRequest" },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success && data.languages.length > 0) {
+        languageSelect.innerHTML =
+          '<option value="" disabled selected>-- Выберите язык перевода --</option>';
+        data.languages.forEach((lang) => {
+          languageSelect.innerHTML += `<option value="${lang.code}">${lang.name} (${lang.words} слов)</option>`;
         });
+        languageSelect.disabled = false;
+      } else {
+        languageSelect.innerHTML =
+          '<option value="" disabled>Нет доступных переводов</option>';
+      }
+    })
+    .catch(() => {
+      languageSelect.innerHTML =
+        '<option value="" disabled>Ошибка загрузки</option>';
     });
+}
+
+// 2. Вешаем обработчик события на изменение селекта (ручной выбор)
+if (articleSelect) {
+  articleSelect.addEventListener("change", function () {
+    fetchLanguages(this.value);
+  });
+
+  // 3. 🔥 АВТО-ЗАПУСК: Если при загрузке страницы в селекте УЖЕ есть значение
+  if (articleSelect.value) {
+    fetchLanguages(articleSelect.value);
   }
+}
 
   // ==========================================
   // 2. ОТПРАВКА ФОРМЫ (Интеграция модалки)
@@ -59,6 +68,19 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       const formData = new FormData(form);
+      
+      if (articleSelect && articleSelect.value) {
+          formData.append('cluster_id', articleSelect.value);
+      }
+      if (languageSelect && languageSelect.value) {
+          formData.append('language_code', languageSelect.value);
+      }
+
+      // Небольшой дебаг в консоль браузера перед отправкой
+      console.log("✈️ Отправка данных нарезки:", {
+          cluster_id: formData.get('cluster_id'),
+          language_code: formData.get('language_code')
+      });
 
       fetch(form.getAttribute("action"), {
         method: "POST",

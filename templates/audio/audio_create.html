@@ -23,22 +23,33 @@
           <div class="form-group mb-3">
             <label class="form-label" for="article_select">📄 Выберите статью:</label>
             <select name="article_id" id="article_select" class="form-control" required>
-              <option value="" disabled selected>-- Нажмите для выбора --</option>
-              {% for item in articles %}
-              <option value="{{ item.id }}" data-translations='{{ item.translations_json|safe }}'>
-                {{ item.id }} | {{ item.title|truncatechars:45 }}
-                {% if item.translations %}
-                [{{ item.translations|length }} пер. |
-                {% for tr in item.translations %}
-                {{ tr.language }}:{{ tr.words }}сл.
-                {% if not forloop.last %}, {% endif %}
-                {% endfor %}]
+            {% if selected_article %}
+              <option value="{{ selected_article.id }}" data-translations='{{ selected_article.translations_json|safe }}' selected>
+                {{ selected_article.id }} | {{ selected_article.title|truncatechars:45 }}
+                {% if selected_article.translations %}
+                  [{{ selected_article.translations|length }} пер. |
+                  {% for tr in selected_article.translations %}
+                    {{ tr.language }}:{{ tr.words }}сл.{% if not forloop.last %}, {% endif %}
+                  {% endfor %}]
                 {% endif %}
               </option>
+            {% else %}
+              <option value="" disabled selected>-- Нажмите для выбора --</option>
+              {% for item in articles %}
+                <option value="{{ item.id }}" data-translations='{{ item.translations_json|safe }}'>
+                  {{ item.id }} | {{ item.title|truncatechars:45 }}
+                  {% if item.translations %}
+                    [{{ item.translations|length }} пер. |
+                    {% for tr in item.translations %}
+                      {{ tr.language }}:{{ tr.words }}сл.{% if not forloop.last %}, {% endif %}
+                    {% endfor %}]
+                  {% endif %}
+                </option>
               {% empty %}
-              <option disabled>В базе нет статей.</option>
+                <option disabled>В базе нет статей.</option>
               {% endfor %}
-            </select>
+            {% endif %}
+          </select>
             <input type="hidden" name="text" id="text_preview_input">
             <small class="text-muted mt-1 d-block" id="article-stats">
               Выберите статью, чтобы увидеть доступные переводы.

@@ -11,101 +11,112 @@ class GenerateIdeasForm(forms.Form):
         label="AI Сервис для генерации",
         choices=[],
         required=True,
-        widget=forms.Select(attrs={
-                            'class': 'form-control', 'style': 'font-weight: 600; color: var(--accent-blue);'})
+        widget=forms.Select(
+            attrs={"class": "form-control", "style": "font-weight: 600; color: var(--accent-blue);"}
+        ),
     )
 
     count = forms.IntegerField(
-        label="Количество идей", min_value=1, max_value=20, initial=5,
-        widget=forms.NumberInput(attrs={'class': 'form-control'})
+        label="Количество идей",
+        min_value=1,
+        max_value=20,
+        initial=5,
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
     )
     # НОВОЕ ПОЛЕ: Выбор стиля промпта
     idea_style = forms.ChoiceField(
         label="Стиль генерации (Промпт)",
         choices=[],  # Заполним динамически в __init__
-        widget=forms.Select(attrs={
-                            'class': 'form-control', 'style': 'font-weight: 600; color: var(--accent-purple);'})
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "style": "font-weight: 600; color: var(--accent-purple);",
+            }
+        ),
     )
     topics_input = forms.CharField(
         label="Фокусные темы (через запятую)",
         required=False,
-        widget=forms.Textarea(attrs={
-            'class': 'form-control',
-            'rows': 4,
-            'placeholder': 'Например:\nСветские новости про Сергея Зверева\nДональд Трамп и жена Макрона\nИсторические фальсификации про Египет'
-        }),
-        help_text="Оставьте пустым для случайных тем из истории."
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 4,
+                "placeholder": "Например:\nСветские новости про Сергея Зверева\nДональд Трамп и жена Макрона\nИсторические фальсификации про Египет",
+            }
+        ),
+        help_text="Оставьте пустым для случайных тем из истории.",
     )
 
-    refresh_old = forms.BooleanField(
-        label="Обновлять старые идеи", required=False, initial=False)
+    refresh_old = forms.BooleanField(label="Обновлять старые идеи", required=False, initial=False)
     REFRESH_CHOICES = [
-        ('30', 'Старше 1 месяца'),
-        ('20', 'Старше 20 дней'),
-        ('60', 'Старше 2 месяцев'),
-        ('90', 'Старше 3 месяцев'),
+        ("30", "Старше 1 месяца"),
+        ("20", "Старше 20 дней"),
+        ("60", "Старше 2 месяцев"),
+        ("90", "Старше 3 месяцев"),
     ]
     refresh_period = forms.ChoiceField(
         label="Период для обновления",
         choices=REFRESH_CHOICES,
         required=False,
-        initial='30',
-        widget=forms.Select(attrs={'class': 'form-control'})
+        initial="30",
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     allow_duplicates = forms.BooleanField(
         label="Разрешить повторение тем",
         required=False,
         initial=False,
-        help_text="Если выключено, система будет избегать похожих тем."
+        help_text="Если выключено, система будет избегать похожих тем.",
     )
     DUPLICATE_CHOICES = [
-        ('20', 'Не повторять раньше 20 дней'),
-        ('30', 'Не повторять раньше 30 дней'),
-        ('40', 'Не повторять раньше 40 дней'),
-        ('60', 'Не повторять раньше 2 месяцев'),
+        ("20", "Не повторять раньше 20 дней"),
+        ("30", "Не повторять раньше 30 дней"),
+        ("40", "Не повторять раньше 40 дней"),
+        ("60", "Не повторять раньше 2 месяцев"),
     ]
     duplicate_period = forms.ChoiceField(
         label="Период запрета повторов",
         choices=DUPLICATE_CHOICES,
         required=False,
-        initial='30',
-        widget=forms.Select(attrs={'class': 'form-control'})
+        initial="30",
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Получаем все активные провайдеры из БД
-        active_providers = AIProvider.objects.filter(
-            is_active=True).order_by('display_name', 'name')
+        active_providers = (
+            AIProvider.objects.filter(is_active=True)
+            .filter(provider_type="llm")
+            .order_by("display_name", "name")
+        )
 
-        choices = [('', '--- Выберите AI сервис ---')]
+        choices = [("", "--- Выберите AI сервис ---")]
         for provider in active_providers:
             display_name = provider.display_name or provider.name.capitalize()
             if provider.config and isinstance(provider.config, dict):
-                model = provider.config.get('text_model', '')
+                model = provider.config.get("text_model", "")
                 if model:
-                    short_model = model.split('/')[-1].split('-')[0]
+                    short_model = model.split("/")[-1].split("-")[0]
                     display_name += f" ({short_model})"
 
             choices.append((provider.name, display_name))
 
         if len(choices) == 1:
-            choices = [('', '--- Нет активных сервисов ---')]
-            self.fields['ai_provider'].widget.attrs['disabled'] = True
+            choices = [("", "--- Нет активных сервисов ---")]
+            self.fields["ai_provider"].widget.attrs["disabled"] = True
 
-        self.fields['ai_provider'].choices = choices
+        self.fields["ai_provider"].choices = choices
         if choices and choices[0][0]:
-            self.fields['ai_provider'].initial = choices[0][0]
+            self.fields["ai_provider"].initial = choices[0][0]
 
         # 1. Получаем все активные стили из БД
         # Мы берем уникальные комбинации style и name, чтобы показать пользователю красивые названия
-        active_prompts = IdeaPrompt.objects.filter(
-            is_active=True).order_by('name')
+        active_prompts = IdeaPrompt.objects.filter(is_active=True).order_by("name")
         # Формируем список вариантов
         style_choices = [
-            ('random', '🎲 Случайный стиль (Random)'),  # Опция рандома
+            ("random", "🎲 Случайный стиль (Random)"),  # Опция рандома
         ]
 
         # Добавляем стили из базы
@@ -113,50 +124,43 @@ class GenerateIdeasForm(forms.Form):
             # Просто добавляем пару: (код, имя)
             style_choices.append((prompt.code_name, prompt.name))
 
-        self.fields['idea_style'].choices = style_choices
-        self.fields['idea_style'].initial = 'random'  # По умолчанию рандом
-
-    # def get_style_display_name(self, style_code):
-    #     """Вспомогательный метод для красивых названий"""
-    #     names = {
-    #         'facts': 'Факты',
-    #         'sensational': 'Сенсация',
-    #         'mystery': 'Мистика',
-    #         'educational': 'Образование',
-    #     }
-    #     return names.get(style_code, style_code.capitalize())
+        self.fields["idea_style"].choices = style_choices
+        self.fields["idea_style"].initial = "random"  # По умолчанию рандом
 
 
 class VideoProjectEditForm(forms.ModelForm):
     class Meta:
         model = VideoProject
-        fields = ['topic', 'angle', 'notes', 'status']
+        fields = ["topic", "angle", "notes", "status"]
         widgets = {
-            'topic': forms.TextInput(attrs={
-                'class': 'form-control',
-                'style': 'width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;',
-                'placeholder': 'Тема...'
-            }),
-            'angle': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 2,
-                'style': 'width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;',
-                'placeholder': 'Идея...'
-            }),
-            'notes': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 8,  # Уменьшили количество строк
-                'style': 'width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem; font-family: monospace;',
-                'placeholder': 'Сценарий...'
-            }),
-            'status': forms.Select(attrs={
-                'class': 'form-control',
-                'style': 'width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;'
-            }),
+            "topic": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "style": "width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;",
+                    "placeholder": "Тема...",
+                }
+            ),
+            "angle": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 2,
+                    "style": "width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;",
+                    "placeholder": "Идея...",
+                }
+            ),
+            "notes": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 8,  # Уменьшили количество строк
+                    "style": "width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem; font-family: monospace;",
+                    "placeholder": "Сценарий...",
+                }
+            ),
+            "status": forms.Select(
+                attrs={
+                    "class": "form-control",
+                    "style": "width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;",
+                }
+            ),
         }
-        labels = {
-            'topic': 'Тема',
-            'angle': 'Идея (Hook)',
-            'notes': 'Сценарий',
-            'status': 'Статус'
-        }
+        labels = {"topic": "Тема", "angle": "Идея (Hook)", "notes": "Сценарий", "status": "Статус"}

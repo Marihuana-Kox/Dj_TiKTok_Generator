@@ -29,12 +29,7 @@ urlpatterns = [
         views.synthesize_single_track,
         name="synthesize_mass_tracks",
     ),
-    # path(
-    #     "track/<int:track_id>/synthesize/",
-    #     views.synthesize_single_track,
-    #     name="synthesize_track",
-    # ),
-    # ⚡ НОВЫЙ РОУТ ДЛЯ ПРОСТОГО СОХРАНЕНИЯ ТЕКСТА
+    path("track/upload-manual/", views.upload_manual_audio, name="upload_manual_audio"),
     path(
         "track/<int:track_id>/save-text/",
         views.save_track_text_ajax,

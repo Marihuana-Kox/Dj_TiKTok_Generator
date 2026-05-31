@@ -3,6 +3,8 @@ import os
 import threading
 import time
 import uuid
+import wave
+from django.views.decorators.http import require_POST
 from django.db.models import Prefetch
 from django.db import connection
 from django.shortcuts import render, redirect, get_object_or_404
@@ -11,7 +13,9 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.http import JsonResponse, StreamingHttpResponse
 from django.core.paginator import Paginator
+import mutagen
 
+from image.services import get_or_create_project_dir
 from tiktok_web import settings
 from .models import AudioProject, AudioTrack
 from article.models import ArticleCluster, ArticleTranslation
@@ -46,7 +50,7 @@ def get_project_audio_progress(project):
 def audio_dashboard(request):
     """Дашборд аудио проектов с принудительным выводом русских названий статей"""
 
-    # Обработка массовых действий
+    # 1. ОБРАБОТКА МАССОВЫХ ДЕЙСТВИЙ (Оставляем без изменений)
     if request.method == "POST":
         action = request.POST.get("action")
         selected_ids = request.POST.getlist("selected_projects")
@@ -56,11 +60,24 @@ def audio_dashboard(request):
             messages.success(request, f"✅ Удалено проектов: {len(selected_ids)}")
             return redirect("audio:dashboard")
 
-    # Получаем базовый QuerySet
-    projects_qs = AudioProject.objects.filter(user=request.user).order_by("-created_at")
+    # 2. ПОЛУЧАЕМ ОПТИМИЗИРОВАННЫЙ QUERYSET
+    # Тянем проекты юзера, сразу подгружая связанные кластеры статей, их переводы и треки
+    projects_qs = (
+        AudioProject.objects.filter(user=request.user)
+        .select_related("article")
+        .prefetch_related(
+            Prefetch(
+                "article__translations",
+                queryset=ArticleTranslation.objects.select_related("language"),
+            ),
+            "tracks",
+        )
+        .order_by("-created_at")
+    )
+
     total_count = projects_qs.count()
 
-    # Пагинация
+    # 3. ПАГИНАЦИЯ
     paginator = Paginator(projects_qs, 10)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
@@ -71,19 +88,34 @@ def audio_dashboard(request):
     # Считаем стартовый номер для обратного отсчета на текущей странице
     start_num = total_count - ((page_obj.number - 1) * paginator.per_page)
 
+    # 4. ЦИКЛ ОБРАБОТКИ СТРОК ТАБЛИЦЫ
     for idx, project in enumerate(page_obj):
+        # 🔥 ЛОГИЧЕСКИЙ ФИКС СБОРА ЗАГОЛОВКА СТАТЬИ ИЗ ПЕРЕВОДОВ КЛАСТЕРА
+        article_title = "Без статьи"
+        if project.article:
+            # Ищем русский перевод для красивого отображения, либо берем самый первый доступный
+            main_trans = (
+                project.article.translations.filter(language__code="ru").first()
+                or project.article.translations.first()
+            )
+            if main_trans:
+                article_title = main_trans.title
+            else:
+                article_title = f"Кластер статей #{project.article.id}"
+
+        # Определяем итоговый display_title для вывода на фронтенд и генерации путей папок
         if project.title and project.title.lower() != "default":
             display_title = project.title
-        elif project.article and hasattr(project.article, "title"):
-            display_title = project.article.title
         else:
-            display_title = f"Аудио-проект #{project.id}"
+            display_title = article_title if project.article else f"Аудио-проект #{project.id}"
 
         # Вычисляем порядковый номер строки (обратный отсчет)
         reverse_num = start_num - idx
 
-        tracks_count = project.tracks.count()
-        completed_count = project.tracks.filter(status="success").count()
+        # Используем предзагруженные треки из кэша ORM (без повторных запросов к БД через .count())
+        all_tracks = list(project.tracks.all())
+        tracks_count = len(all_tracks)
+        completed_count = sum(1 for t in all_tracks if t.status == "success")
 
         # Считаем процент прогресса по трекам
         progress_percent = int((completed_count / tracks_count) * 100) if tracks_count > 0 else 0
@@ -92,11 +124,13 @@ def audio_dashboard(request):
         audio_url = None
         project_lang = (project.language or "ru").lower()  # Код языка (ru, de, en)
 
-        # Получаем последний успешный трек, чтобы вывести его плеер в таблицу дашборда
-        last_success_track = project.tracks.filter(status="success").order_by("-created_at").first()
+        # Получаем последний успешный трек из предзагруженного списка
+        success_tracks = [t for t in all_tracks if t.status == "success"]
+        # Сортируем по дате создания в обратном порядке
+        success_tracks.sort(key=lambda x: x.created_at, reverse=True)
+        last_success_track = success_tracks[0] if success_tracks else None
 
         if last_success_track and project.article:
-            # Нам нужно имя файла (например: voice_5.wav)
             file_name = f"voice_{last_success_track.id}.wav"
 
             try:
@@ -106,8 +140,7 @@ def audio_dashboard(request):
                 # Динамическое имя подпапки аудио: "voices_ru", "voices_de"
                 dir_name = f"voices_{project_lang}"
 
-                # 1. СТРАТЕГИЯ №1: Ищем по нашей НОВОЙ структуре
-                # projects/Великая_ложь_Колумба/voices_ru/voice_5.wav
+                # 1. СТРАТЕГИЯ №1: Ищем по НОВОЙ структуре
                 new_voice_rel = os.path.join("projects", safe_folder_name, dir_name)
                 new_abs_path = os.path.join(settings.MEDIA_ROOT, new_voice_rel, file_name)
 
@@ -116,7 +149,7 @@ def audio_dashboard(request):
                         "\\", "/"
                     )
 
-                # 2. СТРАТЕГИЯ №2: Фолбэк для старых тестовых файлов, если новой структуры еще нет
+                # 2. СТРАТЕГИЯ №2: Фолбэк для старых тестовых файлов
                 else:
                     old_voice_rel = os.path.join("voice", safe_folder_name)
                     old_abs_dir = os.path.join(settings.MEDIA_ROOT, old_voice_rel)
@@ -141,8 +174,8 @@ def audio_dashboard(request):
                 "instance": project,
                 "id": project.id,
                 "reverse_num": reverse_num,
-                "title": display_title,  # 🔥 ТЕПЕРЬ ТУТ СТРОГО РУССКОЕ НАЗВАНИЕ СТАТЬИ
-                "article_title": (project.article.title if project.article else "Без статьи"),
+                "title": display_title,
+                "article_title": article_title,  # 🔥 БЕЗОПАСНЫЙ ВЫВОД: Ошибки больше не будет
                 "language_code": project_lang,
                 "audio_url": audio_url,
                 "provider": project.provider,
@@ -154,7 +187,7 @@ def audio_dashboard(request):
             }
         )
 
-    # Статистика для верхних карточек
+    # Статистика для верхних карточек (вычисляем из базового QuerySet)
     stats = {
         "total": total_count,
         "processing": projects_qs.filter(status="processing").count(),
@@ -172,9 +205,44 @@ def audio_dashboard(request):
 
 @login_required
 def audio_create(request):
-    """Шаг 1: Только выбор статьи, доступного языка-перевода и нарезка текста"""
+    """Шаг 1: Выбор статьи, доступного языка-перевода и генерация аудиопроекта с нарезкой текста"""
 
-    # AJAX: Отдаем языки при выборе статьи
+    selected_article = None
+
+    # 1. Ловим номер статьи из GET-параметра для инициализации формы
+    article_get_id = request.GET.get("article_id")
+    if article_get_id:
+        cluster = get_object_or_404(
+            ArticleCluster.objects.prefetch_related(
+                Prefetch(
+                    "translations", queryset=ArticleTranslation.objects.select_related("language")
+                )
+            ),
+            id=article_get_id,
+        )
+
+        main_trans = (
+            cluster.translations.filter(language__code="ru").first() or cluster.translations.first()
+        )
+
+        if main_trans:
+            trans_stats = [
+                {
+                    "language": tr.language.code,
+                    "lang_name": tr.language.name,
+                    "words": len((tr.content or "").split()),
+                }
+                for tr in cluster.translations.all()
+            ]
+
+            selected_article = {
+                "id": cluster.id,
+                "title": main_trans.title,
+                "translations": trans_stats,
+                "translations_json": json.dumps(trans_stats),
+            }
+
+    # AJAX: Отдаем языки при выборе статьи на фронтенде
     if (
         request.headers.get("x-requested-with") == "XMLHttpRequest"
         and request.GET.get("action") == "get_languages"
@@ -196,149 +264,102 @@ def audio_create(request):
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=400)
 
-    # ОБРАБОТКА ФОРМЫ (POST через AJAX/Fetch)
+    # 2. ОБРАБОТКА ОТПРАВКИ ФОРМЫ (POST через AJAX/Fetch)
     if request.method == "POST":
-        task_id = str(uuid.uuid4())
-        cache_key = f"progress_{task_id}"
-
-        # Стартовое состояние прогресса
-        progress_data = {
-            "percent": 5,
-            "message": "Инициализация...",
-            "status": "working",
-            "logs": [
-                "🚀 Запуск конвейера подготовки контента",
-                f"🆔 Task ID: {task_id}",
-            ],
-        }
-        cache.set(cache_key, progress_data, 3600)
-
         try:
-            # Читаем данные (поддерживаем и обычный POST, и JSON-тело)
             if request.content_type == "application/json":
                 data = json.loads(request.body)
-                article_id = data.get(
-                    "article_id"
-                )  # Это на самом деле ID КЛЮЧЕВОГО кластера (cluster_id)
-                lang_code = data.get("language")
-                words_per_iteration = int(data.get("words_per_iteration", 50))
             else:
-                article_id = request.POST.get("article_id")
-                lang_code = request.POST.get("language")
-                words_per_iteration = int(request.POST.get("words_per_iteration", 50))
+                data = request.POST
 
-            # Ищем текущий перевод (английский, немецкий и т.д.) для нарезки треков
-            trans = ArticleTranslation.objects.filter(
-                cluster_id=article_id, language__code=lang_code
-            ).first()
-            if not trans or not trans.content:
-                raise ValueError("Текст перевода для выбранного языка не найден.")
+            cluster_id = data.get("cluster_id")
+            lang_code = str(data.get("language_code", "ru")).strip().lower()
 
-            # Режем текст
-            text_chunks = split_text_by_words_and_dots(
-                trans.content, target_word_count=words_per_iteration
+            if not cluster_id:
+                return JsonResponse(
+                    {"success": False, "error": "Сервер не получил ID статьи."}, status=400
+                )
+
+            task_id = str(uuid.uuid4())
+            cache_key = f"progress_{task_id}"
+
+            # Шаг 2.1: Ищем перевод для указанного кластера и языка
+            translation = (
+                ArticleTranslation.objects.filter(
+                    cluster_id=int(cluster_id), language__code=lang_code
+                )
+                .select_related("language")
+                .first()
             )
+
+            # Фолбэк: если именно этого языка нет, берем первый доступный перевод этого же кластера
+            if not translation:
+                translation = ArticleTranslation.objects.filter(cluster_id=int(cluster_id)).first()
+
+            if not translation:
+                return JsonResponse(
+                    {"success": False, "error": "Текст статьи не найден в базе данных."}, status=400
+                )
+
+            # Шаг 2.2: Создаем аудиопроект (Связь 'article' теперь железно ведет на ArticleCluster)
+            project = AudioProject.objects.create(
+                user=request.user,
+                article_id=int(cluster_id),
+                title=translation.title,
+                language=translation.language.code.lower(),
+                status="new",
+            )
+            # Если параметр пришел списком (из FormData), берем первый элемент, иначе саму строку.
+            words_raw = data.get("words_per_iteration", 50)
+            if isinstance(words_raw, list) and words_raw:
+                words_raw = words_raw[0]
+
+            # Переводим в число, если что-то пойдет не так — сработает фолбэк на 50
+            try:
+                target_word_count = int(words_raw)
+            except (ValueError, TypeError):
+                target_word_count = 50
+
+            # Шаг 2.3: Нарезаем текст статьи твоей функцией разбивки
+            text_chunks = split_text_by_words_and_dots(
+                translation.content or "", target_word_count=target_word_count
+            )
+
             if not text_chunks:
-                raise ValueError("Не удалось нарезать текст. Статья пустая?")
+                raise Exception("После разбивки текста не получилось ни одного фрагмента.")
 
-            def run_simulation_pipeline():
-                try:
-                    # Шаг 1: Имитация анализа текста
-                    p_data = cache.get(cache_key)
-                    p_data.update({"percent": 25, "message": "Лингвистический анализ текста..."})
-                    p_data["logs"].append("🔍 Сканирование структуры предложений и разметки...")
-                    cache.set(cache_key, p_data, 3600)
-                    time.sleep(0.6)
+            # Шаг 2.4: Сохраняем все нарезанные фрагменты в таблицу AudioTrack
+            for idx, chunk_text in enumerate(text_chunks):
+                AudioTrack.objects.create(
+                    project=project, text=chunk_text, order=idx + 1, status="new"
+                )
 
-                    # Шаг 2: Нарезка и запись проекта в БД
-                    p_data = cache.get(cache_key)
-                    p_data.update({"percent": 50, "message": "Разбиение на сюжетные фрагменты..."})
-                    p_data["logs"].append(
-                        f"✂️ Текст успешно разделен на {len(text_chunks)} логических блоков."
-                    )
-                    cache.set(cache_key, p_data, 3600)
-
-                    # 🎯 НАШ ПЕРЕХВАТ: Ищем оригинальный РУССКИЙ заголовок для папки и дашборда
-                    # Ищем его в том же самом кластере (article_id)
-                    ru_main_trans = ArticleTranslation.objects.filter(
-                        cluster_id=article_id, language__code="ru"
-                    ).first()
-
-                    # Если нашли русский заголовок — берем его, иначе оставляем текущий иностранный тайтл
-                    project_title = ru_main_trans.title if ru_main_trans else trans.title
-
-                    # Создаем проект строго по твоей модели AudioProject
-                    audio_project = AudioProject.objects.create(
-                        user=request.user,
-                        article=None,  # Поле 'article' ожидает одиночный Article, оставляем None
-                        title=project_title,  # 🔥 ТЕПЕРЬ ТУТ ВСЕГДА БУДЕТ "Великая ложь Колумба"
-                        language=lang_code,  # А код языка пишется реальный (en, de...), под озвучку
-                        provider="replicate_f5tts",
-                        voice_preset="default",
-                        status="pending",
-                    )
-
-                    # Наполняем базу треками (используем твою модель AudioTrack)
-                    for idx, chunk_text in enumerate(text_chunks, start=1):
-                        AudioTrack.objects.create(
-                            project=audio_project,
-                            order=idx,
-                            text=chunk_text,
-                            status="pending",
-                        )
-                    time.sleep(0.5)
-
-                    # Шаг 3: Финал
-                    p_data = cache.get(cache_key)
-                    p_data.update({"percent": 85, "message": "Индексация базы данных..."})
-                    p_data["logs"].append(
-                        "💾 Сетка сюжетов успешно сохранена в репозиторий проекта."
-                    )
-                    cache.set(cache_key, p_data, 3600)
-                    time.sleep(0.4)
-
-                    # Завершаем и отдаем ПРАВИЛЬНЫЙ URL для редиректа на edit
-                    final_data = {
-                        "percent": 100,
-                        "message": "Успешно сформировано!",
-                        "status": "done",
-                        "redirect_url": f"/audio/{audio_project.id}/edit/",
-                        "logs": p_data["logs"]
-                        + ["🎉 Подготовка завершена! Перенаправление в лабораровку озвучки..."],
-                    }
-                    cache.set(cache_key, final_data, 3600)
-
-                except Exception as exc:
-                    cache.set(
-                        cache_key,
-                        {
-                            "percent": 100,
-                            "message": "Ошибка выполнения",
-                            "status": "error",
-                            "logs": [f"❌ Сбой на стороне сервера: {str(exc)}"],
-                        },
-                        3600,
-                    )
-                finally:
-                    connection.close()
-
-            threading.Thread(target=run_simulation_pipeline, daemon=True).start()
-            return JsonResponse({"success": True, "task_id": task_id})
-
-        except Exception as e:
+            # Шаг 2.5: Пишем в кэш статус "done", чтобы фронтенд остановил поллинг и сделал редирект
             cache.set(
                 cache_key,
                 {
                     "percent": 100,
-                    "message": "Ошибка",
-                    "status": "error",
-                    "logs": [str(e)],
+                    "message": "🎉 Текст успешно разбит на фрагменты!",
+                    "status": "done",
+                    "redirect_url": f"/audio/{project.id}/edit/",
+                    "logs": [
+                        "✅ Связь со статьей подтверждена.",
+                        f"🧬 Текст успешно нарезан. Создано фрагментов: {len(text_chunks)}",
+                        f"💾 Новый проект #{project.id} сохранен в базу.",
+                    ],
                 },
-                3600,
+                timeout=600,
             )
+
             return JsonResponse({"success": True, "task_id": task_id})
 
-    # GET-запрос: Вывод формы (Без изменений)
+        except Exception as e:
+            print(f"🚨 Критическая ошибка при создании аудиопроекта: {str(e)}")
+            return JsonResponse(
+                {"success": False, "error": f"Ошибка сервера: {str(e)}"}, status=400
+            )
+
+    # 3. GET-запрос: Вывод списка доступных статей для формы (Без изменений)
     articles = ArticleCluster.objects.prefetch_related(
         Prefetch(
             "translations",
@@ -374,6 +395,7 @@ def audio_create(request):
     context = {
         "page_title": "Новый проект озвучки",
         "articles": articles_data,
+        "selected_article": selected_article,
     }
     return render(request, "audio/audio_create.html", context)
 
@@ -735,3 +757,137 @@ def generation_progress(request, task_id=None):
     }
 
     return JsonResponse(response_data)
+
+
+@login_required
+@require_POST
+def upload_manual_audio(request):
+    """
+    Ручная загрузка аудиофайла взамен нейросетевого синтеза.
+    Полная синхронизация путей и файлов:
+    - Пишет файлы в 'voice_<lang>'
+    - Имя файла по орднунгу: {voice_id}_{track_order}_{language}{ext}
+    - Если имя спикера отсутствует, подставляется 'noname'
+    - Измеряет длительность через mutagen и сохраняет её в json клипа.
+    """
+    try:
+        track_id = request.POST.get("track_id")
+        audio_file = request.FILES.get("audio_file")
+
+        if not track_id or not audio_file:
+            return JsonResponse({"success": False, "error": "Не все данные переданы."}, status=400)
+
+        ext = os.path.splitext(audio_file.name)[1].lower()
+        if ext not in [".wav", ".mp3", ".mpeg"]:
+            return JsonResponse(
+                {"success": False, "error": "Допустимы только файлы .wav, .mp3, .mpeg"}, status=400
+            )
+
+        track = get_object_or_404(
+            AudioTrack.objects.select_related("project", "project__article"),
+            id=track_id,
+            project__user=request.user,
+        )
+        project = track.project
+        project_lang = (project.language or "ru").lower()
+
+        # 🔥 НАШ ОРДНУНГ НА ИМЯ: Если имени нет или оно дефолтное системное — пишем 'noname'
+        voice_id = getattr(track, "speaker_name", None)
+        if not voice_id or voice_id in ["Manual", "success", ""]:
+            voice_id = "noname"
+
+        track_order = track.order
+
+        # 1. Папка проекта
+        article_id = project.article.id if project.article else 0
+        project_dir_path, safe_folder_name = get_or_create_project_dir(project.title, article_id)
+
+        # 2. Имя подпапки строго 'voice_ru'
+        voice_folder_name = f"voice_{project_lang}" if project_lang else "voice"
+        voice_dir = project_dir_path / voice_folder_name
+        voice_dir.mkdir(parents=True, exist_ok=True)
+
+        # 3. Имя файла строго по Орднунгу и имя JSON метаданных
+        filename = f"{voice_id}_{track_order}_{project_lang}{ext}"
+        json_filename = f"voices_meta_{project_lang}.json"
+
+        file_path = voice_dir / filename
+        json_path = voice_dir / json_filename
+
+        # Сохраняем физически на диск
+        with open(file_path, "wb+") as destination:
+            for chunk in audio_file.chunks():
+                destination.write(chunk)
+
+        # 4. Вычисляем длительность клипа через mutagen
+        duration = 0.0
+        try:
+            audio_info = mutagen.File(file_path)
+            if audio_info is not None and audio_info.info is not None:
+                duration = round(audio_info.info.length, 2)
+        except Exception as audio_err:
+            print(f"⚠️ Ошибка подсчета длины при ручной загрузке: {audio_err}")
+
+        # Формируем URL для базы данных (с заменой на voice_ru)
+        audio_url = f"{settings.MEDIA_URL}projects/{safe_folder_name}/{voice_folder_name}/{filename}".replace(
+            "\\", "/"
+        )
+
+        # Обновляем трек в БД Django
+        track.status = "success"
+        track.audio_file = audio_url
+        track.speaker_name = "Manual"
+        track.error_message = ""
+        if hasattr(track, "duration"):
+            track.duration = duration
+        track.save()
+
+        # 5. Синхронизируем с файлом voices_meta_<lang>.json
+        if json_path.exists():
+            try:
+                with open(json_path, "r", encoding="utf-8") as jf:
+                    meta_data = json.load(jf)
+            except Exception:
+                meta_data = {"paragraphs": {}}
+        else:
+            meta_data = {"paragraphs": {}}
+
+        if "paragraphs" not in meta_data:
+            meta_data["paragraphs"] = {}
+
+        # Пишем строго по орднунг-ключу
+        meta_data["paragraphs"][str(track_order)] = {
+            "article_title": project.title,
+            "article_id": article_id,
+            "track_order": track_order,
+            "speaker": voice_id,
+            "language": project_lang,
+            "model": "manual",
+            "speed": 1.0,
+            "full_text": track.text,
+            "duration": duration,  # Длительность сохраняется на таймлайн каждого клипа
+        }
+
+        try:
+            with open(json_path, "w", encoding="utf-8") as jf:
+                json.dump(meta_data, jf, ensure_ascii=False, indent=4, sort_keys=True)
+        except Exception as json_write_err:
+            print(f"🚨 Ошибка записи в JSON метаданных: {json_write_err}")
+            return JsonResponse(
+                {"success": False, "error": "Файл сохранен, но не удалось обновить метаданные"},
+                status=500,
+            )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "audio_url": audio_url,
+                "track_id": track.id,
+                "duration": duration,
+                "message": "Успешно синхронизировано с логикой генерации.",
+            }
+        )
+
+    except Exception as e:
+        print(f"🚨 Критическая ошибка в upload_manual_audio: {str(e)}")
+        return JsonResponse({"success": False, "error": f"Ошибка сервера: {str(e)}"}, status=500)

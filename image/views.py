@@ -21,7 +21,6 @@ from django.contrib import messages
 from ai_inspector.models import AIProvider
 from audio.models import AudioProject
 from prompts.models import ImagePromptTemplate
-from tiktok_web import settings
 from .models import ImagePrompt, ImageProject
 from .services import (
     generate_storyboard,
@@ -478,30 +477,36 @@ def project_edit(request, pk):
             try:
                 selected_ids = [int(x) for x in selected_ids_str.split(",") if x.isdigit()]
 
-                # БЛОКИРОВКА ОТ СЛУЧАЙНОЙ ПЕРЕГЕНЕРАЦИИ КАРТИНОК
-                if len(selected_ids) > 1:
-                    filtered_prompts_qs = (
-                        prompts.filter(id__in=selected_ids)
-                        .exclude(image__isnull=False)
-                        .exclude(image="")
-                    )
-                    selected_prompts = list(filtered_prompts_qs)
+                # Находим кадры из выбранных, у которых ЕЩЕ НЕТ картинок (пустые слоты)
+                empty_prompts_qs = (
+                    prompts.filter(id__in=selected_ids).filter(image__isnull=True)
+                    | prompts.filter(id__in=selected_ids).filter(image="")
+                ).distinct()
 
-                    if not selected_prompts:
-                        return JsonResponse(
-                            {
-                                "success": True,
-                                "message": "✅ Все выбранные кадры уже имеют готовые изображения!",
-                            }
-                        )
-                else:
+                # Если передан специальный флаг принудительной перезаписи от пользователя
+                force_regenerate = request.POST.get("force_regenerate") == "true"
+
+                if force_regenerate:
+                    # Если пользователь согласился на перегенерацию, берем ВСЕ выбранные ID
                     selected_prompts = list(prompts.filter(id__in=selected_ids))
+                else:
+                    # Иначе отправляем на генерацию только пустые слоты
+                    selected_prompts = list(empty_prompts_qs)
+
+                # Если пустых слотов нет и принудительный флаг не пришел, отправляем фронтенду статус для вызова Confirm
+                if not selected_prompts and not force_regenerate:
+                    return JsonResponse(
+                        {
+                            "success": False,
+                            "requires_confirmation": True,
+                            "message": "Некоторые или все выбранные кадры уже имеют готовые изображения. Перегенерировать их?",
+                        }
+                    )
 
             except Exception as val_err:
                 return JsonResponse(
                     {"success": False, "error": f"Ошибка валидации ID: {str(val_err)}"}, status=400
                 )
-
             task_id = str(uuid.uuid4())
 
             # Инициализируем прогресс в кэше
