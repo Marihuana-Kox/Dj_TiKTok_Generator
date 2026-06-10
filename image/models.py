@@ -10,7 +10,41 @@ from tiktok_web import settings
 def transliterate(text: str) -> str:
     """Переводит кириллицу в безопасную латиницу для путей"""
     cyrillic = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
-    latin = ["a", "b", "v", "g", "d", "e", "yo", "zh", "z", "i", "y", "k", "l", "m", "n", "o", "p", "r", "s", "t", "u", "f", "kh", "ts", "ch", "sh", "shch", "", "y", "", "e", "yu", "ya"]
+    latin = [
+        "a",
+        "b",
+        "v",
+        "g",
+        "d",
+        "e",
+        "yo",
+        "zh",
+        "z",
+        "i",
+        "y",
+        "k",
+        "l",
+        "m",
+        "n",
+        "o",
+        "p",
+        "r",
+        "s",
+        "t",
+        "u",
+        "f",
+        "kh",
+        "ts",
+        "ch",
+        "sh",
+        "shch",
+        "",
+        "y",
+        "",
+        "e",
+        "yu",
+        "ya",
+    ]
     tr_dict = dict(zip(cyrillic, latin))
     text = text.lower()
     return "".join(tr_dict.get(char, char) for char in text)
@@ -51,11 +85,15 @@ class ImageProject(models.Model):
         ("custom", "Свой стиль..."),
     ]
 
-    article = models.ForeignKey(ArticleCluster, on_delete=models.CASCADE, related_name="image_projects")
+    article = models.ForeignKey(
+        ArticleCluster, on_delete=models.CASCADE, related_name="image_projects"
+    )
     title = models.CharField("Название проекта", max_length=200, blank=True)
 
     # Настройки
-    style_preset = models.CharField("Стиль", max_length=50, choices=STYLE_CHOICES, default="cinematic")
+    style_preset = models.CharField(
+        "Стиль", max_length=50, choices=STYLE_CHOICES, default="cinematic"
+    )
     custom_style_prompt = models.TextField(
         "Доп. описание стиля",
         blank=True,
@@ -80,7 +118,13 @@ class ImageProject(models.Model):
     images_generated = models.BooleanField("Картинки созданы", default=False)
 
     # Для поиска
-    search_title = models.CharField("Поисковый заголовок", max_length=200, blank=True, db_index=True)
+    search_title = models.CharField(
+        "Поисковый заголовок", max_length=200, blank=True, db_index=True
+    )
+
+    class Meta:
+        verbose_name = "Проект картинки"
+        verbose_name_plural = "Проекты картинок"
 
     def save(self, *args, **kwargs):
         # Заполняем заголовок из статьи при сохранении проекта
@@ -128,15 +172,21 @@ class ImagePrompt(models.Model):
     order = models.IntegerField("Порядок сцены", default=0)
 
     # --- КОНТЕНТ ---
-    scene_description = models.TextField("Описание сцены (для человека)", help_text="Что происходит в кадре", blank=True)
+    scene_description = models.TextField(
+        "Описание сцены (для человека)", help_text="Что происходит в кадре", blank=True
+    )
     prompt_text = models.TextField("Текст промпта (для AI)", help_text="На английском языке")
 
     # --- РЕЗУЛЬТАТ ---
     image = models.ImageField("Изображение", upload_to=upload_to, blank=True, null=True)
-    generation_status = models.CharField("Статус генерации", max_length=20, default="pending", choices=STATUS_CHOICES)
+    generation_status = models.CharField(
+        "Статус генерации", max_length=20, default="pending", choices=STATUS_CHOICES
+    )
     error_message = models.TextField("Ошибка", blank=True)
 
     class Meta:
+        verbose_name = "Проект промпт"
+        verbose_name_plural = "Проекты промптов"
         ordering = ["order"]  # Всегда сортировать по порядку
 
     @property

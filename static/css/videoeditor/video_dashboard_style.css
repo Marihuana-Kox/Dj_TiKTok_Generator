@@ -89,9 +89,10 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    max-height: 580px;
+    max-height: 300px;
     overflow-y: auto;
-    padding-right: 8px;
+    padding-right: 5px;
+    margin-bottom: 20px; /* Отступ перед блоком настроек */
 }
 
 .media-item-card-row {
@@ -102,6 +103,12 @@ body {
     border-radius: 8px;
     padding: 12px;
     align-items: center;
+    cursor: pointer;
+}
+
+.media-item-card-row.active {
+    outline: 2px solid #00ff66 !important;
+    background: rgba(0, 255, 102, 0.05);
 }
 
 .media-thumb-wrapper-box {
@@ -247,6 +254,7 @@ body {
     color: var(--text-muted);
     cursor: not-allowed;
 }
+
 .capcut-btn-secondary, .capcut-btn-download {
     display: inline-flex;
     align-items: center;
@@ -256,9 +264,9 @@ body {
     font-size: 14px;
     font-weight: 500;
     line-height: 1.2;
-    color: #e5e7eb; /* Светло-серый текст */
-    background-color: #2d2d30; /* Темный графитовый фон */
-    border: 1px solid #45454a; /* Тонкая серая рамка */
+    color: #e5e7eb;
+    background-color: #2d2d30;
+    border: 1px solid #45454a;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
@@ -266,20 +274,17 @@ body {
     box-sizing: border-box;
 }
 
-/* Эффект при наведении */
 .capcut-btn-secondary:hover, .capcut-btn-download:hover {
-    background-color: #3e3e42; /* Чуть светлее при наведении */
-    border-color: #636366; /* Рамка становится отчетливее */
-    color: #ffffff; /* Текст становится чисто белым */
+    background-color: #3e3e42;
+    border-color: #636366;
+    color: #ffffff;
 }
 
-/* Эффект при нажатии */
 .capcut-btn-secondary:active, .capcut-btn-download:active {
     background-color: #1e1e1f;
-    transform: scale(0.98); /* Легкий эффект просадки при клике */
+    transform: scale(0.98);
 }
 
-/* Состояние, когда кнопка заблокирована (идёт рендеринг) */
 .capcut-btn-secondary:disabled, .capcut-btn-download:disabled {
     background-color: #1c1c1e;
     border-color: #2c2c2e;
@@ -287,6 +292,7 @@ body {
     cursor: not-allowed;
     transform: none;
 }
+
 .btn-download-success {
     background: var(--success-color);
 }
@@ -340,8 +346,6 @@ body {
     margin-top: 12px;
 }
 
-
-
 .track-header-title {
     padding: 12px;
     font-size: 12px;
@@ -368,6 +372,12 @@ body {
     border-radius: 4px;
     min-width: 130px;
     flex-shrink: 0;
+    cursor: pointer;
+}
+
+.timeline-clip.active {
+    outline: 2px solid #00ff66 !important;
+    background: rgba(0, 255, 102, 0.05);
 }
 
 .timeline-clip img {
@@ -397,15 +407,6 @@ body {
 
 .hidden {
     display: none !important;
-}
-
-
-/* Уменьшаем высоту существующей сетки картинок и добавляем скролл внутри неё */
-.media-grid-vertical {
-    max-height: 300px;
-    overflow-y: auto;
-    padding-right: 5px;
-    margin-bottom: 20px; /* Отступ перед блоком настроек */
 }
 
 /* Оформление встроенной панели параметров */
@@ -516,17 +517,6 @@ body {
     text-align: right;
 }
 
-/* Интерактивные стили для будущей подсветки клипов при выборе */
-.timeline-clip, .media-item-card-row {
-    cursor: pointer;
-}
-
-.timeline-clip.active, .media-item-card-row.active {
-    outline: 2px solid #00ff66 !important;
-    background: rgba(0, 255, 102, 0.05);
-}
-
-/* Блок с картинками */
 /* Переключатель вкладок внутри библиотеки ресурсов */
 .media-resource-tabs {
     display: flex;
@@ -587,6 +577,16 @@ body {
     aspect-ratio: 1 / 1;
 }
 
+.image-asset-card.active {
+    border-color: #00ff66;
+    box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
+}
+
+.asset-thumb-box {
+    width: 100%;
+    height: 100%;
+}
+
 .asset-thumb-box img {
     width: 100%;
     height: 100%;
@@ -613,38 +613,6 @@ body {
 }
 
 .audio-asset-card {
-    background: #161616;
-    border: 1px solid #222;
-    border-radius: 4px;
-    padding: 8px;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.audio-asset-card:hover {
-    background: #222;
-}
-
-.audio-asset-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    color: #ccc;
-}
-
-.audio-icon {
-    color: #00ff66;
-}
-
-/* Общая подсветка выбранных ресурсов */
-.image-asset-card.active, .audio-asset-card.active {
-    border-color: #00ff66;
-    box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
-}
-/* Конец блока с картинками */
-/* Блок с аудиофайлами */
-.audio-asset-card {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -659,6 +627,22 @@ body {
 .audio-asset-card:hover {
     background: #1f1f1f;
     border-color: #333;
+}
+
+.audio-asset-card.active {
+    border-color: #00ff66;
+    box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
+}
+
+.audio-asset-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 180px;
+}
+
+.audio-icon {
+    color: #00ff66;
 }
 
 .audio-asset-card-empty {
@@ -681,8 +665,52 @@ body {
     text-transform: uppercase;
 }
 
-/* timline panel */
-/* Контейнер дорожек */
+/* Встроенный мини-таймлайн вкладки аудио */
+.tab-audio-timeline-track {
+    flex-grow: 1;
+    background: #111115;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+}
+
+.tab-audio-timeline-fill {
+    background: linear-gradient(90deg, #25f4ee, #fe2c55);
+    height: 100%;
+    border-radius: 5px;
+    min-width: 20px;
+    max-width: 100%;
+    transition: width 0.3s ease;
+}
+
+/* Круглая минималистичная кнопка воспроизведения во вкладке */
+.audio-tab-play-btn {
+    background: #3a3a44;
+    border: none;
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.audio-tab-play-btn:hover {
+    background: #fe2c55;
+    transform: scale(1.05);
+}
+
+.audio-tab-play-btn.playing {
+    background: #25f4ee;
+    color: #000;
+}
+
+/* Timeline panel */
 .capcut-tracks-container {
     display: flex;
     flex-direction: column;
@@ -693,9 +721,11 @@ body {
     box-sizing: content-box;
     overflow-y: scroll;
 }
+
 .timeline-track {
     display: flex;
 }
+
 /* Динамическая шкала времени */
 .timeline-timebar {
     display: flex;
@@ -715,14 +745,14 @@ body {
     align-items: flex-start;
     flex-shrink: 0;
     height: 100%;
-    border-left: 1px solid #3f3f46; /* Более заметная серая черточка */
+    border-left: 1px solid #3f3f46;
     padding-left: 3px;
     box-sizing: border-box;
 }
 
 /* Каждая 5-я секунда — выделяем ярче */
 .time-tick.major {
-    border-left: 2px solid #a3a3b3; /* Светлая, контрастная черта */
+    border-left: 2px solid #a3a3b3;
 }
 
 /* Цифры секунд (0s, 5s, 10s...) */
@@ -730,7 +760,7 @@ body {
     font-family: 'Courier New', monospace;
     font-weight: bold;
     font-size: 10px;
-    color: #e4e4e7; /* Светло-серый/белый цвет, теперь всё отлично видно! */
+    color: #e4e4e7;
     line-height: 1;
     margin-top: 2px;
 }
@@ -743,7 +773,7 @@ body {
     border-radius: 4px;
 }
 
-/* Трек видео (картинки идут встык друг к другу) */
+/* Трек видео */
 .capcut-clip.video-block {
     height: 65px;
     border: 1px solid #3f3f46;
@@ -751,15 +781,15 @@ body {
     position: relative;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
-/* 🔥 КРИТИЧЕСКИ ВАЖНО: Подсветка для ВСЕХ выделенных клипов */
+
 .capcut-clip.video-block.selected-active {
-    border: 2px solid #38bdf8 !important; /* Яркий голубой цвет */
+    border: 2px solid #38bdf8 !important;
     box-shadow: 0 0 10px rgba(56, 189, 248, 0.6), inset 0 0 8px rgba(56, 189, 248, 0.3);
     transform: scale(1.01);
     z-index: 5;
 }
 
-/* Трек аудио (сохраняет свои пропорции, но лежит независимо) */
+/* Трек аудио */
 .capcut-clip.audio-block {
     height: 36px;
     background: #153e25;
@@ -767,11 +797,11 @@ body {
     display: flex;
     align-items: center;
     padding: 0 10px;
-    margin-right: 1px; /* Минимальный стык между аудиофайлами */
+    margin-right: 1px;
 }
-/* Стилизация играющего в данный момент аудио-блока */
+
 .capcut-clip.audio-block.playing {
-    background: #235c34 !important; /* Более сочный зеленый */
+    background: #235c34 !important;
     border-color: #52af6e !important;
     box-shadow: inset 0 0 10px rgba(167, 243, 208, 0.2);
 }
@@ -784,23 +814,23 @@ body {
     transition: transform 0.2s;
 }
 
-/* Изменяем иконку при активном воспроизведении */
 .capcut-clip.audio-block.playing .play-status-icon {
     color: #ffffff;
     transform: scale(1.2);
 }
 
-/* блок с настройками */
-/* Вёрстка шапки настроек с чекбоксом */
+/* Блок с настройками параметров */
 .label-with-checkbox {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 6px;
 }
+
 .label-with-checkbox label {
     margin-bottom: 0 !important;
 }
+
 .batch-apply {
     font-size: 11px;
     color: #a3a3b3;
@@ -809,21 +839,17 @@ body {
     align-items: center;
     gap: 4px;
 }
+
 .batch-apply input {
     cursor: pointer;
     margin: 0;
-}
-
-/* Контейнер индикаторов внутри .video-block кадра */
-.video-block {
-    position: relative; /* Для позиционирования индикаторов внутри */
 }
 
 .clip-fx-status-bar {
     position: absolute;
     bottom: 4px;
     left: 4px;
-    display: flex;
+    display: flow-root;
     gap: 3px;
     pointer-events: none;
     z-index: 10;
@@ -833,56 +859,233 @@ body {
 .fx-badge {
     font-size: 9px;
     background: rgba(24, 24, 27, 0.9);
-    color: #38bdf8; /* Голубой для FX */
+    color: #38bdf8;
     padding: 1px 4px;
     border-radius: 3px;
     border: 1px solid rgba(56, 189, 248, 0.4);
     font-weight: bold;
-    display: none; /* Скрыт по умолчанию */
+    display: none;
 }
-.fx-badge.badge-filter { color: #f43f5e; border-color: rgba(244, 63, 94, 0.4); } /* Розовый для 🎨 */
-.fx-badge.badge-trans { color: #a855f7; border-color: rgba(168, 85, 247, 0.4); }  /* Фиолетовый для 🔀 */
-.fx-badge.badge-text { color: #eab308; border-color: rgba(234, 179, 8, 0.4); }   /* Жёлтый для 📝 */
 
-/* Класс активации индикатора, который зажигает его на экране */
+.fx-badge.badge-filter { color: #f43f5e; border-color: rgba(244, 63, 94, 0.4); }
+.fx-badge.badge-trans { color: #a855f7; border-color: rgba(168, 85, 247, 0.4); }
+.fx-badge.badge-text { color: #eab308; border-color: rgba(234, 179, 8, 0.4); }
+
 .fx-badge.is-active {
     display: inline-block !important;
 }
+
 .active-fx-btn {
-    background-color: #00bcd4 !important; /* Голубой/бирюзовый цвет активации */
+    background-color: #00bcd4 !important;
     color: #fff !important;
 }
-
+.badge-mirror-x, .badge-mirror-y{
+    width: 10px;
+    margin: 1px;
+}
 /* Разрешаем курсор захвата для кадров */
 .capcut-clip[draggable="true"] {
     cursor: grab !important;
-    user-select: none; /* Запрещаем выделение текста/картинок при тащении */
-    -webkit-user-drag: element !important; /* Форсируем drag для браузеров Safari/Chrome */
+    user-select: none;
+    -webkit-user-drag: element !important;
 }
 
-/* Элемент в процессе перетаскивания */
 .capcut-clip.dragging {
     opacity: 0.4 !important;
     cursor: grabbing !important;
 }
 
-/* Рамка-подсказка куда упадет кадр */
 .capcut-clip.drag-over {
     border: 2px dashed #2196F3 !important;
     box-sizing: border-box;
 }
-/* Пропускаем клики и перетаскивание сквозь картинку в контейнер */
+
 .capcut-clip img {
     pointer-events: none !important;
     user-select: none !important;
 }
-/* Нижний блок управления в редакторе
-тайминг аудио и видео, чекбоксы */
+
+/* Нижний блок управления в редакторе */
 .timeline-controls {
     padding: 10px 0;
     display: flex;
     justify-content: space-between;
 }
+
 .text-danger {
     text-align: center;
+}
+
+/* === НОВЫЕ КЛАССЫ ДЛЯ ВЫВОДА ГОТОВЫХ ВИДЕОРОЛИКОВ (СЕТКА ПО 6 В РЯД) === */
+.generated-videos-section {
+    margin-top: 32px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.generated-videos-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+}
+
+@media (max-width: 1400px) { .generated-videos-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 992px) { .generated-videos-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.video-history-card {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.video-history-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-history-thumb .icon-player-placeholder {
+    font-size: 32px;
+}
+
+.video-history-badge-days {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(234, 179, 8, 0.9);
+    color: #000;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.video-history-badge-days.expired {
+    background: rgba(239, 68, 68, 0.9);
+    color: #fff;
+}
+
+.video-history-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.video-history-date {
+    font-weight: 500;
+    color: var(--text-main);
+}
+
+.video-history-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.video-history-btn-row {
+    display: flex;
+    gap: 4px;
+}
+
+.video-history-btn-row .capcut-btn-secondary,
+.video-history-btn-row .capcut-btn-download,
+.video-history-actions .capcut-btn-primary {
+    padding: 6px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    width: 100%;
+    justify-content: center;
+}
+
+/* Сценарии сборки (Монтажные Json-листы) */
+.scenarios-history-block {
+    margin-top: 10px;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 8px;
+}
+
+.scenarios-history-title {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.scenarios-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.scenario-link-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    background: var(--bg-panel);
+    padding: 4px 6px;
+    border-radius: 3px;
+    color: var(--accent-color);
+    text-decoration: none;
+    border: 1px solid transparent;
+}
+
+.scenario-link-item:hover {
+    border-color: var(--accent-color);
+}
+/* Базовые стили для кнопки действия на карточке ресурса */
+.resource-action-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 14px;
+    display: none; /* По умолчанию скрыта */
+    transition: all 0.2s ease;
+}
+
+.resource-action-btn:hover {
+    background: #00bcd4; /* Подсветка при наведении */
+}
+
+/* СОСТОЯНИЕ 1: Картинка уже есть на таймлайне — кнопку полностью скрываем */
+.image-asset-card.on-timeline .resource-action-btn {
+    display: none !important;
+}
+
+/* СОСТОЯНИЕ 2: Картинка удалена (лежит в корзине) — показываем стрелочку возврата */
+.image-asset-card.in-trash .resource-action-btn {
+    display: inline-block;
+}
+.image-asset-card.in-trash .resource-action-btn::before {
+    content: "↩️";
+}
+
+/* СОСТОЯНИЕ 3: Абсолютно новая картинка (нет на таймлайне и нет в корзине) — показываем плюс */
+.image-asset-card.is-new .resource-action-btn {
+    display: inline-block;
+}
+.image-asset-card.is-new .resource-action-btn::before {
+    content: "➕";
 }

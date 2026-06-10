@@ -1,0 +1,181 @@
+/* Основной контейнер страницы в стиле TikTok */
+.tiktok-profile-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #121212;
+    color: #fff;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.tiktok-profile-header {
+    border-bottom: 1px solid #2f2f2f;
+    padding-bottom: 20px;
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tiktok-profile-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+}
+
+/* 🔥 СЕТКА В СТИЛЕ TIKTOK (Плитки проектов) */
+.tiktok-videos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+/* Карточка проекта с пропорциями 9:16 */
+.tiktok-video-card {
+    position: relative;
+    background: #1e1e1e;
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 9 / 16; /* Строго вертикальный формат */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1px solid #2a2a2a;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.tiktok-video-card:hover {
+    transform: translateY(-4px);
+    border-color: #fe2c55; /* Фирменный цвет TikTok при наведении */
+}
+
+/* Обложка / Заглушка клипа */
+.video-card-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.85) 100%);
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+/* Верхние бейджи статуса на иконке */
+.card-top-badges {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.tiktok-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+.badge-ready { background: #2ecc71; color: #fff; }
+.badge-rendering { background: #f1c40f; color: #000; animation: pulse 1.5s infinite; }
+.badge-expired { background: #e74c3c; color: #fff; }
+.badge-empty { background: #7f8c8d; color: #fff; }
+
+/* Нижняя информационная часть на обложке */
+.card-bottom-info {
+    width: 100%;
+    z-index: 2;
+}
+
+.video-project-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: #fff;
+    line-height: 1.3;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.video-project-date {
+    font-size: 11px;
+    color: #b3b3b3;
+    display: block;
+    margin-bottom: 12px;
+}
+
+/* Кнопки действий на плитке */
+.video-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tiktok-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 4px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+    text-align: center;
+}
+
+.btn-tiktok-primary {
+    background: #fe2c55;
+    color: #fff;
+}
+.btn-tiktok-primary:hover { background: #e02447; }
+
+.btn-tiktok-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    backdrop-filter: blur(5px);
+}
+.btn-tiktok-secondary:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* Блок истории 3-х конфигураций внутри карточки */
+.mini-history-drawer {
+    margin-top: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 4px;
+    padding: 6px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.mini-history-title {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    font-weight: 700;
+}
+.mini-scenario-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #ddd;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    text-decoration: none;
+}
+.mini-scenario-item:last-child { border-bottom: none; }
+.mini-scenario-item:hover { color: #fe2c55; }
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}

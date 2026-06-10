@@ -28,8 +28,62 @@ document.addEventListener('DOMContentLoaded', () => {
         window.initDragAndDrop();
     }
 
+    const tabPlayButtons = document.querySelectorAll('.audio-tab-play-btn');
+
+    tabPlayButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Исключаем ложные срабатывания на таймлайне
+
+            const card = btn.closest('.audio-asset-card');
+            const internalAudio = card.querySelector('.tab-internal-player');
+            const iconSpan = btn.querySelector('.play-icon');
+
+            // 1. Если этот файл уже играет — ставим его на паузу
+            if (!internalAudio.paused) {
+                internalAudio.pause();
+                btn.classList.remove('playing');
+                iconSpan.innerText = '▶';
+            } else {
+                // 2. Если запускаем новый — тушим ВСЕ остальные аудио во вкладке
+                document.querySelectorAll('.tab-internal-player').forEach(audio => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                });
+                document.querySelectorAll('.audio-tab-play-btn').forEach(button => {
+                    button.classList.remove('playing');
+                    const icon = button.querySelector('.play-icon');
+                    if (icon) icon.innerText = '▶';
+                });
+
+                // 3. Ставим на паузу главные плееры редактора, чтобы звуки не накладывались
+                const globalPlayer = document.getElementById('global-timeline-player');
+                if (globalPlayer) globalPlayer.pause();
+                
+                const mainEditorPlayer = document.getElementById('main-editor-player');
+                if (mainEditorPlayer) mainEditorPlayer.pause();
+                
+                const videoPlayer = document.getElementById('videoPlayer');
+                if (videoPlayer) videoPlayer.pause();
+
+                // 4. Включаем текущий файл
+                internalAudio.play().then(() => {
+                    btn.classList.add('playing');
+                    iconSpan.innerText = '⏸';
+                }).catch(err => {
+                    console.error("Ошибка воспроизведения аудио в карточке:", err);
+                });
+            }
+
+            // Автоматический сброс кнопки, когда аудиозапись доиграет до конца
+            internalAudio.onended = () => {
+                btn.classList.remove('playing');
+                iconSpan.innerText = '▶';
+            };
+        });
+    });
     // 5. Инициализация аудио-плеера для предпрослушки треков таймлайна
     initAudioPlayer();
+    syncResourceBarButtons();
 });
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ИНИЦИАЛИЗАЦИИ ---
@@ -76,8 +130,8 @@ function initTimelineState() {
             video_effects: clip.getAttribute('data-effect') || "none",
             filter: clip.getAttribute('data-filter') || "none",
             transition: clip.getAttribute('data-transition') || "none",
-            mirror_x: false,
-            mirror_y: false,
+            mirror_x: clip.getAttribute('data-mirror-x') === 'true',
+            mirror_y: clip.getAttribute('data-mirror-y') === 'true',
             text_overlay: { 
                 text: clip.getAttribute('data-text') || "", 
                 font: clip.getAttribute('data-font') || "Arial", 
@@ -94,14 +148,14 @@ function initTimelineState() {
     });
     
     refreshTimelineLayout();
-    window.updateTimelineAfterDOMChange();
+    if (typeof window.updateTimelineAfterDOMChange === 'function') {
+        window.updateTimelineAfterDOMChange();
+    }
 }
 
 function setupDOMEventListeners() {
     setupTabs('.tab-trigger-btn', '.tab-content-pane', 'data-target');
     
-    const btnMirrorX = document.getElementById('clipMirrorX');
-    const btnMirrorY = document.getElementById('clipMirrorY');
     const previewImage = document.getElementById('monitor-preview-image');
     const emptyState = document.getElementById('emptyMonitorState');
     const btnDuplicate = document.getElementById('clipDuplicateBtn');
@@ -121,24 +175,21 @@ function setupDOMEventListeners() {
             const sourceConfig = window.timelineState[sourceOrder];
 
             if (sourceClip && sourceConfig && videoTrack) {
-                const existingClips = document.querySelectorAll('.capcut-clip[data-type="video"]');
-                let maxOrder = 0;
-                existingClips.forEach(c => {
-                    const o = parseInt(c.getAttribute('data-order')) || 0;
-                    if (o > maxOrder) maxOrder = o;
+                const targetOrder = sourceOrder + 1; // Новый кадр должен стать следующим
+
+                // 1. Раздвигаем window.timelineState, освобождая место для targetOrder
+                const newTimelineState = {};
+                Object.keys(window.timelineState).forEach(orderKey => {
+                    const currentOrder = parseInt(orderKey);
+                    if (currentOrder <= sourceOrder) {
+                        newTimelineState[currentOrder] = window.timelineState[currentOrder];
+                    } else {
+                        newTimelineState[currentOrder + 1] = window.timelineState[currentOrder];
+                    }
                 });
-                const newOrder = maxOrder + 1;
 
-                const duplicatedClip = sourceClip.cloneNode(true);
-                duplicatedClip.setAttribute('data-order', newOrder);
-                duplicatedClip.classList.remove('active', 'selected-active');
-                
-                const badge = duplicatedClip.querySelector('.capcut-badge');
-                if (badge) {
-                    badge.innerText = `Кадр ${newOrder}`;
-                }
-
-                window.timelineState[newOrder] = {
+                // 2. Клонируем конфигурацию родителя в освободившуюся ячейку
+                newTimelineState[targetOrder] = {
                     duration: sourceConfig.duration,
                     user_duration: sourceConfig.user_duration || sourceConfig.duration,
                     video_effects: sourceConfig.video_effects,
@@ -149,14 +200,25 @@ function setupDOMEventListeners() {
                     text_overlay: { ...sourceConfig.text_overlay },
                     audio_effects: { ...sourceConfig.audio_effects }
                 };
+                
+                // Перезаписываем глобальный стейт раздвинутыми данными
+                window.timelineState = newTimelineState;
 
+                // 3. Клонируем сам DOM-элемент кадра
+                const duplicatedClip = sourceClip.cloneNode(true);
+                duplicatedClip.classList.remove('active', 'selected-active');
+
+                // Навешиваем клик на новый клон
                 duplicatedClip.addEventListener('click', (e) => {
                     e.stopPropagation();
                     handleClipClick(duplicatedClip);
                 });
 
-                videoTrack.appendChild(duplicatedClip);
-                window.updateStateOrderFromDOM();
+                // ВСТАВЛЯЕМ СТРОГО СПРАВА ОТ РОДИТЕЛЯ (afterend)
+                sourceClip.insertAdjacentElement('afterend', duplicatedClip);
+
+                // 4. Пересчет порядка и верстки
+                window.updateStateOrderFromDOM(); 
                 refreshTimelineLayout();
                 
                 if (typeof window.updateTimelineAfterDOMChange === 'function') {
@@ -177,27 +239,37 @@ function setupDOMEventListeners() {
                 return;
             }
 
+            // 1. Снимок для истории (чтобы работало Ctrl+Z)
             saveTimelineSnapshot();
 
+            // 2. Удаление из конфига и DOM
             selectedOrders.forEach(order => {
-                if (window.timelineState[order]) {
-                    delete window.timelineState[order];
-                }
                 const clipEl = document.querySelector(`.capcut-clip[data-type="video"][data-order="${order}"]`);
-                if (clipEl) clipEl.remove();
+                
+                if (window.timelineState[order]) {
+                    delete window.timelineState[order]; // Удаляем из нашего JSON-стейта
+                }
+                if (clipEl) {
+                    clipEl.remove(); // Удаляем с экрана
+                }
             });
 
             selectedOrders = [];
-            const titleEl = document.getElementById('selectedClipTitle');
-            if (titleEl) titleEl.innerText = `(Выделено сцен: 0)`;
-
-            if (previewImage) previewImage.classList.add('hidden');
-            if (emptyState) emptyState.classList.remove('hidden');
-            window.updateStateOrderFromDOM();
+            
+            // 3. Обновление интерфейса
             refreshTimelineLayout();
-
             if (typeof window.updateTimelineAfterDOMChange === 'function') {
                 window.updateTimelineAfterDOMChange();
+            }
+            syncResourceBarButtons();
+
+            // 4. САМОЕ ГЛАВНОЕ: Отправка изменений на сервер!
+            // Если у тебя в проекте есть функция сохранения проекта (обычно называется saveProjectState или sendStateToServer)
+            // вызови её именно здесь:
+            if (typeof window.saveProjectState === 'function') {
+                window.saveProjectState(); 
+            } else {
+                console.warn("Функция сохранения на сервер не найдена! Проверь, как у тебя отправляется JSON.");
             }
         });
     }
@@ -220,16 +292,92 @@ function setupDOMEventListeners() {
 
             selectedOrders = lastSnapshot.selected;
 
-            document.querySelectorAll('.capcut-clip[data-type="video"]').forEach(clip => {
-                const newClip = clip.cloneNode(true);
-                clip.parentNode.replaceChild(newClip, clip);
+            // document.querySelectorAll('.capcut-clip[data-type="video"]').forEach(clip => {
+            //     const newClip = clip.cloneNode(true);
+            //     clip.parentNode.replaceChild(newClip, clip);
 
-                newClip.addEventListener('click', (e) => {
+            //     newClip.addEventListener('click', (e) => {
+            //         e.stopPropagation();
+            //         handleClipClick(newClip);
+            //     });
+            // });
+            // =========================================================================
+// ЕДИНАЯ ФУНКЦИЯ ДЛЯ НАВЕШИВАНИЯ СОБЫТИЙ НА ОДИН КОНКРЕТНЫЙ КАДР
+// =========================================================================
+            window.attachClipEvents = function(clip) {
+                if (!clip) return;
+
+                // Очищаем старый обработчик, если он вдруг был (защита от дублирования)
+                clip.onclick = null; 
+
+                // Основной клик — выделение и открытие инспектора
+                clip.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    handleClipClick(newClip);
-                });
-            });
+                    
+                    const order = parseInt(clip.getAttribute('data-order'));
 
+                    if (selectedOrders.includes(order)) {
+                        if (selectedOrders.length > 1) {
+                            selectedOrders = selectedOrders.filter(id => id !== order);
+                            clip.classList.remove('selected-active', 'active');
+                        }
+                    } else {
+                        selectedOrders.push(order);
+                        clip.classList.add('selected-active', 'active'); 
+                    }
+
+                    const titleEl = document.getElementById('selectedClipTitle');
+                    if (titleEl) titleEl.innerText = `(Выделено сцен: ${selectedOrders.length})`;
+
+                    if (selectedOrders.length > 0) {
+                        window.loadClipSettingsToPanel(selectedOrders[selectedOrders.length - 1]);
+                    }
+                });
+
+                // Сюда же точечно подключаем Drag & Drop ТОЛЬКО для этого кадра
+                if (typeof window.attachDragAndDropToElement === 'function') {
+                    window.attachDragAndDropToElement(clip);
+                }
+            };
+
+            // Измененная функция настройки DOM
+            function setupDOMEventListeners() {
+                setupTabs('.tab-trigger-btn', '.tab-content-pane', 'data-target');
+                
+                const previewImage = document.getElementById('monitor-preview-image');
+                const emptyState = document.getElementById('emptyMonitorState');
+                const btnDuplicate = document.getElementById('clipDuplicateBtn');
+                const videoTrack = document.querySelector('.timeline-track.video-track');
+
+                // ... (весь твой код кнопок дублирования, удаления, отмены Ctrl+Z остается без изменений) ...
+
+                // ВМЕСТО СТАРОГО КОДА КЛИКОВ ПО КАДРАМ — ПРОСТО ВЫЗЫВАЕМ НАШУ ФУНКЦИЮ:
+                document.querySelectorAll('.capcut-clip[data-type="video"]').forEach(clip => {
+                    window.attachClipEvents(clip);
+                });
+
+                // Глобальный клик по экрану для снятия выделения (оставляем как у тебя)
+                document.addEventListener('click', (e) => {
+                    const inspector = document.querySelector('.properties-editor-panel') || document.querySelector('.right-sidebar') || document.getElementById('clipDuplicateBtn') || document.getElementById('clipDeleteBtn') || document.getElementById('clipUndoBtn');
+                    if (inspector && inspector.contains(e.target)) return;
+                    if (e.target.closest('.capcut-clip')) return;
+
+                    if (selectedOrders.length > 0) saveTimelineSnapshot();
+
+                    document.querySelectorAll('.capcut-clip[data-type="video"]').forEach(clip => {
+                        clip.classList.remove('selected-active', 'active');
+                    });
+
+                    selectedOrders = [];
+                    const titleEl = document.getElementById('selectedClipTitle');
+                    if (titleEl) titleEl.innerText = `(Выделено сцен: 0)`;
+
+                    if (previewImage) previewImage.classList.add('hidden');
+                    if (emptyState) emptyState.classList.remove('hidden');
+                });
+
+                // ... (все твои обработчики изменений инпутов duration, effect, filter и т.д. остаются ниже) ...
+            }
             refreshTimelineLayout();
             if (typeof window.initDragAndDrop === 'function') window.initDragAndDrop();
 
@@ -241,63 +389,8 @@ function setupDOMEventListeners() {
                 if (previewImage) previewImage.classList.add('hidden');
                 if (emptyState) emptyState.classList.remove('hidden');
             }
+            syncResourceBarButtons();
         });
-    }
-
-    if (btnMirrorX) {
-        btnMirrorX.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (selectedOrders.length === 0) return;
-            
-            saveTimelineSnapshot();
-
-            selectedOrders.forEach(order => {
-                if (window.timelineState[order]) {
-                    window.timelineState[order].mirror_x = !window.timelineState[order].mirror_x;
-                    btnMirrorX.classList.toggle('active-fx-btn', window.timelineState[order].mirror_x);
-                    applyPreviewTransform(window.timelineState[order], order);
-                }
-            });
-        });
-    }
-
-    if (btnMirrorY) {
-        btnMirrorY.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (selectedOrders.length === 0) return;
-
-            saveTimelineSnapshot();
-
-            selectedOrders.forEach(order => {
-                if (window.timelineState[order]) {
-                    window.timelineState[order].mirror_y = !window.timelineState[order].mirror_y;
-                    btnMirrorY.classList.toggle('active-fx-btn', window.timelineState[order].mirror_y);
-                    applyPreviewTransform(window.timelineState[order], order);
-                }
-            });
-        });
-    }
-
-    function applyPreviewTransform(config, order) {
-        const clipEl = document.querySelector(`.capcut-clip[data-type="video"][data-order="${order}"]`);
-        if (clipEl && previewImage) {
-            const src = clipEl.querySelector('img').src;
-            previewImage.src = src;
-            previewImage.classList.remove('hidden');
-            if (emptyState) emptyState.classList.add('hidden');
-
-            const scaleX = config.mirror_x ? '-1' : '1';
-            const scaleY = config.mirror_y ? '-1' : '1';
-            previewImage.style.transform = `scale(${scaleX}, ${scaleY})`;
-            previewImage.style.transition = "transform 0.2s ease";
-        }
-
-        if (clipEl) {
-            const badgeX = clipEl.querySelector('.badge-mirror-x');
-            const badgeY = clipEl.querySelector('.badge-mirror-y');
-            if (badgeX) badgeX.style.display = config.mirror_x ? 'inline-block' : 'none';
-            if (badgeY) badgeY.style.display = config.mirror_y ? 'inline-block' : 'none';
-        }
     }
 
     function handleClipClick(clipElement) {
@@ -358,7 +451,7 @@ function setupDOMEventListeners() {
             selectedOrders.forEach(order => {
                 if (window.timelineState[order]) {
                     window.timelineState[order].duration = parseFloat(val);
-                    window.timelineState[order].user_duration = parseFloat(val); // Синхронизируем пользовательский ввод!
+                    window.timelineState[order].user_duration = parseFloat(val); 
                 }
             });
             refreshTimelineLayout();
@@ -453,21 +546,29 @@ function applyParamToSelected(key, value) {
             updateBadgesVisibility(order);
         }
     });
+    if (typeof window.triggerAutoSave === 'function') {
+        window.triggerAutoSave();
+    }
 }
 
-// Позволяем внешним модулям вызывать перерисовку баджей
 window.updateBadgesVisibility = updateBadgesVisibility;
 
 function applyTextParamToSelected(subKey, value) {
     selectedOrders.forEach(order => {
         if (window.timelineState[order]) window.timelineState[order].text_overlay[subKey] = value;
     });
+    if (typeof window.triggerAutoSave === 'function') {
+        window.triggerAutoSave();
+    }
 }
 
 function applyAudioParamToSelected(subKey, value) {
     selectedOrders.forEach(order => {
         if (window.timelineState[order]) window.timelineState[order].audio_effects[subKey] = value;
     });
+    if (typeof window.triggerAutoSave === 'function') {
+        window.triggerAutoSave();
+    }
 }
 
 function loadClipSettingsToPanel(order) {
@@ -546,7 +647,6 @@ function refreshTimelineLayout() {
         const clipEl = document.querySelector(`.capcut-clip[data-type="video"][data-order="${order}"]`);
         if (clipEl) {
             clipEl.style.width = (config.duration * pixelsPerSecond) + 'px';
-            // УБРАНО: Стирание атрибута, ломавшее синхронизацию с video_editor.js
         }
         totalTimelineSeconds += config.duration;
         updateBadgesVisibility(order);
@@ -660,6 +760,41 @@ function updateStateOrderFromDOM() {
     if (titleEl) titleEl.innerText = `(Выделено сцен: ${selectedOrders.length})`;
 }
 
+/**
+ * Синхронизация кнопок в ресурс-баре на основе присутствия картинок на таймлайне
+ */
+function syncResourceBarButtons() {
+    // Получаем список ИМЕН ФАЙЛОВ, а не полных URL (это надежнее)
+    const getFileName = (url) => url.split('/').pop().toLowerCase();
+    
+    const timelineSrcs = new Set();
+    document.querySelectorAll('.capcut-clip img').forEach(img => {
+        if (img.src) timelineSrcs.add(getFileName(img.src));
+    });
+
+    const resourceCards = document.querySelectorAll('.image-asset-card');
+    
+    resourceCards.forEach(card => {
+        const cardImg = card.querySelector('img');
+        if (!cardImg) return;
+
+        const fileName = getFileName(cardImg.src);
+        const btn = card.querySelector('.resource-action-btn'); // Ищем твой класс кнопки
+
+        if (btn) {
+            // Если файл есть на таймлайне, скрываем кнопку
+            if (timelineSrcs.has(fileName)) {
+                btn.style.display = 'none';
+            } else {
+                btn.style.display = 'block';
+                // При клике сразу добавляем (если еще не привязано)
+                btn.onclick = () => addImageToTimelineFromResource(fileName);
+            }
+        }
+    });
+}
+// Делаем функции доступными глобально
+window.syncResourceBarButtons = syncResourceBarButtons;
 window.loadClipSettingsToPanel = loadClipSettingsToPanel;
 window.updateStateOrderFromDOM = updateStateOrderFromDOM;
 window.saveTimelineSnapshot = saveTimelineSnapshot;

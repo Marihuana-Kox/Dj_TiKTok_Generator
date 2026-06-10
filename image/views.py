@@ -637,9 +637,10 @@ def project_edit(request, pk):
                 prompt.save()
             messages.success(request, "✅ Промпты сохранены!")
             return redirect("image:project_edit", pk=project.id)
-
+    cluster = project.article
     audio_project = None
-    audio_project = AudioProject.objects.filter(title__icontains=project.title.strip()).first()
+    audio_project = AudioProject.objects.filter(article=cluster).first()
+
     # GET: Отображение страницы
     return render(
         request,
@@ -648,7 +649,7 @@ def project_edit(request, pk):
             "project": project,
             "prompts": prompts,
             "image_providers": image_providers,
-            "audio_project": audio_project.pk if audio_project else None,
+            "audio_project": audio_project if audio_project else None,
             # 🔥 Новые переменные для твоей простой шкалы прогресса в HTML
             "total_tracks": progress_data["total_tracks"],
             "success_tracks": progress_data["success_tracks"],

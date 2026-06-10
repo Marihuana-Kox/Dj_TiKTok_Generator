@@ -13,11 +13,16 @@ class ImagePromptInline(admin.StackedInline):  # 🔥 Изменили TabularIn
     model = ImagePrompt
     extra = 0  # Не создавать пустые строки автоматически
     formfield_overrides = {
-        models.ImageField: {"widget": TextInput(attrs={"style": "width: 80%; font-family: monospace;"})},
+        models.ImageField: {
+            "widget": TextInput(attrs={"style": "width: 80%; font-family: monospace;"})
+        },
     }
     # Группируем поля внутри каждого кадра для максимального удобства
     fieldsets = [
-        ("Кадр / Сцена", {"fields": (("order", "generation_status"), ("scene_description", "prompt_text"))}),
+        (
+            "Кадр / Сцена",
+            {"fields": (("order", "generation_status"), ("scene_description", "prompt_text"))},
+        ),
         ("Результат генерации", {"fields": (("image", "image_preview"), "error_message")}),
     ]
 
@@ -28,7 +33,11 @@ class ImagePromptInline(admin.StackedInline):  # 🔥 Изменили TabularIn
         """Выводит миниатюру картинки"""
         url = obj.smart_image_url
         if url:
-            return format_html('<a href="{}" target="_blank"><img src="{}" style="max-height: 120px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" /></a>', url, url)
+            return format_html(
+                '<a href="{}" target="_blank"><img src="{}" style="max-height: 120px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" /></a>',
+                url,
+                url,
+            )
         return "Нет изображения"
 
     image_preview.short_description = "Текущее превью"
@@ -41,7 +50,16 @@ class ImageProjectAdmin(admin.ModelAdmin):
     """
 
     # Что отображать в общем списке проектов
-    list_display = ["id", "title", "article", "style_preset", "aspect_ratio", "status", "prompts_count", "created_at"]
+    list_display = [
+        "id",
+        "title",
+        "article",
+        "style_preset",
+        "aspect_ratio",
+        "status",
+        "prompts_count",
+        "created_at",
+    ]
 
     # Фильтры в правой колонке
     list_filter = ["status", "style_preset", "aspect_ratio", "created_at"]
@@ -55,7 +73,10 @@ class ImageProjectAdmin(admin.ModelAdmin):
     # Группируем поля на странице редактирования для красоты
     fieldsets = [
         ("Основная информация", {"fields": ("article", "title", "status", "search_title")}),
-        ("Настройки AI Генерации", {"fields": ("style_preset", "custom_style_prompt", "aspect_ratio")}),
+        (
+            "Настройки AI Генерации",
+            {"fields": ("style_preset", "custom_style_prompt", "aspect_ratio")},
+        ),
         (
             "Состояние очереди",
             {
@@ -89,7 +110,11 @@ class ImagePromptAdmin(admin.ModelAdmin):
     def image_preview(self, obj):
         url = obj.smart_image_url
         if url:
-            return format_html('<a href="{}" target="_blank"><img src="{}" style="max-height: 60px; border-radius: 4px;" /></a>', url, url)
+            return format_html(
+                '<a href="{}" target="_blank"><img src="{}" style="max-height: 60px; border-radius: 4px;" /></a>',
+                url,
+                url,
+            )
         return "—"
 
     image_preview.short_description = "Миниатюра"

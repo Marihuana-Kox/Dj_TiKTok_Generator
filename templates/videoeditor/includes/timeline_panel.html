@@ -1,27 +1,56 @@
-<footer class="editor-timeline-panel capcut-style">
-    <div class="timeline-scroll-container">
+<footer class="editor-timeline-panel capcut-style" 
+        id="timeline-main-panel"
+        data-project-id="{{ project.id }}">
         
-       <div id="dynamic-timebar" class="timeline-timebar"></div>
+    {{ current_config|json_script:"my-saved-draft-json" }}
 
+    <div class="timeline-scroll-container">
+        <div id="dynamic-timebar" class="timeline-timebar"></div>
         <div class="capcut-tracks-container">
             
             <div class="timeline-track video-track">
                 {% for item in timeline_data %}
                     {% if item.prompt and item.prompt.image %}
-                        <div class="image-asset-card capcut-clip video-block" 
-                             data-id="{{ item.prompt.id }}"
-                             data-type="video"
-                             data-order="{{ item.order }}"
-                             data-duration="5.0"
-                             data-effect="zoom_in"
-                             data-filter="none"
-                             data-text=""
-                             data-font="Arial"
-                             data-font-color="#FFFFFF"
-                             data-position="bottom">
+                        <div class="image-asset-card capcut-clip video-block {% if item.meta_settings.transition and item.meta_settings.transition != 'none' %}has-transition{% endif %}" 
+                            data-id="{{ item.prompt.id }}" 
+                            data-type="video" 
+                            data-order="{{ item.order }}" 
+                            data-duration="{{ item.meta_settings.duration|default:item.audio_duration }}" 
+                            data-effect="{{ item.meta_settings.video_effects|default:'none' }}" 
+                            data-filter="{{ item.meta_settings.filter|default:'none' }}" 
+                            data-transition="{{ item.meta_settings.transition|default:'none' }}"
+                            data-mirror-x="{% if item.meta_settings.mirror_x %}true{% else %}false{% endif %}"
+                            data-mirror-y="{% if item.meta_settings.mirror_y %}true{% else %}false{% endif %}"
+                            data-text="{{ item.meta_settings.text_overlay.text|default:'' }}" 
+                            data-font="{{ item.meta_settings.text_overlay.font|default:'Arial' }}" 
+                            data-font-color="{{ item.meta_settings.text_overlay.font_color|default:'#FFFFFF' }}" 
+                            data-position="{{ item.meta_settings.text_overlay.position|default:'bottom' }}" 
+                            draggable="true">
                             
-                            <img src="{% if item.prompt.smart_image_url %}{{ item.prompt.smart_image_url }}{% else %}{{ item.prompt.image.url }}{% endif %}" alt="">
+                            <img src="{{ item.prompt.smart_image_url }}" 
+                                alt="" 
+                                style= "
+                                    {% if item.meta_settings.mirror_x and item.meta_settings.mirror_y %}
+                                        transform: scale(-1, -1);
+                                    {% elif item.meta_settings.mirror_x %}
+                                        transform: scaleX(-1);
+                                    {% elif item.meta_settings.mirror_y %}
+                                        transform: scaleY(-1);
+                                    {% endif %}
+                                ">
                             <span class="capcut-badge">Кадр {{ item.order }}</span>
+                            
+                            <div class="clip-fx-status-bar">
+                                <span class="fx-badge badge-anim {% if item.meta_settings.video_effects and item.meta_settings.video_effects != 'none' %}is-active{% endif %}">FX</span>
+                                <span class="fx-badge badge-filter {% if item.meta_settings.filter and item.meta_settings.filter != 'none' %}is-active{% endif %}">🎨</span>
+                                
+                                <span class="fx-badge badge-trans {% if item.meta_settings.transition and item.meta_settings.transition != 'none' %}is-active{% endif %}">🔀</span>
+                                
+                                <span class="fx-badge badge-text {% if item.meta_settings.text_overlay.text %}is-active{% endif %}">📝</span>
+                                
+                                <span class="fx-badge badge-mirror-x" style= "{% if item.meta_settings.mirror_x %}display: inline-block; color: rgb(0, 188, 212);{% else %}display: none;{% endif %}">↔</span>
+                                <span class="fx-badge badge-mirror-y" style= "{% if item.meta_settings.mirror_y %}display: inline-block; color: rgb(0, 188, 212);{% else %}display: none;{% endif %}">↕</span>
+                            </div>
                         </div>
                     {% endif %}
                 {% endfor %}
@@ -36,9 +65,9 @@
                             data-src="{{ item.track.audio_file.url }}"
                             data-order="{{ item.order }}"
                             data-duration="{{ item.audio_duration }}"
-                            data-volume="100"
-                            data-fade-in="0.0"
-                            data-fade-out="0.0">
+                            data-volume="{{ item.meta_settings.audio_effects.volume|default:"100" }}"
+                            data-fade-in="{{ item.meta_settings.audio_effects.fade_in|default:"0.0" }}"
+                            data-fade-out="{{ item.meta_settings.audio_effects.fade_out|default:"0.0" }}">
                             <div class="audio-wave-line">
                                 <span class="play-status-icon">▶</span> 
                                 Озвучка {{ item.order }} ({{ item.audio_duration }}s)
@@ -49,8 +78,6 @@
             </div>
 
             <audio id="global-timeline-player" style="display: none;"></audio>
-
         </div>
-
     </div>
 </footer>

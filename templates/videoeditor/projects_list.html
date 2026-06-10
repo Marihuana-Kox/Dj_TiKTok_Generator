@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+
+{% endblock %}
+
+{% block content %}
+<div class="tiktok-profile-container">
+    
+    <header class="tiktok-profile-header">
+        <h2>🗂️ Готовые проекты ({{ page_obj.paginator.count }})</h2>
+        <span style="color: #888; font-size: 14px;">Тариф: Базовый (Сценариев: до 3, Хранение: 10д)</span>
+    </header>
+
+    <div class="tiktok-videos-grid">
+        {% for item in projects %}
+            <div class="tiktok-video-card">
+                
+                <div class="video-card-thumb" {% if item.first_frame_url %}style="background-image: url('{{ item.first_frame_url }}'); background-size: cover; background-position: center;"{% endif %}>
+                    
+                    <div class="card-top-badges">
+                        <div>
+                            <span class="tiktok-badge badge-ready">Готов</span>
+                        </div>
+                        
+                        <div>
+                            {% if item.release.pj_datatime_clip %}
+                                <span style="font-size: 11px; background: rgba(0,0,0,0.6); padding: 3px 6px; border-radius: 4px; color: #aaa;">
+                                    ⏱️ {{ item.release.pj_datatime_clip|date:"d.m" }}
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card-bottom-info">
+                        <h3 class="video-project-title">{{ item.audio_project.title }}</h3>
+                        
+                        <span class="video-project-date">
+                            📅 Создан: {{ item.audio_project.created_at|date:"d.m.Y" }}
+                        </span>
+
+                        <div class="video-card-actions">
+                            <a href="{{ item.action_url }}" class="tiktok-btn btn-tiktok-primary">
+                                🛠️ Открыть редактор
+                            </a>
+
+                            {% if item.download_url %}
+                                <a href="{{ item.download_url }}" download class="tiktok-btn btn-tiktok-secondary">
+                                    📥 Скачать готовый MP4
+                                </a>
+                            {% endif %}
+                        </div>
+
+                        {% if item.release.pj_config %}
+                            <div class="mini-history-drawer">
+                                <div class="mini-history-title">Конфиги (Max 3):</div>
+                                {% for cfg in item.release.pj_config %}
+                                    <a href="{{ item.action_url }}?restore_cfg={{ cfg.config_id }}" class="mini-scenario-item" title="Открыть этот сценарий в редакторе">
+                                        <span>Сборка #{{ cfg.config_id }}</span>
+                                        <span style="color: #fe2c55;">🎬 {{ cfg.scenes_count }} сцен</span>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+            </div>
+        {% empty %}
+            <div style="grid-column: 1 / -1; text-align: center; padding: 50px; color: #666;">
+                <p style="font-size: 18px;">У вас пока нет полностью готовых видеороликов.</p>
+                <a href="/video/project/create/" class="tiktok-btn btn-tiktok-primary" style="display: inline-block; margin-top: 10px;">Создать проект</a>
+            </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

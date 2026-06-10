@@ -434,6 +434,7 @@ def audio_edit(request, pk):
                 voices_list = voices_dict.get(target_key, [])
 
     # Собираем контекст, подмешивая туда данные из нашей функции
+    print(f"Audio link: {tracks.values}")
     context = {
         "page_title": f"Озвучка: {project.title}",
         "project": project,

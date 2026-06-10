@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Автоматически распределяем изображения по длине аудио при загрузке страницы
     renderFlexibleTimeline();
 
-    // Функция запуска рендеринга / пересборки
+    // Функция запуска рендеринга / пересборки (БЕЗОПАСНАЯ И КОРРЕКТНАЯ ВЕРСИЯ)
     async function initVideoRender(e) {
         if (e) {
             e.preventDefault(); 
@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (progressBar) progressBar.style.width = '5%';
         if (progressPercent) progressPercent.innerText = '5%';
-        if (progressMessage) progressMessage.innerText = '🎬 Инициализация MoviePy и очистка диска...';
+        if (progressMessage) progressMessage.innerText = '🎬 Инициализация MoviePy...';
         
         if (emptyMonitorState) {
             emptyMonitorState.classList.remove('hidden');
@@ -86,48 +86,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const finalTimelinePayload = [];
 
-        if (window.timelineState) {
-            Object.keys(window.timelineState).forEach(order => {
-                const sceneData = window.timelineState[order];
+        // Читаем физический DOM таймлайна, чтобы новые кадры гарантированно попали в сборку
+        const clipsInDOM = document.querySelectorAll('.capcut-clip[data-type="video"]');
+        
+        clipsInDOM.forEach((clip, index) => {
+            const order = index + 1; // Определяем честный порядковый номер кадра на экране
+            
+            // Заглядываем в стейт, если там пусто — подстрахуемся пустым объектом
+            const sceneData = (window.timelineState && window.timelineState[order]) || {};
+            
+            let imageFilename = "";
+            const imgEl = clip.querySelector('img');
+            if (imgEl && imgEl.src) {
+                // Берём чистый относительный путь из атрибута src (например: "/media/projects/velikaya_lozh_kolumba/pic_1.png")
+                // Если там полный URL (http://...), getAttribute('src') всё равно вернёт то, что прописано в HTML
+                let srcPath = imgEl.getAttribute('src');
                 
-                let imageFilename = "";
-                const clipEl = document.querySelector(`.capcut-clip[data-type="video"][data-order="${order}"]`);
-                if (clipEl) {
-                    const imgEl = clipEl.querySelector('img');
-                    if (imgEl) {
-                        const src = imgEl.src;
-                        imageFilename = src.substring(src.lastIndexOf('/') + 1);
+                // На всякий случай убираем домен, если он прилетел с http://
+                if (srcPath.startsWith('http')) {
+                    try {
+                        srcPath = new URL(srcPath).pathname;
+                    } catch(e) {}
+                }
+                
+                imageFilename = srcPath; 
+                console.log("🚀 Передаем на бэкенд полный путь:", imageFilename);
+            }
+            finalTimelinePayload.push({
+                "order": order,
+                "meta_settings": {
+                    "image_name": imageFilename,
+                    "duration": parseFloat(clip.getAttribute('data-duration')) || parseFloat(sceneData.duration) || 17.98,
+                    "video_effects": clip.getAttribute('data-effect') || sceneData.video_effects || 'none',
+                    "filter": clip.getAttribute('data-filter') || sceneData.filter || 'none',
+                    "transition": clip.getAttribute('data-transition') || sceneData.transition || 'none',
+                    "mirror_x": clip.getAttribute('data-mirror-x') === 'true' || sceneData.mirror_x === true,
+                    "mirror_y": clip.getAttribute('data-mirror-y') === 'true' || sceneData.mirror_y === true,
+                    "text_overlay": {
+                        "text": clip.getAttribute('data-text') || sceneData.text_overlay?.text || '',
+                        "font": clip.getAttribute('data-font') || sceneData.text_overlay?.font || 'Arial',
+                        "font_color": clip.getAttribute('data-font-color') || sceneData.text_overlay?.font_color || '#FFFFFF',
+                        "position": clip.getAttribute('data-position') || sceneData.text_overlay?.position || 'bottom'
+                    },
+                    "audio_effects": {
+                        "volume": parseInt(sceneData.audio_effects?.volume || 100),
+                        "fade_in": parseFloat(sceneData.audio_effects?.fade_in || 0.0),
+                        "fade_out": parseFloat(sceneData.audio_effects?.fade_out || 0.0)
                     }
                 }
-
-                finalTimelinePayload.push({
-                    "order": parseInt(order),
-                    "meta_settings": {
-                        "image_name": imageFilename,
-                        "duration": parseFloat(sceneData.duration) || 5.0,
-                        "video_effects": sceneData.video_effects || 'none',
-                        "filter": sceneData.filter || 'none',
-                        "transition": sceneData.transition || 'none',
-                        "mirror_x": sceneData.mirror_x || false,
-                        "mirror_y": sceneData.mirror_y || false,
-                        "text_overlay": {
-                            "text": sceneData.text_overlay?.text || '',
-                            "font": sceneData.text_overlay?.font || 'Arial',
-                            "font_color": sceneData.text_overlay?.font_color || '#FFFFFF',
-                            "position": sceneData.text_overlay?.position || 'bottom'
-                        },
-                        "audio_effects": {
-                            "volume": parseInt(sceneData.audio_effects?.volume || 100),
-                            "fade_in": parseFloat(sceneData.audio_effects?.fade_in || 0.0),
-                            "fade_out": parseFloat(sceneData.audio_effects?.fade_out || 0.0)
-                        }
-                    }
-                });
             });
-        }
+        });
+
+        console.log("📦 Сформирован Payload для отправки на РЕНДЕР:", finalTimelinePayload);
 
         try {
-            let response = await fetch(window.location.href, {
+            let currentUrl = window.location.pathname; 
+            if (!currentUrl.endsWith('/')) {
+                currentUrl += '/';
+            }
+            const startRenderUrl = currentUrl + 'start-render/';
+
+            let response = await fetch(startRenderUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -140,11 +159,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
 
-            let data = await response.json();
-            console.log("Ответ сервера на старт:", data);
+            // Безопасно перехватываем ответ сервера в виде текста, защищаясь от HTML-страниц
+            let responseText = await response.text();
+            let data;
+            
+            try {
+                data = JSON.parse(responseText);
+            } catch (jsonErr) {
+                console.error('💥 Ошибка! Сервер вместо JSON для рендера прислал HTML.');
+                console.error('👉 Ответ сервера:\n', responseText.substring(0, 1000));
+                alert('Ошибка сборки! Сервер вернул некорректный ответ. Подробности выведены в консоль (F12).');
+                resetButtons();
+                return;
+            }
             
             if ((data.success || data.status === 'success') && data.task_id) {
-                startPolling(data.task_id);
+                console.log("🚀 Рендеринг успешно запущен! Task ID:", data.task_id);
+                startPolling(data.task_id); // Вызываем твою родную функцию опроса состояния задачи
             } else {
                 alert('Ошибка запуска: ' + (data.error || data.message || 'Неизвестная ошибка сервера.'));
                 resetButtons();
@@ -154,110 +185,80 @@ document.addEventListener('DOMContentLoaded', () => {
             resetButtons();
         }
     }
-
-    if (renderButton) {
-        renderButton.addEventListener('click', initVideoRender);
-    } else {
-        console.error("❌ ВНИМАНИЕ: Кнопка с id='startRenderBtn' не найдена в HTML!");
-    }
-
     function startPolling(taskId) {
-        console.log(`⏱️ Включаем цикличный опрос сервера для Task ID: ${taskId}`);
+        if (checkProgressInterval) clearInterval(checkProgressInterval);
+        
+        console.log("🕵️‍♂️ Запущен процесс опроса статуса генерации для задачи:", taskId);
+
         checkProgressInterval = setInterval(async () => {
             try {
-                let response = await fetch(`${window.location.href}?task_id=${taskId}`, {
+                // СТРОИМ ПРАВИЛЬНЫЙ ПУТЬ К СТАТУСУ: вместо "/video/project/18/?task_id=..."
+                // отправляем на "/video/project/18/start-render/?task_id=..." или твой выделенный роут.
+                // Так как файл статуса создается в той же директории, логично спросить у нашего нового эндпоинта.
+                let currentUrl = window.location.pathname;
+                if (!currentUrl.endsWith('/')) currentUrl += '/';
+                
+                // Делаем запрос к start-render, но методом GET, чтобы получить статус JSON, а не запуск
+                const statusUrl = `${currentUrl}start-render/?task_id=${taskId}`;
+
+                let response = await fetch(statusUrl, {
+                    method: 'GET', // Важно: GET запрос просто читает статус
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 });
+
+                if (!response.ok) {
+                    console.warn("⚠️ Сервер статуса ответил кодом:", response.status);
+                    return;
+                }
+
                 let data = await response.json();
-                console.log("📊 Ответ сервера (GET статус):", data);
+                console.log("📊 Текущий статус из файла:", data);
 
-                if (data.percent !== undefined) {
-                    if (progressBar) progressBar.style.width = data.percent + '%';
-                    if (progressPercent) progressPercent.innerText = data.percent + '%';
-                }
-                if (data.message && progressMessage) {
-                    progressMessage.innerText = data.message;
-                }
-
-                if (data.status === 'error') {
+                if (data.status === 'running') {
+                    if (progressBar) progressBar.style.width = `${data.progress}%`;
+                    if (progressPercent) progressPercent.innerText = `${data.progress}%`;
+                    if (progressMessage) progressMessage.innerText = data.message || '🎬 Рендеринг видео...';
+                } 
+                else if (data.status === 'completed' || data.status === 'success') {
                     clearInterval(checkProgressInterval);
-                    alert('Ошибка рендеринга: ' + data.message);
+                    if (progressBar) progressBar.style.width = '100%';
+                    if (progressPercent) progressPercent.innerText = '100%';
+                    if (progressMessage) progressMessage.innerText = '🎉 Видео успешно собрано!';
+                    
+                    // Показываем плеер с готовым видео
+                    if (videoPlayer) {
+                        videoPlayer.src = data.video_url;
+                        videoPlayer.load();
+                        videoPlayer.style.display = 'block';
+                        videoPlayer.classList.remove('hidden');
+                    }
+                    if (videoResultBlock) {
+                        videoResultBlock.classList.remove('hidden');
+                        videoResultBlock.style.display = 'block';
+                    }
+                    if (downloadVideoBtn) {
+                        downloadVideoBtn.href = data.video_url;
+                        downloadVideoBtn.style.display = 'inline-block';
+                        downloadVideoBtn.classList.remove('hidden');
+                    }
+                    if (emptyMonitorState) {
+                        emptyMonitorState.classList.add('hidden');
+                        emptyMonitorState.style.display = 'none';
+                    }
+                    if (progressBlock) {
+                        progressBlock.classList.add('hidden');
+                        progressBlock.style.display = 'none';
+                    }
+                } 
+                else if (data.status === 'failed' || data.status === 'error') {
+                    clearInterval(checkProgressInterval);
+                    alert('💥 Ошибка рендеринга MoviePy: ' + (data.message || data.error || 'Неизвестный сбой'));
                     resetButtons();
                 }
-
-                const isFinished = data.status === 'done' || 
-                                   data.status === 'success' || 
-                                   data.completed === true ||
-                                   (data.percent === 100 && data.video_url);
-
-                if (isFinished) {
-                    clearInterval(checkProgressInterval);
-                    console.log("🎉 Видео полностью собрано на сервере! Запрашиваем готовый плеер...");
-
-                    if (progressBlock) progressBlock.style.display = 'none';
-                    if (emptyMonitorState) emptyMonitorState.style.display = 'none';
-
-                    fetch(window.location.href)
-                        .then(response => response.text())
-                        .then(html => {
-                            const parser = new DOMParser();
-                            const doc = parser.parseFromString(html, 'text/html');
-
-                            const newPlayer = doc.getElementById('main-editor-player');
-                            const oldPlayer = document.getElementById('main-editor-player');
-
-                            if (newPlayer && oldPlayer) {
-                                console.log("📺 Найдено готовое видео! Перезагружаем DOM-элемент плеера...");
-                                
-                                oldPlayer.outerHTML = newPlayer.outerHTML;
-
-                                const reloadedPlayer = document.getElementById('main-editor-player');
-                                if (reloadedPlayer) {
-                                    reloadedPlayer.classList.remove('hidden');
-                                    reloadedPlayer.style.display = 'block';
-                                    
-                                    const currentSrc = reloadedPlayer.src || reloadedPlayer.querySelector('source')?.src;
-                                    if (currentSrc) {
-                                        const freshUrl = currentSrc.split('?')[0] + '?t=' + new Date().getTime();
-                                        reloadedPlayer.src = freshUrl;
-                                    }
-                                    
-                                    reloadedPlayer.load();
-                                    reloadedPlayer.play().catch(e => {
-                                        console.log("▶️ Автоплей заблокирован браузером, видео готово к просмотру по клику.");
-                                    });
-                                }
-                            } else {
-                                console.warn("⚠️ Не удалось найти плеер в ответе сервера. Перезагружаем страницу целиком...");
-                                window.location.reload();
-                            }
-
-                            if (downloadVideoBtn) {
-                                const currentProjectId = window.location.pathname.split('/')[3];
-                                downloadVideoBtn.setAttribute('href', `/video/project/${currentProjectId}/download/`);
-                                downloadVideoBtn.setAttribute('download', `project_${currentProjectId}.mp4`);
-                                downloadVideoBtn.classList.remove('hidden');
-                                downloadVideoBtn.style.display = 'inline-flex';
-                                downloadVideoBtn.onclick = null;
-                            }
-
-                            if (renderButton) {
-                                renderButton.disabled = false;
-                                renderButton.className = 'capcut-btn-secondary';
-                                renderButton.innerHTML = '🔄 Пересобрать заново';
-                                renderButton.classList.remove('hidden');
-                                renderButton.style.display = 'inline-flex';
-                            }
-                        })
-                        .catch(err => {
-                            console.error("💥 Ошибка AJAX запроса плеера:", err);
-                            window.location.reload();
-                        });
-                }
             } catch (err) {
-                console.error('❌ Ошибка при опросе прогресса:', err);
+                console.error("💥 Ошибка при получении статуса задачи:", err);
             }
-        }, 1500);
+        }, 1500); // Опрашиваем сервер раз в 1.5 секунды
     }
 
     function resetButtons() {
@@ -267,6 +268,9 @@ document.addEventListener('DOMContentLoaded', () => {
             renderButton.classList.remove('hidden');
         }
         if (progressBlock) progressBlock.style.display = 'none';
+    }
+    if (renderButton) {
+        renderButton.addEventListener('click', initVideoRender);
     }
 });
 
@@ -285,12 +289,9 @@ function renderFlexibleTimeline() {
 
     let totalAudioDuration = 0;
     audioClips.forEach(clip => {
-        // Заменяем запятую на точку, чтобы JavaScript прочитал сотые доли секунд
         let rawDuration = (clip.getAttribute('data-duration') || "0").replace(',', '.');
         totalAudioDuration += parseFloat(rawDuration) || 0;
     });
-
-    console.log(totalAudioDuration)
 
     if (totalAudioDuration === 0) totalAudioDuration = 30; 
     if (audioDisplay) audioDisplay.innerText = totalAudioDuration.toFixed(2);
@@ -298,11 +299,7 @@ function renderFlexibleTimeline() {
     let totalVideoDuration = 0;
     const autoAlignCheckbox = document.getElementById('auto-align-audio');
 
-    // ================================================================
-    // РЕЖИМ А: Свободный (Ручной) режим — берем честную сумму data-duration
-    // ================================================================
     if (autoAlignCheckbox && !autoAlignCheckbox.checked) {
-        
         videoClips.forEach(clip => {
             const order = parseInt(clip.getAttribute('data-order'));
             
@@ -325,18 +322,12 @@ function renderFlexibleTimeline() {
             }
 
             clip.style.width = (finalClipDuration * pixelsPerSecond) + 'px';
-            
-            // 🔥 ЧЕСТНОЕ СЛОЖЕНИЕ: Прибавляем реальную длину кадра к общему хронометражу
             totalVideoDuration += finalClipDuration; 
             
             if (typeof window.updateBadgesVisibility === 'function') {
                 window.updateBadgesVisibility(order);
             }
         });
-
-    // ================================================================
-    // РЕЖИМ Б: Автоматический подгон под звук (Магнит)
-    // ================================================================
     } else {
         if (videoClips.length > 0) {
             const baseDurationPerImage = totalAudioDuration / videoClips.length;
@@ -436,10 +427,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
-
-window.updateTimelineAfterDOMChange = function() {
-    console.log("🧩 DOM таймлайна изменился. Выполняем пересчет...");
-    if (typeof window.renderFlexibleTimeline === 'function') {
-        window.renderFlexibleTimeline();
-    }
-};

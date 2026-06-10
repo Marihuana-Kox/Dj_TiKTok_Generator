@@ -85,7 +85,7 @@
             <div class="colom-custom position-right">
                 <div class="col-md-3 mb-2 flex flex-column justify-content-end video-button-create">
                 <label class="form-label text-small">🎞️ Финальный шаг ролика:</label>
-                <a href="/video/project/{{ project.id }}/edit/" 
+                <a href="/video/project/{{ project.id }}/" 
                 id="go-to-video-editor-btn" 
                 class="btn btn-success w-100 flex items-center justify-content-center gap-2 fw-bold {% if not project_ready %}disabled{% endif %}"
                 {% if not project_ready %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}>
@@ -151,7 +151,7 @@
                             <div class="audio-player-container-{{ track.id }}">
                                 {% if track.audio_file %}
                                 <div class="audio-container-box flex align-items-center justify-content-center">
-                                    <audio src="{{ track.audio_file }}" controls class="w-100"></audio>
+                                    <audio src="{{ track.audio_file.url }}" controls class="w-100"></audio>
                                 </div>
                                 {% else %}
                                 <div class="voice-empty flex align-items-center justify-content-center">

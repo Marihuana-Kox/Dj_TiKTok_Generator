@@ -27,41 +27,7 @@
 
             <div class="media-resources-container">
                 
-                <div class="resource-pool-pane active" id="images-pool">
-                    <div class="media-grid-images">
-                        {% for item in timeline_data %}
-                            {% if item.prompt.smart_image_url or item.prompt.image %}
-                                <div class="image-asset-card" data-asset-id="{{ item.prompt.id }}" data-order="{{ item.order }}">
-                                    <div class="asset-thumb-box">
-                                        <img src="{{ item.prompt.smart_image_url|default:item.prompt.image.url }}" alt="Кадр {{ item.order }}">
-                                        <span class="asset-index-badge">#{{ item.order }}</span>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div class="resource-pool-pane" id="audio-pool">
-                    <div class="media-list-audio">
-                        {% for item in timeline_data %}
-                            {% if item.track.audio_file %}
-                                <div class="audio-asset-card" data-asset-id="{{ item.track.id }}" data-src="{{ item.track.audio_file.url }}" data-order="{{ item.order }}">
-                                    <div class="audio-asset-info">
-                                        <span class="audio-icon">🎵</span>
-                                        <span class="audio-name">Аудио Сцены #{{ item.order }}</span>
-                                        <span class="audio-duration-tag">mp3</span>
-                                    </div>
-                                </div>
-                            {% else %}
-                                <div class="audio-asset-card-empty">
-                                    <span class="audio-icon">⚠️</span>
-                                    <span class="audio-name" style="color: #555;">Сцена #{{ item.order }} (Без звука)</span>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                </div>
+                {% include 'videoeditor/includes/resource_panel.html' %}
                 
             </div>
             {% include 'videoeditor/includes/editor_panel.html' %}

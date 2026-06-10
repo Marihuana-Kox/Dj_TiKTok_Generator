@@ -56,7 +56,6 @@ window.toggleSettings = function(show) {
                 if (typeof window.startProgressTracking === 'function') {
                     window.openModal('progress-modal');
                     window.startProgressTracking('/images/api/generation-stream/', data.task_id, 'progress-modal');
-                    // window.startProgressTracking('/images/api/generation-progress/', data.task_id);
                 }
             } else {
                 alert('❌ ' + (data.error || 'Ошибка запуска'));

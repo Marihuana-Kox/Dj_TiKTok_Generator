@@ -1,0 +1,42 @@
+ <div class="resource-pool-pane active" id="images-pool">
+                    <div class="media-grid-images">
+                        {% for item in prompts %}
+                            {% if item.image %}
+                                <div class="image-asset-card" data-asset-id="{{ item.prompt.id }}" data-order="{{ item.order }}">
+                                    <div class="asset-thumb-box">
+                                        <div class="resource-action-btn">↩️</div>
+                                        <img src="{{ item.image.url }}" alt="Кадр {{ item.order }}">
+                                        <span class="asset-index-badge">№ {{ item.order }}</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="resource-pool-pane" id="audio-pool">
+                    <div class="media-list-audio">
+                        {% for item in timeline_data %}
+                            {% if item.track and item.track.audio_file %}
+                                <div class="audio-asset-card" data-asset-id="{{ item.track.id }}" data-src="{{ item.track.audio_file.url }}" data-order="{{ item.order }}">
+                                    <div class="audio-asset-info">
+                                        <span class="audio-icon">🎵</span>
+                                        <span class="audio-name">Аудио Сцены #{{ item.order }}</span>
+                                        <span class="audio-duration-tag">{{ item.audio_duration }}s</span>
+                                    </div>
+
+                                    <div class="tab-audio-timeline-track">
+                                        <div class="tab-audio-timeline-fill" style="width: calc({{ item.audio_duration|stringformat:"f" }} * 8px);"></div>
+                                    </div>
+
+                                    <div class="audio-asset-actions">
+                                        <button class="audio-tab-play-btn">
+                                            <span class="play-icon">▶</span>
+                                        </button>
+                                        <audio class="tab-internal-player" src="{{ item.track.audio_file.url }}" preload="none"></audio>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
