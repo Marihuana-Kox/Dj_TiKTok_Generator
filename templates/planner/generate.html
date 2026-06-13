@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Создать TikTok сценарий{% endblock %}
+
+{% block content %}
+<div class="editor-wrapper">
+    <div class="flex flex-between mb-2">
+        <a href="{% url 'shorts:dashboard' %}" class="text-muted">&larr; НАЗАД</a>
+        <h1>Новый TikTok сценарий</h1>
+    </div>
+
+    <!-- ДОБАВЛЕН ID "generate-form" ДЛЯ JS-ПЕРЕХВАТА -->
+    <form method="post" class="card" id="generate-form">
+        {% csrf_token %}
+
+        <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 15px;">
+            <label class="form-label">{{ form.ai_provider.label }}</label>
+            {{ form.ai_provider }}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.research_project.label }}</label>
+            {{ form.research_project }}
+            {% if form.research_project.errors %}
+                <small class="text-muted">{{ form.research_project.errors }}</small>
+            {% endif %}
+                <small class="text-muted">{{ form.research_project.help_text }}</small>
+        </div>
+
+        <div class="card" style="background: rgba(15, 23, 42, 0.55); margin: 20px 0;">
+            <h3 style="margin-top: 0;">Что будет создано</h3>
+            <small class="text-muted">GPT сам выберет DOCUMENTARY, SHOCK или THEORY.</small>
+            <p class="text-muted" style="margin-bottom: 0;">
+                Один JSON: style, hook, voiceover и 4-7 сцен с текстом, cinematic image prompts и длительностью.
+            </p>
+        </div>
+
+        <div class="flex mt-2 border-top pt-2">
+            <button type="submit" class="btn btn-success">Сгенерировать</button>
+            <a href="{% url 'shorts:dashboard' %}" class="btn btn-outline">Отмена</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

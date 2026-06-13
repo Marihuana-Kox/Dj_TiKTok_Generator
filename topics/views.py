@@ -9,13 +9,109 @@ from django.http import StreamingHttpResponse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import render, redirect, get_object_or_404
 
-from topics.models import VideoProject
-from .forms import GenerateIdeasForm, VideoProjectEditForm
-from .services import generate_unique_ideas
+from shorts.progressbar import ProgressManager, sse_progress_view
+from topics.models import ResearchProject, VideoProject
+from .forms import (
+    GenerateIdeasForm,
+    ResearchProjectEditForm,
+    VideoProjectEditForm,
+    GenerateResearchForm,
+)
+from .services import generate_research_data, generate_unique_ideas  # , generate_research_json
+# from .progressbar import ProgressManager, sse_progress_view
 
 # Время жизни записи в кэше (секунды).
 # Прогресс будет храниться 1 час, даже если что-то пойдет не так.
 CACHE_TIMEOUT = 3600
+
+
+def generate_research_view(request):
+    """Модуль, который запускает исследование с прогресс-баром через ProgressManager и SSE."""
+    if request.method == "POST":
+        form = GenerateResearchForm(request.POST)
+
+        if form.is_valid():
+            topic = form.cleaned_data["topic"]
+            provider = form.cleaned_data["ai_provider"]
+            style = form.cleaned_data.get("research_style", "random")
+            focus_notes = form.cleaned_data.get("focus_notes", "")
+
+            # 1. Создаём заготовку проекта
+            project = ResearchProject.objects.create(
+                topic=topic,
+                provider=provider,
+                status="processing",
+            )
+
+            task_id = str(uuid.uuid4())
+            redirect_url = f"/topics/edit-research/{project.pk}/"
+
+            # 2. Инициализируем наш ProgressManager (вместо ручного cache.set)
+            pb = ProgressManager(task_id=task_id, redirect_url=redirect_url, timeout=CACHE_TIMEOUT)
+            pb.init("🚀 Запуск исследования...", log_msg=f"Стиль: {style}")
+
+            # 3. Фоновая задача
+            def run_research():
+                try:
+                    pb.update(15, "🤖 Отправка запроса к AI...", log_msg="Промпт сформирован")
+
+                    # 🔥 РЕАЛЬНЫЙ ВЫЗОВ СЕРВИСА ГЕНЕРАЦИИ
+                    research_json = generate_research_data(
+                        topic=topic, provider_name=provider, style=style, focus_notes=focus_notes
+                    )
+
+                    pb.update(
+                        60,
+                        "✅ Ответ получен. Валидация JSON...",
+                        log_msg="Структура проверена и нормализована",
+                    )
+
+                    # Сохраняем результат в JSONField модели
+                    project.research_data = research_json
+                    project.status = "pending"
+                    project.save()
+
+                    pb.update(90, "💾 Данные сохранены в базу...", log_msg="Готово")
+                    pb.done(100, "✅ Исследование успешно завершено!", log_msg="Готово к просмотру")
+
+                except Exception as exc:
+                    print(f"❌ Ошибка исследования {task_id}: {exc}")
+                    project.status = "failed"
+                    project.error_message = str(exc)
+                    project.save()
+
+                    # Используем метод fail из ProgressManager
+                    pb.fail(str(exc))
+
+                finally:
+                    from django.db import connection
+
+                    connection.close()
+
+            # Запуск фонового потока
+            threading.Thread(target=run_research, daemon=True).start()
+
+            # 4. Ответ для фронтенда (AJAX)
+            if (
+                request.headers.get("x-requested-with") == "XMLHttpRequest"
+                or request.content_type == "application/json"
+            ):
+                # Добавляем stream_url, чтобы modal.js знал, куда подключаться
+                stream_url = f"/topics/generate_stream/?task_id={task_id}"
+                return JsonResponse({"status": "ok", "task_id": task_id, "stream_url": stream_url})
+
+            messages.success(request, "Генерация исследования запущена в фоне.")
+            return redirect("topics:dashboard_research")
+
+        else:
+            if request.content_type == "application/json":
+                return JsonResponse({"status": "error", "errors": form.errors}, status=400)
+            messages.error(request, "Ошибка в форме.")
+    else:
+        form = GenerateResearchForm()
+
+    # Переиспользуем шаблон генерации
+    return render(request, "topics/generate_research.html", {"form": form})
 
 
 def generate_idea_view(request):
@@ -114,9 +210,9 @@ def generate_idea_view(request):
                         callback=callback,
                     )
                     final_steps = [
-                        (92, "💾 Подготовка данных для сохранения..."),
-                        (94, "🔍 Валидация структуры идей..."),
-                        (97, "📝 Запись в базу данных..."),
+                        (87, "💾 Подготовка данных для сохранения..."),
+                        (91, "🔍 Валидация структуры идей..."),
+                        (95, "📝 Запись в базу данных..."),
                         (99, "⚙️ Финализация транзакций..."),
                     ]
 
@@ -170,40 +266,11 @@ def generate_stream(request):
     """SSE поток, который РЕАЛЬНО читает прогресс из кэша"""
     task_id = request.GET.get("task_id")
 
-    def event_stream(t_id):
-        last_percent = -1
-
-        while True:
-            # Читаем то, что пишет функция run_generation
-            data = cache.get(f"progress_{t_id}")
-
-            if not data:
-                # Если задача еще не успела создаться в кэше
-                yield f"data: {json.dumps({'status': 'waiting', 'message': 'Подключение...'})}\n\n"
-                time.sleep(1)
-                continue
-
-            current_status = data.get("status")
-            current_percent = data.get("percent", 0)
-
-            # Отправляем данные только если есть изменения
-            if current_percent != last_percent or current_status in ["done", "error"]:
-                yield f"data: {json.dumps(data)}\n\n"
-                last_percent = current_percent
-
-                # Если сервер проставил 'done', закрываем поток SSE
-                if current_status in ["done", "error"]:
-                    break
-
-            time.sleep(1)  # Проверяем кэш раз в секунду
-
     if not task_id:
         return JsonResponse({"error": "No task_id"}, status=400)
 
-    response = StreamingHttpResponse(event_stream(task_id), content_type="text/event-stream")
-    response["Cache-Control"] = "no-cache"
-    response["X-Accel-Buffering"] = "no"
-    return response
+    # Полностью заменяем ручную логику while True на нашу готовую функцию из progressbar.py
+    return sse_progress_view(request, task_id, timeout=CACHE_TIMEOUT)
 
 
 def dashboard(request):
@@ -289,6 +356,89 @@ def dashboard(request):
     return render(request, "topics/dashboard.html", context)
 
 
+def dashboard_research(request):
+    # --- ОБРАБОТКА УДАЛЕНИЯ И СМЕНЫ СТАТУСА ---
+    if request.method == "POST":
+        action = request.POST.get("action")
+        selected_ids = request.POST.getlist("selected_ideas")
+
+        if selected_ids:
+            ideas = ResearchProject.objects.filter(id__in=selected_ids)
+
+            if action == "delete_selected":
+                count, _ = ideas.delete()
+                messages.success(request, f"✅ Удалено {count} идей.")
+
+            elif action == "change_status":
+                new_status = request.POST.get("new_status")
+                if new_status:
+                    # Обновляем статус у всех выбранных идей
+                    ideas.update(status=new_status)
+                    messages.success(
+                        request, f"✅ Статус изменен на «{new_status}» для {ideas.count()} идей."
+                    )
+                else:
+                    messages.warning(request, "⚠️ Не выбран новый статус.")
+        else:
+            messages.warning(request, "⚠️ Вы не выбрали ни одной идеи.")
+
+        return redirect("topics:dashboard_research")
+
+    # Статистика (без изменений)
+    stats = {
+        "total": ResearchProject.objects.count(),
+        "new": ResearchProject.objects.filter(status="new").count(),
+        "pending": ResearchProject.objects.filter(status="pending").count(),
+        "done": ResearchProject.objects.filter(status="completed").count(),
+    }
+
+    # Список последних идей (без изменений)
+    research_ideas = ResearchProject.objects.all().order_by("-created_at")[:50]
+
+    # --- НАСТРОЙКА ПАГИНАЦИИ (без изменений) ---
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(research_ideas, 20)
+
+    try:
+        research_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        research_page = paginator.page(1)
+    except EmptyPage:
+        research_page = paginator.page(paginator.num_pages)
+
+    # --- ДОБАВЛЕНО: РАСЧЕТ ОБРАТНОЙ НУМЕРАЦИИ ---
+    total_count = research_ideas.count()  # Общее количество идей
+    per_page = 20  # Количество на странице
+
+    # Номер первой идеи на этой странице (с конца)
+    start_num = total_count - ((research_page.number - 1) * per_page)
+
+    # Номер последней идеи на этой странице
+    count_on_page = len(research_page.object_list)
+    end_num = start_num - count_on_page + 1
+
+    # Защита от нуля или отрицательных чисел
+    if total_count == 0:
+        start_num = 0
+        end_num = 0
+
+    # ГЕНЕРАЦИЯ СПИСКА НОМЕРОВ (70, 69, 68...)
+    row_numbers = range(start_num, end_num - 1, -1)
+
+    # СОЕДИНЕНИЕ ИДЕЙ С НОМЕРАМИ
+    research_with_numbers = zip(research_page.object_list, row_numbers)
+
+    context = {
+        "stats": stats,
+        "ideas_with_numbers": research_with_numbers,
+        "page_obj": research_page,
+        "total_count": total_count,
+        "start_num": start_num,
+        "end_num": end_num,
+    }
+    return render(request, "topics/dashboard_research.html", context)
+
+
 def project_edit(request, pk):
     # Получаем проект или 404
     project = get_object_or_404(VideoProject, pk=pk)
@@ -308,3 +458,64 @@ def project_edit(request, pk):
 
     context = {"form": form, "project": project}
     return render(request, "topics/project_edit.html", context)
+
+
+def research_edit(request, pk):
+    # Получаем проект или 404
+    project = get_object_or_404(ResearchProject, pk=pk)
+
+    if request.method == "POST":
+        form = ResearchProjectEditForm(request.POST, instance=project)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "✅ Идеи успешно сохранены!")
+            # Перезагружаем страницу, чтобы увидеть изменения
+            return redirect("topics:research_edit", pk=pk)
+        else:
+            messages.error(request, "❌ Ошибка при сохранении. Проверьте поля.")
+    else:
+        # Если GET запрос, просто создаем форму с текущими данными
+        form = ResearchProjectEditForm(instance=project)
+
+    context = {"form": form, "project": project}
+    return render(request, "topics/research_edit.html", context)
+
+
+# def generate_stream(request):
+#     """SSE поток, который РЕАЛЬНО читает прогресс из кэша"""
+#     task_id = request.GET.get("task_id")
+
+#     def event_stream(t_id):
+#         last_percent = -1
+
+#         while True:
+#             # Читаем то, что пишет функция run_generation
+#             data = cache.get(f"progress_{t_id}")
+
+#             if not data:
+#                 # Если задача еще не успела создаться в кэше
+#                 yield f"data: {json.dumps({'status': 'waiting', 'message': 'Подключение...'})}\n\n"
+#                 time.sleep(1)
+#                 continue
+
+#             current_status = data.get("status")
+#             current_percent = data.get("percent", 0)
+
+#             # Отправляем данные только если есть изменения
+#             if current_percent != last_percent or current_status in ["done", "error"]:
+#                 yield f"data: {json.dumps(data)}\n\n"
+#                 last_percent = current_percent
+
+#                 # Если сервер проставил 'done', закрываем поток SSE
+#                 if current_status in ["done", "error"]:
+#                     break
+
+#             time.sleep(1)  # Проверяем кэш раз в секунду
+
+#     if not task_id:
+#         return JsonResponse({"error": "No task_id"}, status=400)
+
+#     response = StreamingHttpResponse(event_stream(task_id), content_type="text/event-stream")
+#     response["Cache-Control"] = "no-cache"
+#     response["X-Accel-Buffering"] = "no"
+#     return response

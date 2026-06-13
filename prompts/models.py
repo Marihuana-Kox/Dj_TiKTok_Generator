@@ -3,14 +3,19 @@ from django.db import models
 
 class BasePrompt(models.Model):
     """Базовый класс для общих полей"""
+
     name = models.CharField("Название", max_length=100)
     code_name = models.SlugField(
-        "Кодовое имя", unique=True, help_text="Уникальный ID для кода, например 'idea_facts_v1'")
+        "Кодовое имя", unique=True, help_text="Уникальный ID для кода, например 'idea_facts_v1'"
+    )
     description = models.TextField(
-        "Описание", blank=True, help_text="Для чего этот промпт? (на русском)")
+        "Описание", blank=True, help_text="Для чего этот промпт? (на русском)"
+    )
 
     template_content = models.TextField(
-        "Текст промпта (EN)", help_text="Шаблон на английском. Переменные: {topic}, {context}, {language} и т.д.")
+        "Текст промпта (EN)",
+        help_text="Шаблон на английском. Переменные: {topic}, {context}, {language} и т.д.",
+    )
 
     is_active = models.BooleanField("pending", default=True)
     version = models.CharField("Версия", max_length=20, default="1.0")
@@ -26,33 +31,30 @@ class BasePrompt(models.Model):
     def render(self, **kwargs):
         try:
             # Добавляем язык по умолчанию, если не передан
-            if 'language' not in kwargs:
-                kwargs['language'] = 'Russian'
+            if "language" not in kwargs:
+                kwargs["language"] = "Russian"
             return self.template_content.format(**kwargs)
         except KeyError as e:
             raise ValueError(f"Missing variable in prompt: {e}")
 
+
 # --- ТАБЛИЦА 1: Промпты для ИДЕЙ ---
-
-
 class IdeaPrompt(BasePrompt):
     STYLE_CHOICES = [
-        ('facts', 'Факты и Вопросы'),
-        ('sensational', 'Сенсационный/Кликбейт'),
-        ('mystery', 'Загадки и Тайны'),
-        ('educational', 'Образовательный/Строгий'),
+        ("facts", "Факты и Вопросы"),
+        ("sensational", "Сенсационный/Кликбейт"),
+        ("mystery", "Загадки и Тайны"),
+        ("educational", "Образовательный/Строгий"),
     ]
-    style = models.CharField(
-        "Стиль подачи", max_length=50, choices=STYLE_CHOICES, default='facts')
+    style = models.CharField("Стиль подачи", max_length=50, choices=STYLE_CHOICES, default="facts")
 
     class Meta:
         verbose_name = "Промпт для Идеи"
         verbose_name_plural = "1. Промпты для Идей"
-        ordering = ['-is_active', 'style']
+        ordering = ["-is_active", "style"]
+
 
 # --- ТАБЛИЦА 2: Промпты для ПЛАНА/СТРУКТУРЫ ---
-
-
 class SystemInstruction(BasePrompt):
     """
     Универсальное хранилище для любых системных инструкций:
@@ -78,15 +80,15 @@ class SystemInstruction(BasePrompt):
     class Meta:
         verbose_name = "Системная Инструкция"
         verbose_name_plural = "2. Системные Инструкции"
-        ordering = ['-is_active', '-created_at']
+        ordering = ["-is_active", "-created_at"]
+
 
 # --- ТАБЛИЦА 3: Промпты для СТАТЕЙ ---
-
-
 class ArticlePrompt(BasePrompt):
     """
     Промпты для написания полного текста статьи на основе плана.
     """
+
     # Связь с планом: Можно выбрать дефолтный план для этого промпта статьи
     # Но лучше выбирать их независимо при генерации.
     # Если нужна жесткая связка "Многие к одному" (одна статья использует один план),
@@ -96,11 +98,10 @@ class ArticlePrompt(BasePrompt):
     class Meta:
         verbose_name = "Промпт для Статьи"
         verbose_name_plural = "3. Промпты для Статей"
-        ordering = ['-is_active', '-created_at']
+        ordering = ["-is_active", "-created_at"]
 
 
 # --- ТАБЛИЦА 4: Промпты для ГЕНЕРАЦИИ ИЗОБРАЖЕНИЙ (Раскадровка) ---
-
 class ImagePromptTemplate(BasePrompt):
     """
     Шаблоны промптов для генерации раскадровки (сцен) на основе текста статьи.
@@ -116,24 +117,54 @@ class ImagePromptTemplate(BasePrompt):
     """
 
     OUTPUT_FORMAT_CHOICES = [
-        ('json_list', 'JSON List ( [{"desc": "...", "prompt": "..."}] )'),
-        ('json_object', 'JSON Object ( {"scenes": [...]} )'),
-        ('markdown', 'Markdown Table'),
+        ("json_list", 'JSON List ( [{"desc": "...", "prompt": "..."}] )'),
+        ("json_object", 'JSON Object ( {"scenes": [...]} )'),
+        ("markdown", "Markdown Table"),
     ]
 
     preferred_format = models.CharField(
         "Предпочитаемый формат ответа",
         max_length=20,
         choices=OUTPUT_FORMAT_CHOICES,
-        default='json_list',
-        help_text="Подсказка для модели, в каком формате вернуть данные."
+        default="json_list",
+        help_text="Подсказка для модели, в каком формате вернуть данные.",
     )
 
     class Meta:
         verbose_name = "Шаблон для Изображений (Раскадровка)"
         verbose_name_plural = "4. Промпты для Изображений"
-        ordering = ['-is_active', '-created_at']
+        ordering = ["-is_active", "-created_at"]
 
     def __str__(self):
         status = "✅" if self.is_active else "❌"
         return f"{status} [IMG] [{self.code_name}] {self.name}"
+
+
+# --- ТАБЛИЦА 5: Промпты для ГЕНЕРАЦИИ SCHORTS БЛОК СЦЕНАРИЕВ ---
+class ScriptPrompt(models.Model):
+    STYLE_CHOICES = [
+        ("UNIVERSAL", "Универсальный (AI сам выбирает)"),
+        ("DOCUMENTARY", "Documentary"),
+        ("SHOCK", "Shock"),
+        ("THEORY", "Theory"),
+    ]
+    code = models.SlugField("Код промпта", unique=True, help_text="Например: universal, shock, doc")
+    name = models.CharField("Название", max_length=100)
+    prompt_text = models.TextField("Текст промпта")
+    config = models.JSONField(
+        "Настройки генерации",
+        default=dict,
+        blank=True,
+        help_text='{"min_scenes": 4, "max_scenes": 7, "lang": "en"}',
+    )
+    is_active = models.BooleanField("Активен", default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Промпт для сценария"
+        verbose_name_plural = "5. Промпты для сценариев"
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.name} [{self.code}]"

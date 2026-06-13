@@ -1,8 +1,8 @@
 from django import forms
 
-from topics.models import VideoProject
+from topics.models import ResearchProject, VideoProject
 from ai_inspector.models import AIProvider  # Импортируем модель провайдера
-from prompts.models import IdeaPrompt
+from prompts.models import IdeaPrompt, ScriptPrompt
 
 
 class GenerateIdeasForm(forms.Form):
@@ -164,3 +164,158 @@ class VideoProjectEditForm(forms.ModelForm):
             ),
         }
         labels = {"topic": "Тема", "angle": "Идея (Hook)", "notes": "Сценарий", "status": "Статус"}
+
+
+class GenerateResearchForm(forms.Form):
+    # 1. Выбор AI-провайдера (динамически из БД)
+    ai_provider = forms.ChoiceField(
+        label="AI Сервис для исследования",
+        choices=[],
+        required=True,
+        widget=forms.Select(
+            attrs={"class": "form-control", "style": "font-weight: 600; color: var(--accent-blue);"}
+        ),
+    )
+
+    # 2. Тема исследования
+    topic = forms.CharField(
+        label="Тема исследования",
+        required=True,
+        max_length=300,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Например: Дамасская сталь, Загадки пирамид, Римские гавани...",
+            }
+        ),
+    )
+
+    # 3. Стиль промпта (динамически из БД)
+    research_style = forms.ChoiceField(
+        label="Темы промптов для исследования",
+        choices=[],
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "style": "font-weight: 600; color: var(--accent-purple);",
+            }
+        ),
+    )
+    # 4. Количество генераций
+    count = forms.IntegerField(
+        label="Количество исследований",
+        min_value=1,
+        max_value=10,
+        initial=1,
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # ==========================================
+        # 1. Загрузка активных провайдеров (LLM)
+        # ==========================================
+        active_providers = (
+            AIProvider.objects.filter(is_active=True)
+            .filter(provider_type="llm")
+            .order_by("display_name", "name")
+        )
+
+        provider_choices = [("", "--- Выберите AI сервис ---")]
+        for provider in active_providers:
+            display_name = provider.display_name or provider.name.capitalize()
+            if provider.config and isinstance(provider.config, dict):
+                model = provider.config.get("text_model", "")
+                if model:
+                    short_model = model.split("/")[-1].split("-")[0]
+                    display_name += f" ({short_model})"
+            provider_choices.append((provider.name, display_name))
+
+        if len(provider_choices) == 1:
+            provider_choices = [("", "--- Нет активных сервисов ---")]
+            self.fields["ai_provider"].widget.attrs["disabled"] = True
+
+        self.fields["ai_provider"].choices = provider_choices
+        if provider_choices and provider_choices[0][0]:
+            self.fields["ai_provider"].initial = provider_choices[0][0]
+
+        # ==========================================
+        # 2. Загрузка стилей промптов из БД
+        # ==========================================
+        # Используем ScriptPrompt (или замени на IdeaPrompt, если нужно)
+        active_prompts = (
+            IdeaPrompt.objects.filter(
+                is_active=True,
+            )
+            .filter(code_name="research_agent")
+            .order_by("name")
+        )
+        style_choices = [("random", "🎲 Случайный стиль (Auto)")]
+
+        for prompt in active_prompts:
+            # Формат строго: (value_for_db, display_name_for_user)
+            # Если у модели есть поле style, добавим его в название для красоты
+            if hasattr(prompt, "style") and prompt.style:
+                display_name = f"{prompt.name} ({prompt.style})"
+            else:
+                display_name = prompt.name
+
+            style_choices.append((prompt.code_name, display_name))
+
+        self.fields["research_style"].choices = style_choices
+        self.fields["research_style"].initial = "random"
+
+
+class ResearchProjectEditForm(forms.ModelForm):
+    class Meta:
+        model = ResearchProject
+        fields = ["topic", "provider", "status", "research_data", "error_message"]
+        widgets = {
+            "topic": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "style": "width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;",
+                    "placeholder": "Тема исследования...",
+                }
+            ),
+            "provider": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "style": "width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;",
+                    "placeholder": "AI провайдер...",
+                }
+            ),
+            "status": forms.Select(
+                attrs={
+                    "class": "form-control",
+                    "style": "width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;",
+                }
+            ),
+            "research_data": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "style": "width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 0.95rem;",
+                    "placeholder": "Исследовательские данные (JSON)...",
+                }
+            ),
+            "error_message": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "style": "width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; color: red; border-radius: 6px; font-size: 0.95rem;",
+                    "placeholder": "Сообщение об ошибке (если есть)...",
+                    "readonly": True,
+                }
+            ),
+        }
+        labels = {
+            "topic": "Тема исследования",
+            "provider": "AI провайдер",
+            "status": "Статус",
+            "research_data": "Исследовательские данные (JSON)",
+            "error_message": "Ошибка (если есть)",
+            "created_at": "Дата создания",
+            "updated_at": "Дата обновления",
+        }

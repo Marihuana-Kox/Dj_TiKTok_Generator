@@ -36,6 +36,8 @@ urlpatterns = [
     path("topics/", include("topics.urls", namespace="topics")),
     path("audio/", include("audio.urls", namespace="audio")),
     path("video/", include("videoeditor.urls", namespace="videoeditor")),
+    path("shorts/", include("shorts.urls", namespace="shorts")),
+    path("planner/", include("planner.urls", namespace="planner")),
 ]
 
 # Чтобы отдавать медиа-файлы (картинки/видео) в режиме разработки

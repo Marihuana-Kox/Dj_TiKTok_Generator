@@ -12,7 +12,7 @@
     <form method="post" class="card" id="generate-form">
         {% csrf_token %}
 
-        <!-- Выбор сервиса -->
+        <!-- 1. Выбор сервиса -->
         <div class="form-group" style="border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px;">
             <label class="form-label">{{ form.ai_provider.label }}</label>
             {% if form.ai_provider.field.choices %}
@@ -24,21 +24,22 @@
                 </div>
             {% endif %}
         </div>
-            <!-- НОВЫЙ БЛОК: Выбор стиля промпта -->
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label class="form-label">{{ form.idea_style.label }}</label>
-                {{ form.idea_style }}
-                <small class="text-muted">Выбери конкретную подачу или доверься случаю.</small>
-            </div>
+        
+        <!-- 2. Выбор стиля промпта -->
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label">{{ form.idea_style.label }}</label>
+            {{ form.idea_style }}
+            <small class="text-muted">Выбери конкретную подачу или доверься случаю.</small>
+        </div>
 
-        <!-- Количество -->
-        <div class="form-group">
+        <!-- 3. Количество -->
+        <div class="form-group" style="margin-bottom: 15px;">
             <label class="form-label">{{ form.count.label }}</label>
             {{ form.count }}
         </div>
 
-        <!-- Темы -->
-        <div class="form-group">
+        <!-- 4. Темы -->
+        <div class="form-group" style="margin-bottom: 15px;">
             <label class="form-label">{{ form.topics_input.label }}</label>
             {{ form.topics_input }}
             <small class="text-muted">{{ form.topics_input.help_text }}</small>
@@ -46,35 +47,37 @@
 
         <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
 
-        <!-- Настройки обновления -->
-        <div class="form-group">
+        <!-- 5. Настройки обновления (без display: none, чтобы работало без JS) -->
+        <div class="form-group" style="margin-bottom: 15px;">
             <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                 {{ form.refresh_old }} 
                 <span class="form-label" style="margin:0;">{{ form.refresh_old.label }}</span>
             </label>
-            <div id="refresh-options" style="display: none; margin-top: 10px; padding-left: 25px;">
+            <div style="margin-top: 10px; padding-left: 25px;">
                 <label class="form-label">{{ form.refresh_period.label }}</label>
                 {{ form.refresh_period }}
             </div>
         </div>
 
-        <!-- Настройки повторов -->
-        <div class="form-group">
+        <!-- 6. Настройки повторов (без display: none, чтобы работало без JS) -->
+        <div class="form-group" style="margin-bottom: 15px;">
             <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                 {{ form.allow_duplicates }} 
                 <span class="form-label" style="margin:0;">{{ form.allow_duplicates.label }}</span>
             </label>
-            <small class="text-muted" style="display:block; margin-top:5px; padding-left: 25px;">{{ form.allow_duplicates.help_text }}</small>
+            <small class="text-muted" style="display:block; margin-top:5px; padding-left: 25px;">
+                {{ form.allow_duplicates.help_text }}
+            </small>
             
-            <div id="duplicate-options" style="display: none; margin-top: 10px; padding-left: 25px;">
+            <div style="margin-top: 10px; padding-left: 25px;">
                 <label class="form-label">{{ form.duplicate_period.label }}</label>
                 {{ form.duplicate_period }}
             </div>
         </div>
 
-        <!-- Кнопки -->
+        <!-- 7. Кнопки -->
         <div class="flex mt-2 border-top pt-2">
-            <button type="submit" id="start-topics-gen" class="btn btn-success">🚀 Запустить генерацию</button>
+            <button type="submit" class="btn btn-success">🚀 Запустить генерацию</button>
             <a href="{% url 'topics:dashboard' %}" class="btn btn-outline">Отмена</a>
         </div>
     </form>

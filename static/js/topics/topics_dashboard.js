@@ -151,3 +151,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     console.log('✅ topics_dashboard.js полностью загружен');
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Тоггл для обновления старых идей
+    const refreshCheck = document.getElementById('id_refresh_old');
+    const refreshOpts = document.getElementById('refresh-options');
+    if (refreshCheck && refreshOpts) {
+        refreshCheck.addEventListener('change', () => {
+            refreshOpts.style.display = refreshCheck.checked ? 'block' : 'none';
+        });
+    }
+
+    // Тоггл для повторов
+    const dupCheck = document.getElementById('id_allow_duplicates');
+    const dupOpts = document.getElementById('duplicate-options');
+    if (dupCheck && dupOpts) {
+        dupCheck.addEventListener('change', () => {
+            dupOpts.style.display = dupCheck.checked ? 'block' : 'none';
+        });
+    }
+});

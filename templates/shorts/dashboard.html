@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}TikTok сценарии{% endblock %}
+
+{% block content %}
+<div class="flex flex-between mb-2">
+    <div>
+        <h1>TikTok сценарии</h1>
+        <p class="text-muted">Новая логика: тема сразу превращается в hook, voiceover и сцены.</p>
+    </div>
+    <a href="{% url 'shorts:generate' %}" class="btn btn-success">Создать сценарий</a>
+</div>
+
+<div class="flex mb-2">
+    <div class="card stat-card blue">
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-label">Всего</span>
+    </div>
+    <div class="card stat-card green">
+        <span class="stat-value">{{ stats.ready }}</span>
+        <span class="stat-label">Готово</span>
+    </div>
+    <div class="card stat-card red">
+        <span class="stat-value">{{ stats.failed }}</span>
+        <span class="stat-label">Ошибки</span>
+    </div>
+</div>
+
+<div class="card" style="padding: 0;">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Тема</th>
+                <th>Стиль</th>
+                <th>Сцен</th>
+                <th>Статус</th>
+                <th>Дата</th>
+                <th>Действие</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for project in page_obj %}
+            <tr>
+                <td class="text-muted">{{ project.id }}</td>
+                <td class="text-bold">{{ project.topic }}</td>
+                <td>{{ project.style|default:"-" }}</td>
+                <td>{{ project.scenes.count }}</td>
+                <td>
+                    {% if project.status == 'script_ready' %}
+                        <span class="badge badge-done">Сценарий готов</span>
+                    {% elif project.status == 'processing' %}
+                        <span class="badge badge-work">Генерация</span>
+                    {% elif project.status == 'failed' %}
+                        <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Ошибка</span>
+                    {% else %}
+                        <span class="text-muted">{{ project.status }}</span>
+                    {% endif %}
+                </td>
+                <td class="text-muted">{{ project.created_at|date:"d.m H:i" }}</td>
+                <td><a href="{% url 'shorts:detail' project.id %}" class="text-bold" style="color: var(--accent-blue);">Открыть</a></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-muted" style="text-align: center;">Сценариев пока нет</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="flex flex-between mt-2">
+    <div class="text-muted">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</div>
+    <div class="flex">
+        {% if page_obj.has_previous %}
+            <a class="btn btn-outline" href="?page={{ page_obj.previous_page_number }}">Назад</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+            <a class="btn btn-outline" href="?page={{ page_obj.next_page_number }}">Вперед</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

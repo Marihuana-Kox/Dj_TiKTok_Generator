@@ -17,6 +17,9 @@
     {% endif %}
 {% elif request.resolver_match.namespace == 'topics' %}
 <script src="{% static 'js/topics/topics_dashboard.js' %}"></script>
+    {% if request.resolver_match.url_name == 'research' %}
+<script src="{% static 'js/topics/research_progress.js' %}"></script>
+    {% endif %}
 {% elif request.resolver_match.namespace == 'article' %}
 <script src="{% static 'js/article/article_create.js' %}"></script>
 <script src="{% static 'js/article/article_edit.js' %}"></script>
@@ -25,4 +28,8 @@
 <script src="{% static 'js/videoeditor/video_editor.js' %}"></script>
 <script src="{% static 'js/videoeditor/timeline_drag_drop.js' %}"></script>
 <script src="{% static 'js/videoeditor/capcut_editor.js' %}"></script>
+{% elif request.resolver_match.namespace == 'shorts' %}
+<script src="{% static 'js/shorts/shorts_modal.js' %}"></script>
+{% elif request.resolver_match.namespace == 'planner' %}
+<script src="{% static 'js/planner/planner_modal.js' %}"></script>
 {% endif %}

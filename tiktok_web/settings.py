@@ -62,6 +62,8 @@ INSTALLED_APPS = [
     "prompts",
     "audio",
     "videoeditor",
+    "shorts",
+    "planner",
 ]
 
 MIDDLEWARE = [

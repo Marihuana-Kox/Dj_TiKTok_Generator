@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Research Generator{% endblock %}
+
+{% block content %}
+<div class="editor-wrapper">
+    <div class="flex flex-between mb-2">
+        <a href="{% url 'topics:dashboard_research' %}" class="text-muted">&larr; НАЗАД</a>
+        <h1>Research Generator</h1>
+    </div>
+
+<form method="post" class="card" id="generate-form">
+    {% csrf_token %}
+
+    <!-- 1. Выбор сервиса -->
+    <div class="form-group" style="border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px;">
+        <label class="form-label">{{ form.ai_provider.label }}</label>
+        {% if form.ai_provider.field.choices %}
+            {{ form.ai_provider }}
+            <small class="text-muted">Активные провайдеры из базы.</small>
+        {% else %}
+            <div class="alert alert-error">⚠️ Нет активных сервисов. Проверьте админку.</div>
+        {% endif %}
+    </div>
+    <!-- 2. Выбор темы промпта -->
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label class="form-label">{{ form.research_style.label }}</label>
+        {{ form.research_style }}
+        <small class="text-muted">Выбери конкретную подачу или доверься случаю.</small>
+    </div>
+
+    <!-- 3. Тема (в ResearchForm это одно поле topic, а не topics_input) -->
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label class="form-label">{{ form.topic.label }}</label>
+        {{ form.topic }}
+        <small class="text-muted">{{ form.topic.help_text }}</small>
+    </div>
+
+    <!-- 4. Дополнительные заметки (если есть в твоей форме) -->
+    {% if form.focus_notes %}
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label class="form-label">{{ form.focus_notes.label }}</label>
+        {{ form.focus_notes }}
+        <small class="text-muted">{{ form.focus_notes.help_text }}</small>
+    </div>
+    {% endif %}
+
+    <!-- 5. Дополнительные заметки (если есть в твоей форме) -->
+    {% if form.count %}
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label class="form-label">{{ form.count.label }}</label>
+        {{ form.count }}
+        <small class="text-muted">{{ form.count.help_text }}</small>
+    </div>
+    {% endif %}
+
+
+    <!-- Кнопки -->
+    <div class="flex mt-2 border-top pt-2">
+        <button type="submit" class="btn btn-success">🔍 Запустить исследование</button>
+        <a href="{% url 'topics:dashboard_research' %}" class="btn btn-outline">Отмена</a>
+    </div>
+</form>
+</div>
+{% endblock %}
