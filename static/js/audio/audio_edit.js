@@ -278,6 +278,141 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Инициализация кастомных плееров
   initCustomAudioPlayers();
+
+// ==========================================
+// 7. 🔓 МЕХАНИЗМ РАЗБЛОКИРОВКИ (DBLCLICK)
+// ==========================================
+
+/**
+ * Разблокировка успешного трека для редактирования
+ */
+function unlockTrackForEdit(trackId) {
+    const card = document.getElementById(`track-card-${trackId}`);
+    if (!card) {
+        console.warn(`⚠️ Карточка track-card-${trackId} не найдена`);
+        return;
+    }
+
+    const checkbox = card.querySelector('.prompt-checkbox');
+    const textarea = card.querySelector('.track-textarea');
+    const badge = card.querySelector('.badge');
+    const saveBtn = card.querySelector('.track-save-btn');
+
+    if (!checkbox || !textarea) {
+        console.warn(`⚠️ Чекбокс или textarea не найдены в карточке #${trackId}`);
+        return;
+    }
+
+    // Подтверждение
+    if (!confirm('🔓 Разблокировать трек для редактирования?\n\n⚠️ Текущий аудиофайл останется, но вы сможете изменить текст и перегенерировать озвучку.')) {
+        return;
+    }
+
+    // 🔥 Разблокируем чекбокс
+    checkbox.removeAttribute('disabled');
+    checkbox.checked = false;
+
+    // 🔥 Разблокируем textarea
+    textarea.removeAttribute('disabled');
+    textarea.removeAttribute('readonly');
+    textarea.readOnly = false;
+    textarea.style.backgroundColor = '';
+    textarea.style.opacity = '';
+
+    // 🔥 Меняем статус бэйджа
+    if (badge) {
+        badge.className = 'badge badge-work';
+        badge.textContent = '📝 На редактировании';
+    }
+
+    // 🔥 Активируем кнопку сохранения
+    if (saveBtn) {
+        saveBtn.disabled = false;
+    }
+
+    // 🔥 Подсвечиваем карточку
+    card.style.border = '2px dashed #07c5ff';
+    card.style.backgroundColor = '#055bfb';
+
+    // Безопасный вызов toast
+    if (typeof showToast === 'function') {
+        showToast('✅ Трек разблокирован. Теперь вы можете изменить текст.', 'success');
+    }
+    console.log(`🔓 Трек #${trackId} разблокирован для редактирования`);
+
+    // 🔥 Обновляем состояние интерфейса
+    if (typeof updateInterfaceState === 'function') {
+        updateInterfaceState();
+    }
+}
+
+/**
+ * Инициализация обработчиков dblclick на УСПЕШНЫХ треках
+ * 🔥 ВАЖНО: вешаем на КАРТОЧКУ, а не на disabled чекбокс!
+ */
+function initUnlockHandlers() {
+    const allCards = document.querySelectorAll('[id^="track-card-"]');
+    let initializedCount = 0;
+
+    allCards.forEach((card) => {
+        const badge = card.querySelector('.badge');
+        const checkbox = card.querySelector('.prompt-checkbox');
+        
+        // Проверяем, что трек успешный И чекбокс заблокирован
+        const isSuccessful = badge && (
+            badge.classList.contains('badge-done') ||
+            badge.textContent.trim() === 'Успешно'
+        );
+        const isLocked = checkbox && checkbox.hasAttribute('disabled');
+
+        if (isSuccessful && isLocked && !card.dataset.unlockInitialized) {
+            // 🔥 Вешаем dblclick на КАРТОЧКУ (а не на disabled чекбокс!)
+            card.addEventListener('dblclick', function(e) {
+                // Игнорируем двойной клик внутри textarea и кнопок
+                const target = e.target;
+                if (target.tagName === 'TEXTAREA' || 
+                    target.tagName === 'BUTTON' || 
+                    target.tagName === 'INPUT' ||
+                    target.tagName === 'A' ||
+                    target.closest('.custom-audio-player')) {
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const trackId = card.id.replace('track-card-', '');
+                unlockTrackForEdit(trackId);
+            });
+
+            // Визуальная подсказка
+            card.title = '💡 Двойной клик по карточке для разблокировки трека';
+            card.style.cursor = 'help';
+            card.dataset.unlockInitialized = 'true';
+            initializedCount++;
+        }
+    });
+
+    console.log(`🔓 Инициализировано обработчиков разблокировки: ${initializedCount}`);
+}
+
+// 🔥 ЭКСПОРТИРУЕМ ГЛОБАЛЬНО
+window.unlockTrackForEdit = unlockTrackForEdit;
+window.initUnlockHandlers = initUnlockHandlers;
+
+// 🔥 ЗАПУСКАЕМ СРАЗУ
+setTimeout(() => {
+    initUnlockHandlers();
+}, 300);
+
+// 🔥 ПЕРЕОПРЕДЕЛЯЕМ updateInterfaceState
+const _originalUpdateInterfaceState = updateInterfaceState;
+updateInterfaceState = function() {
+    _originalUpdateInterfaceState();
+    initUnlockHandlers();
+};
+
+console.log('✅ Механизм разблокировки загружен');
 });
 
 // ==========================================

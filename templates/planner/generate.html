@@ -5,7 +5,7 @@
 {% block content %}
 <div class="editor-wrapper">
     <div class="flex flex-between mb-2">
-        <a href="{% url 'shorts:dashboard' %}" class="text-muted">&larr; НАЗАД</a>
+        <a href="{% url 'planner:dashboard' %}" class="text-muted">&larr; НАЗАД</a>
         <h1>Новый TikTok сценарий</h1>
     </div>
 
@@ -37,7 +37,7 @@
 
         <div class="flex mt-2 border-top pt-2">
             <button type="submit" class="btn btn-success">Сгенерировать</button>
-            <a href="{% url 'shorts:dashboard' %}" class="btn btn-outline">Отмена</a>
+            <a href="{% url 'planner:dashboard' %}" class="btn btn-outline">Отмена</a>
         </div>
     </form>
 </div>

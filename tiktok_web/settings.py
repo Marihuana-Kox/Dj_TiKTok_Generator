@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_json_widget",
     "core",
     "generator",
     "article",
@@ -148,7 +149,11 @@ STATIC_URL = "/static/"
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
-
+# Путь к JSON файлу
+DOMAINS_FILE = BASE_DIR / "topics" / "data" / "research_domains.json"
+# SMART_QUERIES = BASE_DIR / "topics" / "data" / "search_templates.json"
+SMART_QUERIES = BASE_DIR / "topics" / "data" / "search_theorie.json"
+BLACK_LIST_SITES = BASE_DIR / "topics" / "data" / "black_list.json"
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 

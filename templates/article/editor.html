@@ -37,8 +37,37 @@
             <small class="text-muted">Обновлено: {{ cluster.updated_at|date:"d.m.Y H:i" }}</small>
         </div>
     </div>
+    <!-- БЫСТРЫЙ ПЕРЕВОД ЧЕРЕЗ AI -->
+    {% if available_languages %}
+    <div class="card mb-3 bg-light">
+        <div class="card-body">
+            <h5 class="mb-2">🌍 Быстрый перевод через AI</h5>
+            <form id="ai-translate-form" method="post" action="{% url 'article:ai_translate' cluster.id %}">
+                {% csrf_token %}
+                <div class="flex gap-2">
+                    <select name="target_language" id="target-language" class="form-control" style="max-width: 250px;" required>
+                        <option value="">Выберите язык для перевода...</option>
+                        {% for lang in available_languages %}
+                        <option value="{{ lang.id }}">{{ lang.flag_emoji }} {{ lang.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary">
+                        ✨ Перевести
+                    </button>
+                </div>
+                <small class="text-muted">
+                    Перевод будет создан автоматически на основе {{ main_trans.language.name|default:"основного" }} текста
+                </small>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-success mb-3">
+        ✅ Все доступные языки уже добавлены к этой статье
+    </div>
+    {% endif %}
 
-    <!-- СПИСОК ПЕРЕВОДОВ -->
+    <!-- СУЩЕСТВУЮЩИЙ СПИСОК ПЕРЕВОДОВ -->
     <h3 class="mb-3">🌍 Переводы</h3>
     
     {% if translations %}

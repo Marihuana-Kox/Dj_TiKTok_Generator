@@ -18,4 +18,9 @@ urlpatterns = [
         views.restore_config_view,
         name="restore_config",
     ),
+    path(
+        "project/<int:project_id>/download-media/",
+        views.download_project_media,
+        name="download_project_media",
+    ),
 ]

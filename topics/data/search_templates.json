@@ -1,0 +1,77 @@
+{
+    "categories": {
+        "person": {
+            "label": "👤 Персона (историческая личность)",
+            "description": "Для тем о конкретных людях: правителях, учёных, полководцах",
+            "templates": [
+                "{topic} biography contradictions unknown facts",
+                "{topic} controversial decisions unexpected outcomes",
+                "{topic} mysterious death forensic evidence analysis",
+                "{topic} private correspondence unverified letters paradox",
+                "{topic} state propaganda vs archival reality",
+                "{topic} secret alliances geopolitical betrayals documents",
+                "{topic} omitted achievements historical bias",
+                "{topic} psychological profile anomalous behavior"
+            ]
+        },
+        "event": {
+            "label": "⚔️ Событие (война, революция, кризис)",
+            "description": "Для тем о исторических событиях, войнах, революциях",
+            "templates": [
+                "{topic} official consensus vs forensic evidence",
+                "{topic} declassified documents recent findings",
+                "{topic} conflicting eyewitness testimonies archives",
+                "{topic} cause and effect anomalies discrepancy",
+                "{topic} tactical turning point critical analysis",
+                "{topic} chronology gaps contradictions",
+                "{topic} intelligence failures orchestration debate",
+                "{topic} alternative historical models peer reviewed"
+            ]
+        },
+        "architecture": {
+            "label": "🏛️ Архитектура (здания, сооружения)",
+            "description": "Для тем о постройках, городах, инженерных сооружениях",
+            "templates": [
+                "{topic} engineering paradox logic flaws",
+                "{topic} weight transportation mathematical impossibility",
+                "{topic} tool marks high tech traces anomaly",
+                "{topic} structural anomalies underground cavities radar",
+                "{topic} quarry extraction sudden abandonment reason",
+                "{topic} original purpose astronomy alignment challenge",
+                "{topic} construction workforce labor calculation debate",
+                "{topic} lost technologies material processing efficiency"
+            ]
+        },
+        "artifact": {
+            "label": "🏺 Артефакты (предметы, находки)",
+            "description": "Для тем о археологических находках, предметах, реликвиях",
+            "templates": [
+                "{topic} craft technology manufacturing limits anomaly",
+                "{topic} anomalous artifacts out of place context",
+                "{topic} radiocarbon dating controversy stratigraphy layers",
+                "{topic} metallurgical chemical analysis mysteries composition",
+                "{topic} functional design wear patterns purpose",
+                "{topic} cultural origin attribution controversy",
+                "{topic} museum archives unexhibited collection",
+                "{topic} unclassified archaeological finds repository records"
+            ]
+        },
+        "general": {
+            "label": "🌍 Общая (универсальные запросы)",
+            "description": "Подходит для любой темы — универсальные шаблоны",
+            "templates": [
+                "{topic} structural anomalies unexplained phenomena",
+                "{topic} data discrepancies statistical paradox",
+                "{topic} historiography gaps ignored evidence",
+                "{topic} academic controversy scientific debate",
+                "{topic} alternative models historical revision",
+                "{topic} internal source contradictions discrepancy",
+                "{topic} archival findings modern reinterpretation",
+                "{topic} paradigm shift critical analysis"
+            ]
+        }
+    },
+    "default_category": "general",
+    "max_queries_per_category": 6,
+    "description": "Сбалансированные гибридные шаблоны поисковых запросов для Tavily. Нацелены на поиск жесткой фактуры, инженерных тупиков и архивных нестыковок без ухода в желтую конспирологию."
+}

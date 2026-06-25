@@ -96,7 +96,7 @@ def sse_progress_view(request, task_id: str, timeout: int = None):
             else:
                 checks_without_change += 1
                 # Защита от "зависших" задач (>30 сек без изменений)
-                if checks_without_change > 30:
+                if checks_without_change > 150:
                     yield f"data: {json.dumps({'status': 'error', 'message': 'Таймаут ожидания'})}\n\n"
                     break
 

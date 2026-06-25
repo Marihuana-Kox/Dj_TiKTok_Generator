@@ -1,8 +1,10 @@
 from django import forms
 
+from topics.helpers.domains import get_preset_choices
+from topics.helpers.search_templates import get_category_choices
 from topics.models import ResearchProject, VideoProject
 from ai_inspector.models import AIProvider  # Импортируем модель провайдера
-from prompts.models import IdeaPrompt, ScriptPrompt
+from prompts.models import IdeaPrompt
 
 
 class GenerateIdeasForm(forms.Form):
@@ -189,8 +191,23 @@ class GenerateResearchForm(forms.Form):
             }
         ),
     )
-
-    # 3. Стиль промпта (динамически из БД)
+    search_category = forms.ChoiceField(
+        label="🎯 Тип темы (для умного поиска)",
+        choices=[],
+        initial="general",
+        required=False,
+        widget=forms.Select(attrs={"class": "form-control"}),
+        help_text="Выберите тип темы для более релевантных поисковых запросов.",
+    )
+    # 3. Переключатель WEB поиска
+    use_web_search = forms.BooleanField(
+        label="🔍 Искать факты в интернете (Tavily)",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-control checkbox-fix"}),
+        help_text="Сначала найти факты в интернете, потом передать их в AI для анализа.",
+    )
+    # 4. Стиль промпта (динамически из БД)
     research_style = forms.ChoiceField(
         label="Темы промптов для исследования",
         choices=[],
@@ -201,7 +218,23 @@ class GenerateResearchForm(forms.Form):
             }
         ),
     )
-    # 4. Количество генераций
+
+    # 4.1. Выбор пресета доменов
+    domain_preset = forms.ChoiceField(
+        label="🎯 Источник поиска (опционально)",
+        required=False,
+        choices=[("", "— Весь интернет —")] + get_preset_choices(),
+        widget=forms.Select(attrs={"class": "form-control"}),
+        help_text="Выберите конкретные сайты для поиска. Оставьте пустым для поиска по всему интернету.",
+    )
+    # 5. Дополнительная информация для поиска
+    focus_notes = forms.CharField(
+        label="Дополнительные указания (фокус)",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+        help_text="Например: 'Сосредоточься только на средневековых источниках' или 'Ищи только документальные подтверждения'.",
+    )
+    # 6. Количество генераций
     count = forms.IntegerField(
         label="Количество исследований",
         min_value=1,
@@ -265,6 +298,8 @@ class GenerateResearchForm(forms.Form):
 
         self.fields["research_style"].choices = style_choices
         self.fields["research_style"].initial = "random"
+        # Выбор категории для создания вариаций запроса поиска
+        self.fields["search_category"].choices = get_category_choices()
 
 
 class ResearchProjectEditForm(forms.ModelForm):

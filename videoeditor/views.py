@@ -1,18 +1,21 @@
+import io
 import json
 import os
 import time
 import uuid
 import urllib.parse
 import threading
+import zipfile
 from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth.decorators import login_required
 from django.db import connection
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.http import JsonResponse, FileResponse, Http404
+from django.http import HttpResponse, JsonResponse, FileResponse, Http404
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
+import mutagen
 
 from .models import ProjectVideoRelease
 from audio.models import AudioProject, AudioTrack
@@ -777,3 +780,160 @@ def download_video_file(request, project_id):
             filename=f"project_{project_id}.mp4",
         )
     raise Http404()
+
+
+@login_required
+def download_project_media(request, project_id):
+    """
+    Скачивание ВСЕГО проекта в ZIP:
+    - Все аудиофайлы (audio_01.wav, audio_02.wav...)
+    - Все сгенерированные картинки (image_01.jpg, image_02.jpg...)
+    - project_metadata.json (полная информация о проекте)
+    - voices_meta_<lang>.json (метаданные озвучки)
+    """
+    # Получаем аудиопроект
+    audio_project = get_object_or_404(AudioProject, id=project_id, user=request.user)
+
+    # Получаем статью (кластер)
+    article_cluster = audio_project.article
+    if not article_cluster:
+        messages.error(request, "⚠️ У проекта нет связанной статьи!")
+        return redirect("audio:audio_edit", pk=project_id)
+
+    # Получаем все треки
+    tracks = audio_project.tracks.filter(status="success").order_by("order")
+
+    if not tracks.exists():
+        messages.error(request, "⚠️ В проекте нет готовых аудиофайлов!")
+        return redirect("audio:audio_edit", pk=project_id)
+
+    # Получаем все промпты картинок для этой статьи
+    image_prompts = ImageProject.objects.filter(article__cluster=article_cluster).order_by(
+        "scene_type__order"
+    )
+
+    # Создаём ZIP в памяти
+    buffer = io.BytesIO()
+
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        project_lang = (audio_project.language or "ru").lower()
+        article_title = article_cluster.translations.filter(language__code="ru").first()
+        article_title = article_title.title if article_title else f"Project_{project_id}"
+        safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in article_title[:50])
+
+        # === 1. АУДИОФАЙЛЫ ===
+        audio_count = 0
+        for track in tracks:
+            if track.audio_file:
+                file_path = os.path.join(settings.MEDIA_ROOT, track.audio_file)
+
+                if os.path.exists(file_path):
+                    # Имя в ZIP: audio_01.wav, audio_02.wav...
+                    ext = os.path.splitext(file_path)[1]
+                    arcname = f"audio/audio_{track.order:02d}{ext}"
+                    zip_file.write(file_path, arcname)
+                    audio_count += 1
+
+        # === 2. ИЗОБРАЖЕНИЯ ===
+        image_count = 0
+        for idx, img_prompt in enumerate(image_prompts, 1):
+            if img_prompt.image_url:
+                # Извлекаем путь из URL
+                image_path_str = img_prompt.image_url.replace(settings.MEDIA_URL, "")
+                image_path = os.path.join(settings.MEDIA_ROOT, image_path_str)
+
+                if os.path.exists(image_path):
+                    ext = os.path.splitext(image_path)[1]
+                    arcname = f"images/image_{idx:02d}{ext}"
+                    zip_file.write(image_path, arcname)
+                    image_count += 1
+
+        # === 3. METADATA JSON ===
+        # Получаем основной перевод статьи
+        main_translation = article_cluster.translations.filter(language__code="ru").first()
+        if not main_translation:
+            main_translation = article_cluster.translations.first()
+
+        metadata = {
+            "project_info": {
+                "title": article_title,
+                "language": project_lang,
+                "provider": audio_project.provider,
+                "created_at": audio_project.created_at.isoformat(),
+                "total_tracks": tracks.count(),
+                "total_images": image_prompts.count(),
+            },
+            "audio_tracks": [],
+            "images": [],
+        }
+
+        # Добавляем информацию о треках
+        for track in tracks:
+            track_meta = {
+                "order": track.order,
+                "text": track.text,
+                "status": track.status,
+                "speaker": getattr(track, "speaker_name", "unknown"),
+            }
+
+            # Пытаемся найти длительность
+            if track.audio_file:
+                file_path = os.path.join(settings.MEDIA_ROOT, track.audio_file)
+                if os.path.exists(file_path):
+                    try:
+                        audio_info = mutagen.File(file_path)
+                        if audio_info and audio_info.info:
+                            track_meta["duration"] = round(audio_info.info.length, 2)
+                    except:
+                        pass
+
+            metadata["audio_tracks"].append(track_meta)
+
+        # Добавляем информацию о картинках
+        for idx, img_prompt in enumerate(image_prompts, 1):
+            img_meta = {
+                "order": idx,
+                "scene_type": img_prompt.scene_type.name if img_prompt.scene_type else "unknown",
+                "prompt": img_prompt.prompt_text,
+                "image_url": img_prompt.image_url,
+            }
+            metadata["images"].append(img_meta)
+
+        # Сохраняем metadata.json в ZIP
+        zip_file.writestr(
+            "project_metadata.json", json.dumps(metadata, ensure_ascii=False, indent=2)
+        )
+
+        # === 4. README ===
+        readme_text = f"""
+PROJECT: {article_title}
+LANGUAGE: {project_lang.upper()}
+CREATED: {audio_project.created_at.strftime("%Y-%m-%d %H:%M")}
+
+STRUCTURE:
+├── audio/           - Аудиофайлы для озвучки (audio_01.wav, audio_02.wav...)
+├── images/          - Сгенерированные изображения (image_01.jpg, image_02.jpg...)
+└── project_metadata.json - Полная информация о проекте
+
+HOW TO USE IN CAPCUT:
+1. Распакуйте архив
+2. Импортируйте все файлы из папки audio/ на таймлайн
+3. Добавьте изображения из папки images/ между аудиофрагментами
+4. Откройте project_metadata.json для просмотра текстов и промптов
+
+TOTAL AUDIO TRACKS: {audio_count}
+TOTAL IMAGES: {image_count}
+"""
+        zip_file.writestr("README.txt", readme_text.strip())
+
+    # Подготовка файла к отдаче
+    buffer.seek(0)
+    filename = f"media_project_{project_id}_{safe_title.replace(' ', '_')}.zip"
+
+    response = HttpResponse(buffer.getvalue(), content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    messages.success(
+        request, f"✅ Проект упакован: {audio_count} аудио + {image_count} изображений"
+    )
+    return response

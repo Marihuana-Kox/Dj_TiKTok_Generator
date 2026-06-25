@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+
+{% block title %}Текст для ролика #{{ script.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    
+    <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+    <div class="card mb-4">
+        <div class="card-header flex flex-between items-center">
+            <h2>🎬 Текст для ролика #{{ script.id }}</h2>
+            
+            <!-- Статус -->
+            <div class="flex items-center gap-2">
+                <span class="text-bold">Статус:</span>
+                {% if script.status == 'approved' %}
+                    <span class="badge badge-done">✅ Утверждено</span>
+                {% elif script.status == 'draft' %}
+                    <span class="badge badge-work">✏️ Черновик</span>
+                {% elif script.status == 'rejected' %}
+                    <span class="badge bg-danger">❌ Отклонено</span>
+                {% else %}
+                    <span class="badge bg-light">{{ script.get_status_display }}</span>
+                {% endif %}
+                
+                <span class="badge bg-light">v{{ script.version }}</span>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            <div class="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                    <p><strong>Название:</strong> {{ script.title }}</p>
+                    <p><strong>Исследование:</strong> 
+                        <a href="{% url 'topics:research_edit' script.research_project.id %}" class="link-blue">
+                            {{ script.research_project.topic|truncatechars:60 }}
+                        </a>
+                    </p>
+                </div>
+                <div>
+                    <p><strong>Провайдер:</strong> {{ script.provider }}</p>
+                    <p><strong>Создано:</strong> {{ script.created_at|date:"d.m.Y H:i" }}</p>
+                    <p><strong>Обновлено:</strong> {{ script.updated_at|date:"d.m.Y H:i" }}</p>
+                </div>
+            </div>
+            
+            <!-- Метрики -->
+            <div class="flex gap-3 mt-3">
+                <div class="card stat-card blue" style="padding: 10px 15px;">
+                    <span class="stat-value" style="font-size: 1.2rem;">{{ script.word_count }}</span>
+                    <span class="stat-label" style="font-size: 0.75rem;">Слов</span>
+                </div>
+                <div class="card stat-card orange" style="padding: 10px 15px;">
+                    <span class="stat-value" style="font-size: 1.2rem;">{{ script.estimated_duration }}с</span>
+                    <span class="stat-label" style="font-size: 0.75rem;">Длительность</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ТЕКСТ СКРИПТА -->
+    <h3 class="mb-3">📝 Текст скрипта</h3>
+    
+    {% if script.script_data %}
+        <div class="grid grid-cols-1 gap-4">
+            
+            <!-- ХУК -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">🎣 Хук (первые 3 секунды)</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-bold" style="font-size: 1.1rem;">{{ script.hook }}</p>
+                </div>
+            </div>
+
+            <!-- ВСТУПЛЕНИЕ -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">📖 Вступление</h4>
+                </div>
+                <div class="card-body">
+                    <p>{{ script.intro }}</p>
+                </div>
+            </div>
+
+            <!-- ОСНОВНАЯ ЧАСТЬ -->
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">📝 Основная часть</h4>
+                </div>
+                <div class="card-body">
+                    <div style="white-space: pre-wrap;">{{ script.body }}</div>
+                </div>
+            </div>
+
+            <!-- ЗАКЛЮЧЕНИЕ -->
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">🎯 Заключение</h4>
+                </div>
+                <div class="card-body">
+                    <p>{{ script.conclusion }}</p>
+                </div>
+            </div>
+
+            <!-- ВОВЛЕКАЮЩАЯ КОНЦОВКА -->
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">✨ Вовлекающая концовка</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-italic">{{ script.script_data.engaging_ending }}</p>
+                    {% if script.script_data.ending_technique %}
+                        <small class="text-muted">
+                            Техника: <code>{{ script.script_data.ending_technique }}</code>
+                        </small>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- КРЮЧКИ УДЕРЖАНИЯ -->
+            {% if script.retention_hooks %}
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h4 class="mb-0">🪝 Крючки удержания</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        {% for hook in script.retention_hooks %}
+                        <li>{{ hook }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- ЭМОЦИОНАЛЬНЫЕ ТРИГГЕРЫ -->
+            {% if script.script_data.emotional_triggers %}
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h4 class="mb-0">💥 Эмоциональные триггеры</h4>
+                </div>
+                <div class="card-body">
+                    <div class="flex gap-2 flex-wrap">
+                        {% for trigger in script.script_data.emotional_triggers %}
+                        <span class="badge bg-light text-dark border">{{ trigger }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    {% else %}
+        <div class="alert alert-warning">
+            ⚠️ Текст скрипта пуст. Возможно, генерация ещё не завершена или произошла ошибка.
+        </div>
+    {% endif %}
+
+    <!-- СЫРОЙ JSON (для отладки) -->
+    <details class="mt-4">
+        <summary class="text-bold cursor-pointer">🔧 Сырые данные JSON (для отладки)</summary>
+        <div class="card mt-2">
+            <div class="card-body">
+                <pre style="max-height: 400px; overflow: auto; font-size: 0.85rem;">{{ script.script_data|pprint }}</pre>
+            </div>
+        </div>
+    </details>
+
+    <!-- КНОПКИ -->
+    <div class="flex gap-2 mt-4">
+        <a href="{% url 'article:script_dashboard' %}" class="btn btn-secondary">← Назад к списку</a>
+        <button type="button" class="btn btn-outline" onclick="copyFullText()">📋 Копировать весь текст</button>
+    </div>
+</div>
+
+{% endblock %}

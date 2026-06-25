@@ -1,8 +1,13 @@
+import json
+
 from django.contrib import admin
 from django import forms
 from django.contrib import messages
 from django.utils.html import format_html
 from django.urls import path
+from django.utils.text import Truncator
+from django.db import models
+from django_json_widget.widgets import JSONEditorWidget
 from django.shortcuts import render, redirect
 from .models import ResearchProject, VideoProject
 from .services import generate_unique_ideas
@@ -98,10 +103,22 @@ class VideoProjectAdmin(admin.ModelAdmin):
 
 @admin.register(ResearchProject)
 class ResearchProjectAdmin(admin.ModelAdmin):
-    list_display = ("topic", "status", "facts_count", "created_at")
-    list_filter = ("status", "provider")
+    list_display = ("topic", "status", "cluster", "facts_count", "created_at")
+    list_filter = (
+        "status",
+        "cluster",
+        "provider",
+        "research_data",
+    )
     search_fields = ("topic", "central_mystery")
-    readonly_fields = ("research_data", "created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at")
+
+    formfield_overrides = {
+        models.JSONField: {"widget": JSONEditorWidget},
+    }
+
+    def research_data_short(self, obj):
+        return Truncator(str(obj.research_data)).chars(100)
 
 
 # Регистрируем только VideoProject

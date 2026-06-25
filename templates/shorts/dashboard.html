@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}TikTok сценарии{% endblock %}
 
@@ -6,11 +7,12 @@
 <div class="flex flex-between mb-2">
     <div>
         <h1>TikTok сценарии</h1>
-        <p class="text-muted">Новая логика: тема сразу превращается в hook, voiceover и сцены.</p>
+        <p class="text-muted">Управление сгенерированными сценариями и сценами.</p>
     </div>
-    <a href="{% url 'shorts:generate' %}" class="btn btn-success">Создать сценарий</a>
+    <a href="{% url 'shorts:generate' %}" class="btn btn-success">✨ Создать сценарий</a>
 </div>
 
+<!-- Статистика -->
 <div class="flex mb-2">
     <div class="card stat-card blue">
         <span class="stat-value">{{ stats.total }}</span>
@@ -26,48 +28,92 @@
     </div>
 </div>
 
-<div class="card" style="padding: 0;">
-    <table class="table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Тема</th>
-                <th>Стиль</th>
-                <th>Сцен</th>
-                <th>Статус</th>
-                <th>Дата</th>
-                <th>Действие</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for project in page_obj %}
-            <tr>
-                <td class="text-muted">{{ project.id }}</td>
-                <td class="text-bold">{{ project.topic }}</td>
-                <td>{{ project.style|default:"-" }}</td>
-                <td>{{ project.scenes.count }}</td>
-                <td>
-                    {% if project.status == 'script_ready' %}
-                        <span class="badge badge-done">Сценарий готов</span>
-                    {% elif project.status == 'processing' %}
-                        <span class="badge badge-work">Генерация</span>
-                    {% elif project.status == 'failed' %}
-                        <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Ошибка</span>
-                    {% else %}
-                        <span class="text-muted">{{ project.status }}</span>
-                    {% endif %}
-                </td>
-                <td class="text-muted">{{ project.created_at|date:"d.m H:i" }}</td>
-                <td><a href="{% url 'shorts:detail' project.id %}" class="text-bold" style="color: var(--accent-blue);">Открыть</a></td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7" class="text-muted" style="text-align: center;">Сценариев пока нет</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+<!-- Таблица с формой массовых действий -->
+<form method="post" id="bulk-action-form">
+    {% csrf_token %}
+    
+    <div class="card" style="padding: 0;">
+        
+        <!-- Панель управления -->
+        <div class="flex flex-between mb-2" style="padding: 15px;">
+            <div class="flex items-center">
+                <input type="checkbox" id="select-all" class="form-control checkbox-fix">
+                <label for="select-all" class="text-bold ml-1">Выбрать все</label>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button type="submit" name="action" value="delete_selected" id="btn-delete" class="btn btn-outline" disabled onclick="return confirm('Вы уверены? Это действие нельзя отменить.');">
+                    🗑️ Удалить
+                </button>
+                
+                <div class="separator" style="width:1px; height:20px; background:var(--border-color); margin:0 5px;"></div>
+                
+                <select name="new_status" id="status-select" class="form-control" style="width: auto; min-width: 150px;" disabled>
+                    <option value="" selected disabled>Изменить статус на...</option>
+                    <option value="draft">📝 Черновик</option>
+                    <option value="processing">🔄 Генерация</option>
+                    <option value="script_ready">✅ Сценарий готов</option>
+                    <option value="failed">❌ Ошибка</option>
+                </select>
+                <button type="submit" name="action" value="change_status" id="btn-status" class="btn btn-primary" disabled>
+                    Применить
+                </button>
+            </div>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;"></th> <!-- Чекбокс -->
+                    <th>ID</th>
+                    <th>Тема</th>
+                    <th>Стиль</th>
+                    <th>Сцен</th>
+                    <th>Статус</th>
+                    <th>Дата</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in page_obj %}
+                <tr class="idea-row">
+                    <!-- Чекбокс выбора -->
+                    <td style="text-align: center;">
+                        <input type="checkbox" name="selected_projects" value="{{ project.id }}" class="row-checkbox form-control">
+                    </td>
+                    
+                    <td class="text-muted">{{ project.id }}</td>
+                    <td class="text-bold">{{ project.topic|truncatechars:40 }}</td>
+                    <td>{{ project.style|default:"-" }}</td>
+                    <td>{{ project.scenes.count }}</td>
+                    
+                    <!-- Статус -->
+                    <td>
+                        {% if project.status == 'script_ready' %}
+                            <span class="badge badge-done">Сценарий готов</span>
+                        {% elif project.status == 'processing' %}
+                            <span class="badge badge-work">Генерация</span>
+                        {% elif project.status == 'failed' %}
+                            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Ошибка</span>
+                        {% elif project.status == 'draft' %}
+                            <span class="badge badge-work">Черновик</span>
+                        {% else %}
+                            <span class="text-muted">{{ project.status }}</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td class="text-muted">{{ project.created_at|date:"d.m H:i" }}</td>
+                    <td><a href="{% url 'shorts:detail' project.id %}" class="text-bold" style="color: var(--accent-blue);">Открыть</a></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-muted" style="text-align: center; padding: 40px;">Сценариев пока нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</form>
 
 {% if page_obj.paginator.num_pages > 1 %}
 <div class="flex flex-between mt-2">
@@ -82,4 +128,7 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Подключаем JS для массовых действий -->
+<script src="{% static 'shorts/js/bulk-actions.js' %}"></script>
 {% endblock %}

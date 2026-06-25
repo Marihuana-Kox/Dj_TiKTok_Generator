@@ -1,24 +1,60 @@
 {
   "language_all": [
-    { "code": "ru-RU", "name": "Русский" },
-    { "code": "en-US", "name": "English" },
-    { "code": "de-DE", "name": "Deutsch" }
+    {
+      "code": "ru-RU",
+      "name": "Русский"
+    },
+    {
+      "code": "en-US",
+      "name": "English"
+    },
+    {
+      "code": "de-DE",
+      "name": "Deutsch"
+    }
   ],
-
   "voices": {
     "ru-RU": [
-      { "id": "Dmitry", "name": "Дмитрий (муж.)" },
-      { "id": "Nikolai", "name": "Николай (муж.)" },
-      { "id": "Elena", "name": "Елена (жен.)" },
-      { "id": "Svetlana", "name": "Светлана (жен.)" }
+      {
+        "id": "default-mwx-w5dvmldahfby4uvang__marihuanakox",
+        "name": "Marihuana Kox (муж.)"
+      },
+      {
+        "id": "Dmitry",
+        "name": "Дмитрий (муж.)"
+      },
+      {
+        "id": "Nikolai",
+        "name": "Николай (муж.)"
+      },
+      {
+        "id": "Elena",
+        "name": "Елена (жен.)"
+      },
+      {
+        "id": "Svetlana",
+        "name": "Светлана (жен.)"
+      }
     ],
     "en-US": [
-      { "id": "Alex", "name": "Alex (male)" },
-      { "id": "Anjali", "name": "Anjali (female)" }
+      {
+        "id": "Alex",
+        "name": "Alex (male)"
+      },
+      {
+        "id": "Anjali",
+        "name": "Anjali (female)"
+      }
     ],
     "de-DE": [
-      { "id": "Josef", "name": "Josef (male)" },
-      { "id": "Johanna", "name": "Johanna (female)" }
+      {
+        "id": "Josef",
+        "name": "Josef (male)"
+      },
+      {
+        "id": "Johanna",
+        "name": "Johanna (female)"
+      }
     ]
   }
 }

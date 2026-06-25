@@ -1,66 +1,141 @@
 {% extends 'base.html' %}
 
-{% block title %}TikTok сценарий #{{ project.id }}{% endblock %}
+{% block title %}План сценария #{{ plan.id }}{% endblock %}
 
 {% block content %}
 <div class="flex flex-between mb-2">
-    <a href="{% url 'shorts:dashboard' %}" class="text-muted">&larr; НАЗАД</a>
-    <a href="{% url 'shorts:generate' %}" class="btn btn-success">Создать еще</a>
+    <a href="{% url 'planner:dashboard' %}" class="text-muted">&larr; НАЗАД</a>
+    <a href="{% url 'planner:generate' %}" class="btn btn-success">Создать новый план</a>
 </div>
 
 <div class="card">
     <div class="flex flex-between">
         <div>
-            <h1 style="margin-bottom: 6px;">{{ project.topic }}</h1>
-            <p class="text-muted">Стиль: <strong>{{ project.style|default:"-" }}</strong> · Провайдер: {{ project.provider }}</p>
+            <h1 style="margin-bottom: 6px;">{{ plan.title }}</h1>
+            <p class="text-muted">
+                Тема: <strong>{{ plan.research_project.topic }}</strong> · 
+                Стиль: <strong>{{ plan.narrative_style|default:"-" }}</strong> · 
+                Вирусность: <strong style="color: {% if plan.virality_score >= 8 %}#4caf50{% else %}inherit{% endif %};">{{ plan.virality_score }}/10</strong>
+            </p>
         </div>
         <div>
-            {% if project.status == 'script_ready' %}
-                <span class="badge badge-done">Сценарий готов</span>
-            {% elif project.status == 'failed' %}
-                <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Ошибка</span>
+            {% if plan.status == 'approved' or plan.status == 'script_generated' %}
+                <span class="badge badge-done">Утвержден</span>
+            {% elif plan.status == 'draft' %}
+                <span class="badge badge-work">Черновик</span>
+            {% elif plan.status == 'rejected' %}
+                <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Отклонен</span>
             {% else %}
-                <span class="badge badge-work">{{ project.status }}</span>
+                <span class="badge badge-work">{{ plan.get_status_display }}</span>
             {% endif %}
         </div>
     </div>
 
-    {% if project.error_message %}
-        <div class="alert alert-error">{{ project.error_message }}</div>
-    {% endif %}
-
-    <div class="form-group">
-        <label class="form-label">Hook</label>
-        <div class="card" style="background: rgba(15, 23, 42, 0.55);">{{ project.hook|linebreaksbr }}</div>
+    <div class="form-group" style="margin-top: 20px;">
+        <label class="form-label">🔍 Центральная загадка</label>
+        <div class="card" style="background: rgba(15, 23, 42, 0.55); padding: 15px;">
+            {{ plan.story_data.central_mystery|default:"Не указана"|linebreaksbr }}
+        </div>
     </div>
 
     <div class="form-group">
-        <label class="form-label">Voiceover</label>
-        <textarea class="form-control" rows="8" readonly>{{ project.voiceover }}</textarea>
+        <label class="form-label">🪝 Хук (Зацепка)</label>
+        <div class="card" style="background: rgba(15, 23, 42, 0.55); padding: 15px;">
+            <p style="margin: 0 0 10px 0; font-weight: 600;">{{ plan.story_data.hook_fact.fact|default:"Не указан" }}</p>
+            <small class="text-muted">Почему это сработает: {{ plan.story_data.hook_fact.selection_reason|default:"-" }}</small>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">🏗 Структура повествования</label>
+        <div style="display: grid; gap: 10px;">
+            
+            <div class="card" style="background: rgba(15, 23, 42, 0.55); padding: 15px;">
+                <strong style="color: #60a5fa;">SETUP (Завязка):</strong> {{ plan.story_data.story_structure.setup.beat|default:"-" }}
+                {% if plan.story_data.story_structure.setup.image_generation_prompt %}
+                    <div style="margin-top: 10px; color: #a78bfa; font-family: monospace; font-size: 0.9em;">🎬 Prompt: {{ plan.story_data.story_structure.setup.image_generation_prompt }}</div>
+                {% endif %}
+            </div>
+            
+            {% for dev_item in plan.story_data.story_structure.development %}
+            <div class="card" style="background: rgba(15, 23, 42, 0.55); padding: 15px; margin-left: 20px; border-left: 3px solid #60a5fa;">
+                <strong style="color: #9ca3af;">DEVELOPMENT:</strong> {{ dev_item.beat|default:"-" }}
+                {% if dev_item.image_generation_prompt %}
+                    <div style="margin-top: 10px; color: #a78bfa; font-family: monospace; font-size: 0.9em;">🎬 Prompt: {{ dev_item.image_generation_prompt }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <div class="card" style="background: rgba(15, 23, 42, 0.55); padding: 15px;">
+                <strong style="color: #fbbf24;">REVEAL (Раскрытие):</strong> {{ plan.story_data.story_structure.reveal.beat|default:"-" }}
+                {% if plan.story_data.story_structure.reveal.image_generation_prompt %}
+                    <div style="margin-top: 10px; color: #a78bfa; font-family: monospace; font-size: 0.9em;">🎬 Prompt: {{ plan.story_data.story_structure.reveal.image_generation_prompt }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="card" style="background: rgba(239, 68, 68, 0.1); padding: 15px; border: 1px solid rgba(239, 68, 68, 0.3);">
+                <strong style="color: #f87171;">CLIMAX (Кульминация):</strong> {{ plan.story_data.story_structure.climax.beat|default:"-" }}
+                {% if plan.story_data.story_structure.climax.image_generation_prompt %}
+                    <div style="margin-top: 10px; color: #a78bfa; font-family: monospace; font-size: 0.9em;">🎬 Prompt: {{ plan.story_data.story_structure.climax.image_generation_prompt }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="card" style="background: rgba(15, 23, 42, 0.55); padding: 15px;">
+                <strong style="color: #4caf50;">ENDING (Финал):</strong> {{ plan.story_data.story_structure.ending.beat|default:"-" }}
+                {% if plan.story_data.story_structure.ending.image_generation_prompt %}
+                    <div style="margin-top: 10px; color: #a78bfa; font-family: monospace; font-size: 0.9em;">🎬 Prompt: {{ plan.story_data.story_structure.ending.image_generation_prompt }}</div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
 
 <div class="flex flex-between mt-2 mb-2">
-    <h2>Сцены</h2>
-    <span class="text-muted">{{ project.scenes.count }} сцен</span>
+    <h2>Отобранные факты и сцены</h2>
+    <span class="text-muted">{{ plan.story_data.selected_facts|length }} элементов</span>
 </div>
 
-{% for scene in project.scenes.all %}
+{% for fact in plan.story_data.selected_facts %}
 <div class="card mb-2">
     <div class="flex flex-between">
-        <h3 style="margin-top: 0;">Сцена {{ scene.order }}</h3>
-        <span class="badge badge-work">{{ scene.duration }} сек</span>
+        <h3 style="margin-top: 0;">
+            {% if fact.role == 'hook' %}🪝 Хук
+            {% elif fact.role == 'climax' %}🔥 Кульминация
+            {% elif fact.role == 'reveal' %}💡 Раскрытие
+            {% else %}📌 {{ fact.role|title }}{% endif %}
+        </h3>
+        <span class="badge badge-work">Visual Priority: {{ fact.visual_priority|default:"5" }}/10</span>
     </div>
+    
     <div class="form-group">
-        <label class="form-label">Текст сцены</label>
-        <p>{{ scene.text }}</p>
+        <label class="form-label">Факт</label>
+        <p>{{ fact.fact }}</p>
+        <small class="text-muted">Причина выбора: {{ fact.selection_reason|default:"-" }}</small>
     </div>
+    
     <div class="form-group">
-        <label class="form-label">Image prompt</label>
-        <textarea class="form-control" rows="3" readonly>{{ scene.image_prompt }}</textarea>
+        <label class="form-label">🎬 Scene Concept (Image Prompt)</label>
+        <textarea class="form-control" rows="3" readonly style="font-family: monospace; font-size: 0.9em; color: #a78bfa;">{% if fact.role == 'hook' %}{{ plan.story_data.story_structure.hook.image_generation_prompt|default:"Используется изображение из поиска" }}{% elif fact.role == 'setup' %}{{ plan.story_data.story_structure.setup.image_generation_prompt|default:"Используется изображение из поиска" }}{% elif fact.role == 'reveal' %}{{ plan.story_data.story_structure.reveal.image_generation_prompt|default:"Используется изображение из поиска" }}{% elif fact.role == 'climax' %}{{ plan.story_data.story_structure.climax.image_generation_prompt|default:"Используется изображение из поиска" }}{% elif fact.role == 'ending' %}{{ plan.story_data.story_structure.ending.image_generation_prompt|default:"Используется изображение из поиска" }}{% else %}Промпт находится в блоке DEVELOPMENT выше{% endif %}</textarea>
     </div>
 </div>
 {% empty %}
-<div class="card text-muted">Сцен нет.</div>
+<div class="card text-muted">Отобранных фактов нет.</div>
 {% endfor %}
+
+{% if plan.story_data.discarded_facts %}
+<details class="card mt-2" style="background: rgba(239, 68, 68, 0.05);">
+    <summary style="cursor: pointer; font-weight: 600; color: #f87171; padding: 10px;">
+        Показать отсеянные факты ({{ plan.story_data.discarded_facts|length }})
+    </summary>
+    <div style="padding: 0 15px 15px 15px;">
+        {% for discarded in plan.story_data.discarded_facts %}
+        <div style="border-bottom: 1px solid rgba(239, 68, 68, 0.2); padding: 10px 0;">
+            <strong>{{ discarded.fact }}</strong><br>
+            <small class="text-muted">Причина отсева: {{ discarded.reason }}</small>
+        </div>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}
+
 {% endblock %}

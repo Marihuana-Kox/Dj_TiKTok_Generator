@@ -57,10 +57,22 @@ class ResearchProject(models.Model):
         blank=True,
         help_text="Сырой JSON от AI: facts, scores, hooks, visual_moments...",
     )
-
+    cluster = models.ForeignKey(
+        "article.ArticleCluster",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="research_projects",
+        help_text="Глобальная тема или ниша исследования",
+    )
     status = models.CharField("Статус", max_length=20, choices=STATUS_CHOICES, default="pending")
     error_message = models.TextField("Ошибка", blank=True)
-
+    selected_images = models.JSONField(
+        "Выбранные изображения",
+        default=list,
+        blank=True,
+        help_text="Изображения, выбранные AI для этой темы",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

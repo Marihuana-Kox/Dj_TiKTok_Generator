@@ -13,23 +13,32 @@
     {% if request.resolver_match.url_name == 'audio_edit' %}
 <script src="{% static 'js/audio/audio_edit.js' %}"></script>
     {% elif request.resolver_match.url_name == 'audio_create' %}
-<script src="{% static 'js/audio/audio_create.js' %}"></script>
+    <script src="{% static 'js/audio/audio_create.js' %}"></script>
     {% endif %}
 {% elif request.resolver_match.namespace == 'topics' %}
 <script src="{% static 'js/topics/topics_dashboard.js' %}"></script>
     {% if request.resolver_match.url_name == 'research' %}
-<script src="{% static 'js/topics/research_progress.js' %}"></script>
+    <script src="{% static 'js/topics/research_progress.js' %}"></script>
     {% endif %}
 {% elif request.resolver_match.namespace == 'article' %}
 <script src="{% static 'js/article/article_create.js' %}"></script>
 <script src="{% static 'js/article/article_edit.js' %}"></script>
 <script src="{% static 'js/article/article_dashboard.js' %}"></script>
+    {% if request.resolver_match.url_name == 'script_generate' %}
+    <script src="{% static 'js/article/scripts_generate_progress.js' %}"></script>
+    {% elif request.resolver_match.url_name == 'script_dashboard' %}
+    <script src="{% static 'js/article/scripts_dashboard.js' %}"></script>
+     {% endif %}
 {% elif request.resolver_match.namespace == 'videoeditor' %}
 <script src="{% static 'js/videoeditor/video_editor.js' %}"></script>
 <script src="{% static 'js/videoeditor/timeline_drag_drop.js' %}"></script>
 <script src="{% static 'js/videoeditor/capcut_editor.js' %}"></script>
 {% elif request.resolver_match.namespace == 'shorts' %}
 <script src="{% static 'js/shorts/shorts_modal.js' %}"></script>
+    {% if request.resolver_match.url_name == 'dashboard' %}
+    <script src="{% static 'js/shorts/shorts_dashboard.js' %}"></script>
+    {% endif %}
 {% elif request.resolver_match.namespace == 'planner' %}
 <script src="{% static 'js/planner/planner_modal.js' %}"></script>
+<script src="{% static 'js/planner/planner_checkbox.js' %}"></script>
 {% endif %}

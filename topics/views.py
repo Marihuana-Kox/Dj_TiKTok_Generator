@@ -11,6 +11,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 
 from shorts.progressbar import ProgressManager, sse_progress_view
 from topics.models import ResearchProject, VideoProject
+from .helpers.domains import get_domains_for_preset
 from .forms import (
     GenerateIdeasForm,
     ResearchProjectEditForm,
@@ -36,6 +37,11 @@ def generate_research_view(request):
             style = form.cleaned_data.get("research_style", "random")
             focus_notes = form.cleaned_data.get("focus_notes", "")
 
+            # 🔥 ПОЛУЧАЕМ ДОМЕНЫ ИЗ ПРЕСЕТА
+            domain_preset = form.cleaned_data.get("domain_preset", "")
+            include_domains = get_domains_for_preset(domain_preset) if domain_preset else None
+            # Категории запросов
+            search_category = form.cleaned_data.get("search_category", "general")
             # 1. Создаём заготовку проекта
             project = ResearchProject.objects.create(
                 topic=topic,
@@ -48,30 +54,49 @@ def generate_research_view(request):
 
             # 2. Инициализируем наш ProgressManager (вместо ручного cache.set)
             pb = ProgressManager(task_id=task_id, redirect_url=redirect_url, timeout=CACHE_TIMEOUT)
-            pb.init("🚀 Запуск исследования...", log_msg=f"Стиль: {style}")
+            pb.init(
+                "🚀 Запуск исследования...", log_msg=f"Стиль: {style}, Категория: {search_category}"
+            )
 
             # 3. Фоновая задача
             def run_research():
                 try:
-                    pb.update(15, "🤖 Отправка запроса к AI...", log_msg="Промпт сформирован")
-
-                    # 🔥 РЕАЛЬНЫЙ ВЫЗОВ СЕРВИСА ГЕНЕРАЦИИ
-                    research_json = generate_research_data(
-                        topic=topic, provider_name=provider, style=style, focus_notes=focus_notes
-                    )
-
+                    t = 11
+                    pb.update(t, "🤖 Отправка запроса к AI...", log_msg="Промпт сформирован")
+                    time.sleep(8)
                     pb.update(
-                        60,
+                        27, "🤖 Получение данных запроса к AI...", log_msg="Промпт сформирован"
+                    )
+                    time.sleep(11)
+                    pb.update(39, "🤖 Обработка полученных данных...", log_msg="Промпт сформирован")
+                    if t == 11:
+                        # 🔥 РЕАЛЬНЫЙ ВЫЗОВ СЕРВИСА ГЕНЕРАЦИИ
+                        research_json = generate_research_data(
+                            topic=topic,
+                            provider_name=provider,
+                            style=style,
+                            focus_notes=focus_notes,
+                            use_web_search=form.cleaned_data.get("use_web_search", True),
+                            include_domains=include_domains,  #  Передаём домены
+                            search_category=search_category,  #  Категории
+                        )
+                    time.sleep(6)
+                    pb.update(
+                        59,
                         "✅ Ответ получен. Валидация JSON...",
                         log_msg="Структура проверена и нормализована",
                     )
 
                     # Сохраняем результат в JSONField модели
                     project.research_data = research_json
+                    project.selected_images = research_json.get(
+                        "selected_images", []
+                    )  # 🔥 Сохраняем картинки
                     project.status = "pending"
                     project.save()
-
+                    time.sleep(4)
                     pb.update(90, "💾 Данные сохранены в базу...", log_msg="Готово")
+                    time.sleep(5)
                     pb.done(100, "✅ Исследование успешно завершено!", log_msg="Готово к просмотру")
 
                 except Exception as exc:
@@ -80,8 +105,13 @@ def generate_research_view(request):
                     project.error_message = str(exc)
                     project.save()
 
-                    # Используем метод fail из ProgressManager
-                    pb.fail(str(exc))
+                    pb.update(
+                        percent=100,
+                        message=f"❌ Ошибка: {str(exc)}",
+                        log_msg=f"❌ {str(exc)}",
+                        status="done",  # Заставляет модалку подождать перед закрытием
+                        redirect_url="/topics/research/",  # Возвращаем пользователя обратно на форму
+                    )
 
                 finally:
                     from django.db import connection
@@ -97,7 +127,7 @@ def generate_research_view(request):
                 or request.content_type == "application/json"
             ):
                 # Добавляем stream_url, чтобы modal.js знал, куда подключаться
-                stream_url = f"/topics/generate_stream/?task_id={task_id}"
+                stream_url = f"/topics/generate-stream/?task_id={task_id}"
                 return JsonResponse({"status": "ok", "task_id": task_id, "stream_url": stream_url})
 
             messages.success(request, "Генерация исследования запущена в фоне.")
@@ -260,17 +290,6 @@ def generate_idea_view(request):
         form = GenerateIdeasForm()
 
     return render(request, "topics/generate.html", {"form": form})
-
-
-def generate_stream(request):
-    """SSE поток, который РЕАЛЬНО читает прогресс из кэша"""
-    task_id = request.GET.get("task_id")
-
-    if not task_id:
-        return JsonResponse({"error": "No task_id"}, status=400)
-
-    # Полностью заменяем ручную логику while True на нашу готовую функцию из progressbar.py
-    return sse_progress_view(request, task_id, timeout=CACHE_TIMEOUT)
 
 
 def dashboard(request):
@@ -479,6 +498,17 @@ def research_edit(request, pk):
 
     context = {"form": form, "project": project}
     return render(request, "topics/research_edit.html", context)
+
+
+def generate_stream(request):
+    """SSE поток, который РЕАЛЬНО читает прогресс из кэша"""
+    task_id = request.GET.get("task_id")
+
+    if not task_id:
+        return JsonResponse({"error": "No task_id"}, status=400)
+
+    # Полностью заменяем ручную логику while True на нашу готовую функцию из progressbar.py
+    return sse_progress_view(request, task_id, timeout=CACHE_TIMEOUT)
 
 
 # def generate_stream(request):

@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Генерация текста для ролика{% endblock %}
+
+{% block content %}
+<form id="video-script-form" method="POST">
+    {% csrf_token %}
+    
+    <h5 class="mb-2 text-bold text-blue">1. Настройки генерации</h5>
+    
+    <div class="flex mb-2 gap-2">
+        <div class="form-group flex-fill">
+            <label class="form-label">{{ form.ai_provider.label }}</label>
+            {{ form.ai_provider }}
+        </div>
+        <div class="form-group flex-fill">
+            <label class="form-label">{{ form.target_duration.label }}</label>
+            {{ form.target_duration }}
+        </div>
+    </div>
+
+    <div class="form-group mb-2">
+        <label class="form-label">{{ form.script_prompt.label }}</label>
+        {{ form.script_prompt }}
+        <small class="text-muted text-small d-block mt-1">
+            Промпт для написания вирусного текста (код: <code id="prompt-code-display">{{ form.script_prompt.value|default:"viral_script_writer" }}</code>)
+        </small>
+    </div>
+
+    <h5 class="text-bold text-blue mb-2 border-bottom pb-2 mt-4">2. Выбор исследования</h5>
+
+    <div class="form-group mb-2">
+        <label class="form-label">{{ form.research_project.label }}</label>
+        {{ form.research_project }}
+        <small class="text-muted text-small d-block mt-1">
+            {{ form.research_project.help_text }}
+        </small>
+        {% for error in form.research_project.errors %}
+        <div class="text-danger text-small">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+<div class="form-group mb-3">
+    <label class="form-label">{{ form.focus_notes.label }}</label>
+    {{ form.focus_notes }}
+    <small class="text-muted text-small d-block mt-1">
+        {{ form.focus_notes.help_text }}
+    </small>
+</div>
+
+    <div class="flex mt-4 border-top pt-3 gap-2">
+        <button type="submit" class="btn btn-success flex-fill">🚀 Сгенерировать текст</button>
+        <a href="{% url 'article:script_dashboard' %}" class="btn btn-outline flex-fill">Отмена</a>
+    </div>
+</form>
+
+<script>
+    // Используем эти переменные в JS файле
+    window.VIDEO_SCRIPT_STREAM_URL = "{% url 'article:script_generate' %}";
+</script>
+{% endblock %}

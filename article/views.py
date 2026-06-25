@@ -11,9 +11,10 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 
 # Импорт моделей
 from prompts.models import ArticlePrompt
+from shorts.progressbar import ProgressManager
 from topics.models import VideoProject
-from article.models import ArticleCluster, ArticleTranslation, Language
-from article.forms import ArticleGenerationForm
+from .models import ArticleCluster, ArticleTranslation, Language, VideoScript
+from .forms import ArticleCreateForm, ArticleGenerationForm, VideoScriptForm
 
 # Импорт сервисов
 from ai_inspector.services import generate_text
@@ -456,6 +457,13 @@ def article_dashboard(request):
 def article_editor(request, pk):
     cluster = get_object_or_404(ArticleCluster, id=pk)
     translations = cluster.translations.all().order_by("language__order")
+    # Получаем список языков, которые ещё не переведены
+    translated_lang_ids = translations.values_list("language_id", flat=True)
+    available_languages = (
+        Language.objects.filter(is_active=True)
+        .exclude(id__in=translated_lang_ids)
+        .order_by("order")
+    )
 
     # основной перевод
     main_trans = translations.filter(language__code="ru").first()
@@ -496,6 +504,353 @@ def article_editor(request, pk):
         "cluster": cluster,
         "translations": translations,
         "main_trans": main_trans,
+        "available_languages": available_languages,
     }
 
     return render(request, "article/editor.html", context)
+
+
+# Самостоятельное добавле готовых статей для роликов
+def article_create(request):
+    """Создание новой статьи вручную."""
+    if request.method == "POST":
+        form = ArticleCreateForm(request.POST)
+
+        if form.is_valid():
+            language = form.cleaned_data["language"]
+
+            # 1. Создаём кластер (контейнер для всех переводов)
+            cluster = ArticleCluster.objects.create(
+                is_complete=(form.cleaned_data["status"] == "published")
+            )
+
+            # 2. Создаём первый перевод
+            ArticleTranslation.objects.create(
+                cluster=cluster,
+                language=language,
+                title=form.cleaned_data["title"],
+                description=form.cleaned_data.get("description", ""),
+                content=form.cleaned_data["content"],
+                hashtags=form.cleaned_data.get("hashtags", ""),
+                status=form.cleaned_data["status"],
+            )
+
+            messages.success(
+                request, f"✅ Статья '{form.cleaned_data['title']}' создана на {language.name}!"
+            )
+            return redirect("article:article_editor", pk=cluster.pk)
+        else:
+            messages.error(request, "⚠️ Проверьте форму на ошибки.")
+    else:
+        form = ArticleCreateForm()
+
+    context = {"form": form}
+    return render(request, "article/create.html", context)
+
+
+# Перевод статей на разные языки
+def ai_translate(request, cluster_id):
+    """Быстрый перевод статьи через AI."""
+    cluster = get_object_or_404(ArticleCluster, id=cluster_id)
+
+    if request.method != "POST":
+        messages.error(request, "⚠️ Метод не разрешён")
+        return redirect("article:article_editor", pk=cluster_id)
+
+    target_lang_id = request.POST.get("target_language")
+    if not target_lang_id:
+        messages.error(request, "⚠️ Выберите язык для перевода")
+        return redirect("article:article_editor", pk=cluster_id)
+
+    target_language = get_object_or_404(Language, id=target_lang_id)
+
+    # Проверяем, нет ли уже перевода на этот язык
+    if cluster.translations.filter(language=target_language).exists():
+        messages.warning(request, f"⚠️ Перевод на {target_language.name} уже существует")
+        return redirect("article:article_editor", pk=cluster_id)
+
+    # Получаем основной перевод (русский или первый доступный)
+    source_translation = cluster.translations.filter(language__code="ru").first()
+    if not source_translation:
+        source_translation = cluster.translations.first()
+
+    if not source_translation:
+        messages.error(request, "⚠️ Нет исходного текста для перевода")
+        return redirect("article:article_editor", pk=cluster_id)
+
+    # Запускаем фоновую задачу перевода
+    task_id = str(uuid.uuid4())
+
+    # Инициализируем прогресс
+    cache.set(
+        f"progress_{task_id}",
+        {
+            "percent": 0,
+            "message": "Подготовка к переводу...",
+            "status": "running",
+            "logs": ["🚀 Запуск перевода..."],
+            "task_id": task_id,
+        },
+        timeout=3600,
+    )
+
+    def run_translation():
+        try:
+            cache.set(
+                f"progress_{task_id}",
+                {
+                    "percent": 20,
+                    "message": f"🤖 AI переводит на {target_language.name}...",
+                    "status": "running",
+                    "logs": ["🤖 Отправка текста в AI..."],
+                    "task_id": task_id,
+                },
+                timeout=3600,
+            )
+
+            # Получаем промпт для перевода
+            from prompts.services import get_system_instruction
+
+            context = {
+                "target_lang": target_language.name,
+                "original_title": source_translation.title,
+                "article_content": source_translation.content,
+            }
+
+            trans_prompt = get_system_instruction("translation_strict", context)
+
+            # Генерируем перевод
+            provider = "openai"  # Или возьми из настроек
+            trans_raw = generate_text(provider, trans_prompt, max_tokens=2500)
+            trans_data = parse_ai_json(trans_raw)
+
+            cache.set(
+                f"progress_{task_id}",
+                {
+                    "percent": 80,
+                    "message": "💾 Сохранение перевода...",
+                    "status": "running",
+                    "logs": ["💾 Сохранение в базу..."],
+                    "task_id": task_id,
+                },
+                timeout=3600,
+            )
+
+            # Создаём перевод
+            ArticleTranslation.objects.create(
+                cluster=cluster,
+                language=target_language,
+                title=trans_data.get("title", source_translation.title),
+                content=trans_data.get("content", source_translation.content),
+                description=trans_data.get("description", ""),
+                hashtags=trans_data.get("hashtags", ""),
+                status="draft",
+            )
+
+            cache.set(
+                f"progress_{task_id}",
+                {
+                    "percent": 100,
+                    "message": "✅ Перевод создан!",
+                    "status": "done",
+                    "logs": ["✅ Перевод успешно создан!"],
+                    "task_id": task_id,
+                    "redirect_url": f"/article/editor/{cluster.id}/",
+                },
+                timeout=3600,
+            )
+
+        except Exception as e:
+            print(f"❌ Ошибка перевода: {e}")
+            cache.set(
+                f"progress_{task_id}",
+                {
+                    "percent": 0,
+                    "message": f"❌ Ошибка: {str(e)}",
+                    "status": "error",
+                    "logs": [f"❌ Ошибка: {str(e)}"],
+                    "task_id": task_id,
+                },
+                timeout=3600,
+            )
+        finally:
+            from django.db import connection
+
+            connection.close()
+
+    # Запускаем поток
+    threading.Thread(target=run_translation, daemon=True).start()
+
+    # Возвращаем JSON для AJAX
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse(
+            {
+                "status": "ok",
+                "task_id": task_id,
+                "stream_url": f"/article/generation-stream/?task_id={task_id}",
+            }
+        )
+
+    messages.success(request, "🚀 Перевод запущен в фоне")
+    return redirect("article:article_editor", pk=cluster_id)
+
+
+# Новая логика написания статьи с моделью gpt-4o-mini
+def script_dashboard(request):
+    """Список текстов для роликов."""
+    # Обработка POST (удаление/смена статуса)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        selected_ids = request.POST.getlist("selected_scripts")
+
+        if selected_ids:
+            scripts = VideoScript.objects.filter(id__in=selected_ids)
+
+            if action == "delete_selected":
+                count, _ = scripts.delete()
+                messages.success(request, f"✅ Удалено {count} текстов.")
+            elif action == "change_status":
+                new_status = request.POST.get("new_status")
+                if new_status:
+                    scripts.update(status=new_status)
+                    messages.success(request, f"✅ Статус изменён для {scripts.count()} текстов.")
+        else:
+            messages.warning(request, "⚠️ Ничего не выбрано.")
+
+        return redirect("article:video_script_list")
+
+    # Статистика
+    scripts_qs = VideoScript.objects.all()
+    stats = {
+        "total": scripts_qs.count(),
+        "draft": scripts_qs.filter(status="draft").count(),
+        "approved": scripts_qs.filter(status="approved").count(),
+        "rejected": scripts_qs.filter(status="rejected").count(),
+    }
+
+    # Список
+    scripts = scripts_qs.select_related("research_project").order_by("-created_at")
+
+    context = {
+        "scripts": scripts,
+        "total": stats["total"],
+        "stats": stats,
+    }
+    return render(request, "article/script_dashboard.html", context)
+
+
+def script_generate(request):
+    """Генерация вирусного текста для ролика."""
+    if request.method == "POST":
+        form = VideoScriptForm(request.POST)
+
+        if form.is_valid():
+            research_project = form.cleaned_data["research_project"]
+            provider_name = form.cleaned_data["ai_provider"]
+            prompt_code = form.cleaned_data["script_prompt"]
+            focus_notes = form.cleaned_data.get("focus_notes", "")
+
+            # Создаём черновик VideoScript
+            script = VideoScript.objects.create(
+                research_project=research_project,
+                title=f"Текст: {research_project.topic}",
+                provider=provider_name,
+                status="draft",
+            )
+
+            task_id = str(uuid.uuid4())
+            redirect_url = f"/article/api/generation_stream/{script.pk}/"
+
+            # Инициализируем прогресс-бар
+            pb = ProgressManager(task_id=task_id, redirect_url=redirect_url, timeout=CACHE_TIMEOUT)
+            pb.init("🚀 Запуск генерации текста...", log_msg=f"Тема: {research_project.topic}")
+
+            # Фоновая задача
+            def run_generation():
+                try:
+                    pb.update(20, "🤖 Анализ исследования...", log_msg="Извлечение фактов")
+
+                    # TODO: Здесь будет вызов сервиса generate_video_script
+                    # Пока просто имитация для теста
+                    import time
+
+                    time.sleep(3)
+
+                    pb.update(60, "✅ Текст сгенерирован", log_msg="Валидация структуры")
+
+                    # TODO: Сохранение реальных данных
+                    # script.script_data = script_data
+                    # script.status = "approved"
+                    # script.save()
+
+                    pb.update(90, "💾 Сохранение в базу...", log_msg="Готово")
+                    pb.done(100, "✅ Текст успешно создан!", log_msg="Перенаправление...")
+
+                except Exception as exc:
+                    print(f"❌ Ошибка генерации текста {task_id}: {exc}")
+                    script.status = "rejected"
+                    script.save()
+                    pb.fail(str(exc))
+                finally:
+                    from django.db import connection
+
+                    connection.close()
+
+            # Запуск потока
+            threading.Thread(target=run_generation, daemon=True).start()
+
+            # Ответ для AJAX (модалка прогресса)
+            if (
+                request.headers.get("x-requested-with") == "XMLHttpRequest"
+                or request.content_type == "application/json"
+            ):
+                return JsonResponse(
+                    {
+                        "status": "ok",
+                        "task_id": task_id,
+                        "stream_url": f"/article/api/generation_stream/?task_id={task_id}",
+                    }
+                )
+
+            messages.success(request, "Генерация текста запущена.")
+            return redirect("article:script_dashboard")
+
+        else:
+            if request.content_type == "application/json":
+                return JsonResponse({"status": "error", "errors": form.errors}, status=400)
+            messages.error(request, "Ошибка в форме.")
+
+    else:
+        form = VideoScriptForm()
+
+    context = {
+        "form": form,
+    }
+    return render(request, "article/script_generate.html", context)
+
+
+def script_detail(request, pk):
+    """Детальная страница текста для ролика."""
+    script = get_object_or_404(
+        VideoScript.objects.select_related("research_project", "cluster"), pk=pk
+    )
+
+    # Обработка POST (редактирование) — пока заглушка
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "update_status":
+            new_status = request.POST.get("status")
+            if new_status in ["draft", "approved", "rejected"]:
+                script.status = new_status
+                script.save()
+                messages.success(request, f"✅ Статус изменён на '{script.get_status_display()}'")
+            else:
+                messages.error(request, "⚠️ Неверный статус")
+
+        return redirect("article:script_detail", pk=script.pk)
+
+    context = {
+        "script": script,
+    }
+    return render(request, "article/script_detail.html", context)

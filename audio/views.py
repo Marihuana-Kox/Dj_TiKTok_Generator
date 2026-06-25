@@ -830,9 +830,7 @@ def upload_manual_audio(request):
             print(f"⚠️ Ошибка подсчета длины при ручной загрузке: {audio_err}")
 
         # Формируем URL для базы данных (с заменой на voice_ru)
-        audio_url = f"{settings.MEDIA_URL}projects/{safe_folder_name}/{voice_folder_name}/{filename}".replace(
-            "\\", "/"
-        )
+        audio_url = f"projects/{safe_folder_name}/{voice_folder_name}/{filename}".replace("\\", "/")
 
         # Обновляем трек в БД Django
         track.status = "success"

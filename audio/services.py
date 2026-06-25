@@ -19,6 +19,28 @@ from image.services import get_or_create_project_dir
 logger = logging.getLogger(__name__)
 
 
+def clean_voice_name(voice_id: str) -> str:
+    """
+    Извлекает чистое имя голоса из полного ID.
+
+    Примеры:
+    - 'default-jkassdf23jk__marfa_new' → 'Marfa'
+    - 'Nikolai' → 'Nikolai'
+    - 'elevenlabs__abc123__elena' → 'Elena'
+    """
+    if not voice_id:
+        return "Unknown"
+
+    # Берём часть после последнего '__' (если есть)
+    clean_name = voice_id.split("__")[-1]
+
+    # Берём только первое слово (до первого '_')
+    clean_name = clean_name.split("_")[0]
+
+    # Делаем первую букву заглавной
+    return clean_name.title() if clean_name else "Unknown"
+
+
 def split_text_by_words_and_dots(text: str, target_word_count: int = 50) -> list:
     """
     Разбивает текст на сюжеты примерно по target_word_count слов,
@@ -86,10 +108,10 @@ def generate_voiceover_inworld(
             raise ValueError("Ключ API в базе не найден")
         clean_key = api_key.strip()
 
-        model_id = config.get("model_id", "inworld-tts-2")
+        model_id = config.get("modelId", "inworld-tts-2")
 
         short_text = " ".join(text.split())
-        print(f"📤 Payload для теста (10 слов): {short_text}")
+        print(f"📤 Payload для теста: {short_text}")
 
         async def _async_stream_generate():
             log_to_modal(
@@ -125,9 +147,10 @@ def generate_voiceover_inworld(
         voice_folder_name = f"voice_{language}" if language else "voice"
         voice_dir = Path(project_dir) / voice_folder_name
         voice_dir.mkdir(parents=True, exist_ok=True)
-
+        # default - mwx - w5dvmldahfby4uvang__marihuanakox
         # 3. Имя файла по твоему стандарту
-        file_base_name = f"{voice_id}_{track_order}_{language}"
+        clean_voice = clean_voice_name(voice_id)
+        file_base_name = f"{clean_voice}_{track_order}_{language}"
         filename = f"{file_base_name}.wav"
         json_filename = f"voices_meta_{language}.json"
 
@@ -166,6 +189,7 @@ def generate_voiceover_inworld(
             "article_id": article_id,
             "track_order": track_order,
             "speaker": voice_id,
+            "speaker_clean": clean_voice,
             "language": language,
             "model": model_id,
             "speed": speaking_rate,

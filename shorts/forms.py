@@ -1,39 +1,45 @@
 from django import forms
-
 from ai_inspector.models import AIProvider
+from planner.models import StoryPlan  # Импортируем модель плана
 
 
 class ShortGenerationForm(forms.Form):
-    topic = forms.CharField(
-        label="Тема ролика",
-        max_length=255,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "Например: Пирамиды Гизы, исчезновение Майя, Атлантида",
-            }
-        ),
-    )
     ai_provider = forms.ChoiceField(
-        label="AI сервис",
+        label="AI Провайдер",
         choices=[],
+        required=True,
+        widget=forms.Select(attrs={"class": "form-control", "style": "font-weight: 600;"}),
+    )
+
+    story_plan = forms.ModelChoiceField(
+        label="Сюжетный план (Основа)",
+        queryset=StoryPlan.objects.filter(status__in=["approved", "script_generated"]).order_by(
+            "-virality_score", "-created_at"
+        ),
+        required=True,
         widget=forms.Select(attrs={"class": "form-control"}),
+        help_text="Сценарий будет написан строго на основе структуры и фактов этого плана.",
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         providers = AIProvider.objects.filter(is_active=True, provider_type="llm").order_by(
-            "display_name", "name"
+            "display_name"
         )
-        choices = [("", "--- Выберите AI сервис ---")]
-        for provider in providers:
-            label = provider.display_name or provider.name
-            config = provider.config or {}
-            model = config.get("model_id") or config.get("model") or config.get("text_model")
-            if model:
-                label = f"{label} ({model})"
-            choices.append((provider.name, label))
-
-        self.fields["ai_provider"].choices = choices
-        if len(choices) == 2:
-            self.fields["ai_provider"].initial = choices[1][0]
+        self.fields["ai_provider"].choices = [("", "--- Выберите AI ---")] + [
+            (p.name, p.display_name) for p in providers
+        ]
+        if len(self.fields["ai_provider"].choices) > 1:
+            self.fields["ai_provider"].initial = self.fields["ai_provider"].choices[1][0]
+        # 2. Настройка Сюжетных планов
+        # Задаем красивую пустую строку по умолчанию вместо стандартных дефисов "---------"
+        self.fields["story_plan"].empty_label = "--- Выберите план ---"
+        # --- ВОТ КОД ДЛЯ ОБРЕЗКИ СТРОКИ ДО 40 СИМВОЛОВ ---
+        # Заменяем стандартное строковое отображение объектов в списке
+        self.fields["story_plan"].label_from_instance = lambda obj: (
+            obj.title[:37] + "..." if len(obj.title) > 40 else obj.title
+        )
+        # Автоматически подставляем самый первый (лучший по вирулентности/свежий) план
+        first_plan = self.fields["story_plan"].queryset.first()
+        if first_plan:
+            self.fields["story_plan"].initial = first_plan

@@ -10,5 +10,5 @@ urlpatterns = [
     path("dashboard-research/", views.dashboard_research, name="dashboard_research"),
     path("<int:pk>/edit/", views.project_edit, name="project_edit"),
     path("edit-research/<int:pk>/", views.research_edit, name="research_edit"),
-    path("api/generate-stream/", views.generate_stream, name="generate_stream"),
+    path("generate-stream/", views.generate_stream, name="generate_stream"),
 ]

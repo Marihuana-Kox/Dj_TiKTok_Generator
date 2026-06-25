@@ -1,0 +1,112 @@
+{
+    "categories": {
+        "person": {
+            "label": "👤 Персона (историческая личность)",
+            "description": "Поиск компромата, безумия, тайных мотивов, фальсификации репутации и архивных тайн.",
+            "templates": [
+                "{topic} hidden motives crimes financial scandals",
+                "{topic} propaganda fabrications myths vs reality",
+                "{topic} cruel decisions insanity psychiatric analysis",
+                "{topic} secret alliances betrayals classified documents",
+                "{topic} suspicious death autopsy cover up",
+                "{topic} historical criticism modern controversies debates",
+                "{topic} internal corruption power struggles hidden wealth",
+                "{topic} darkest secrets suppressed biographies diaries",
+                "{topic} political manipulation unpunished crimes archives",
+                "{topic} public image vs private atrocities",
+                "{topic} forbidden love affairs blackmail espionage",
+                "{topic} dynamic with enemies secret letters leaks",
+                "{topic} double life imposter theories deception",
+                "{topic} who benefited from his fall betrayal",
+                "{topic} most hated decisions historical backlash"
+            ]
+        },
+        "event": {
+            "label": "⚔️ Событие (война, революция, кризис)",
+            "description": "Поиск фальсификаций, замалчивания жертв, тайных бенефициаров, заговоров и несостыковок.",
+            "templates": [
+                "{topic} official version vs classified evidence",
+                "{topic} who benefited corruption hidden agenda",
+                "{topic} suppressed documents eyewitness testimonies anomalies",
+                "{topic} staged events propaganda cover up",
+                "{topic} historical contradictions unresolved mysteries",
+                "{topic} forbidden history fatal mistakes unintended consequences",
+                "{topic} true casualty numbers hidden genocide massacre",
+                "{topic} economic interests secret funding banks",
+                "{topic} conspiracy theories debunked vs proven facts",
+                "{topic} structural lies prewar manipulation archives",
+                "{topic} ignored warnings intelligence failure sabotage",
+                "{topic} geopolitical betrayal secret treaties exposure",
+                "{topic} human experimentation war crimes cover up",
+                "{topic} behind the scenes puppet masters manipulation",
+                "{topic} shocking aftermath unexpected turning points"
+            ]
+        },
+        "architecture": {
+            "label": "🏛️ Архитектура (здания, сооружения)",
+            "description": "Поиск технологических аномалий, скрытых пустот, альтернативной хронологии и лжи о датировках.",
+            "templates": [
+                "{topic} impossible engineering ancient advanced tools",
+                "{topic} hidden chambers underground forbidden tunnels",
+                "{topic} dating controversy alternative chronology",
+                "{topic} who really built it suppressed history",
+                "{topic} architectural anomalies destruction cover up",
+                "{topic} lost construction technologies original purpose mystery",
+                "{topic} purpose debunked ritual vs functional infrastructure",
+                "{topic} out of place materials trade routes anomaly",
+                "{topic} seismic technology impossible precision alignment",
+                "{topic} sudden abandonment theories mass panic",
+                "{topic} sacred geometry esoteric secrets hidden codes",
+                "{topic} excavation scandals items missing from archives",
+                "{topic} local legends vs academic consensus friction",
+                "{topic} destroyed evidence deliberate vandalism historians",
+                "{topic} older structures underneath secret excavations"
+            ]
+        },
+        "artifact": {
+            "label": "🏺 Артефакты (предметы, находки)",
+            "description": "Поиск неуместных артефактов (OOPArt), цензуры музеев, аномальных материалов и запрещенной археологии.",
+            "templates": [
+                "{topic} forbidden archaeology suppressed discoveries",
+                "{topic} impossible manufacturing materials analysis anomaly",
+                "{topic} museum hidden artifacts restricted access vaults",
+                "{topic} hoax accusation vs genuine scientific debate",
+                "{topic} true origin lost function paradigm shift",
+                "{topic} anomaly dating controversy age deception",
+                "{topic} stolen artifacts black market repatriation scandal",
+                "{topic} organic residue analysis unexpected results shock",
+                "{topic} high tech properties ancient metallurgy paradox",
+                "{topic} dangerous properties curses radioactive anomalies",
+                "{topic} matching artifacts distinct continents impossible contact",
+                "{topic} item confiscated by authorities cover up",
+                "{topic} mistranslated inscriptions hidden message code",
+                "{topic} non human design claims scientific friction",
+                "{topic} bizarre wear patterns impossible usage evidence"
+            ]
+        },
+        "general": {
+            "label": "🌍 Общая (универсальные запросы)",
+            "description": "Универсальные триггеры для вскрытия исторической цензуры, когнитивного диссонанса и парадоксов.",
+            "templates": [
+                "{topic} historical anomalies friction cognitive dissonance",
+                "{topic} suppressed knowledge forbidden truth scandal",
+                "{topic} alternative theories main stream science criticism",
+                "{topic} shocking facts unexpected outcomes paradox",
+                "{topic} lies deception cover up rewriting history",
+                "{topic} unresolved mysteries fierce debates conspiracy",
+                "{topic} dark side uncomfortable truth censorship",
+                "{topic} massive cover up missing evidence archives",
+                "{topic} what historians are hiding fierce argument",
+                "{topic} paradigm shift discoveries rejected by academia",
+                "{topic} terrifying statistics forgotten incidents shock",
+                "{topic} taboo topics restricted information leaked",
+                "{topic} logic flaws official explanation impossible",
+                "{topic} documents declassified recently shocking revelations",
+                "{topic} double standards historical hypocrisy exposed"
+            ]
+        }
+    },
+    "default_category": "general",
+    "max_queries_per_category": 15,
+    "description": "Расширенные категоризированные шаблоны поисковых запросов для Tavily (по 15 на категорию). Максимальное разнообразие выдачи, упор на эмоциональное трение, ложь, аномалии и заговоры."
+}

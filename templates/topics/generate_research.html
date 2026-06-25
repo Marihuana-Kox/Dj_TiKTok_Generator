@@ -22,11 +22,26 @@
             <div class="alert alert-error">⚠️ Нет активных сервисов. Проверьте админку.</div>
         {% endif %}
     </div>
-    <!-- 2. Выбор темы промпта -->
+
+     <!-- 2. Выбор темы промпта -->
     <div class="form-group" style="margin-bottom: 15px;">
         <label class="form-label">{{ form.research_style.label }}</label>
         {{ form.research_style }}
-        <small class="text-muted">Выбери конкретную подачу или доверься случаю.</small>
+        <small class="text-muted">Выбери ресурсы для поиска.</small>
+    </div>
+
+    <!-- 2.2 Выбор ресурса для поиска -->
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label class="form-label">{{ form.domain_preset.label }}</label>
+        {{ form.domain_preset }}
+        <small class="text-muted">Выбери ресурсы для поиска.</small>
+    </div>
+
+    <!-- 2.3 Переключатель поиска -->
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label class="form-label">{{ form.use_web_search.label }}</label>
+        {{ form.use_web_search }}
+        <small class="text-muted">{{ form.use_web_search.help_text }}</small>
     </div>
 
     <!-- 3. Тема (в ResearchForm это одно поле topic, а не topics_input) -->
@@ -34,6 +49,13 @@
         <label class="form-label">{{ form.topic.label }}</label>
         {{ form.topic }}
         <small class="text-muted">{{ form.topic.help_text }}</small>
+    </div>
+
+    <!-- 3.1 Выбор категории запроса -->
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label class="form-label">{{ form.search_category.label }}</label>
+        {{ form.search_category }}
+        <small class="text-muted">Выбери категорию для поиска.</small>
     </div>
 
     <!-- 4. Дополнительные заметки (если есть в твоей форме) -->
@@ -45,7 +67,7 @@
     </div>
     {% endif %}
 
-    <!-- 5. Дополнительные заметки (если есть в твоей форме) -->
+    <!-- 5. Количество запросов одного топика (если есть в твоей форме) -->
     {% if form.count %}
     <div class="form-group" style="margin-bottom: 15px;">
         <label class="form-label">{{ form.count.label }}</label>

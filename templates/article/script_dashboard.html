@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block title %}Тексты для роликов{% endblock %}
+
+{% block content %}
+<div class="flex flex-between mb-2">
+    <div>
+        <h1>🎬 Тексты для роликов</h1>
+        <p class="text-muted">Вирусные тексты для TikTok, Reels и Shorts на основе исследований.</p>
+    </div>
+    <a href="{% url 'article:script_generate' %}" class="btn btn-primary">✨ Создать текст</a>
+</div>
+
+<!-- Статистика -->
+<div class="flex mb-2">
+    <div class="card stat-card blue">
+        <span class="stat-value">{{ total }}</span>
+        <span class="stat-label">Всего</span>
+    </div>
+    <div class="card stat-card orange">
+        <span class="stat-value">{{ stats.draft }}</span>
+        <span class="stat-label">Черновики</span>
+    </div>
+    <div class="card stat-card green">
+        <span class="stat-value">{{ stats.approved }}</span>
+        <span class="stat-label">Утверждено</span>
+    </div>
+    <div class="card stat-card red">
+        <span class="stat-value">{{ stats.rejected }}</span>
+        <span class="stat-label">Отклонено</span>
+    </div>
+</div>
+
+<form method="post" id="bulk-action-form">
+    {% csrf_token %}
+    <div class="card" style="padding: 0;">
+        <div class="flex flex-between mb-2 pt-2" style="padding: 0 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 0;">
+            <div class="flex items-center">
+                <input type="checkbox" id="select-all" class="form-control checkbox-fix">
+                <label for="select-all" class="text-bold ml-1">Выбрать все</label>
+                <span id="selection-count" class="ml-2 text-muted" style="display:none;">(выбрано: <span id="count-val">0</span>)</span>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <!-- Удаление -->
+                <button type="submit" name="action" value="delete_selected" id="btn-delete" class="btn btn-outline" disabled onclick="return confirm('Удалить выбранные тексты? Это действие нельзя отменить.');">
+                    🗑️ Удалить
+                </button>
+                
+                <div class="separator" style="width:1px; height:20px; background:var(--border-color); margin:0 5px;"></div>
+                
+                <!-- Смена статуса -->
+                <select name="new_status" id="status-select" class="form-control" style="width: auto; min-width: 150px;" disabled>
+                    <option value="" selected disabled>Изменить статус на...</option>
+                    <option value="approved">✅ Утверждено</option>
+                    <option value="draft">✏️ Черновик</option>
+                    <option value="rejected">❌ Отклонено</option>
+                </select>
+                <button type="submit" name="action" value="change_status" id="btn-status" class="btn btn-primary" disabled>
+                    Применить
+                </button>
+            </div>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th></th>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Исследование</th>
+                    <th>Слов</th>
+                    <th>Длит.</th>
+                    <th>Версия</th>
+                    <th>Статус</th>
+                    <th>Создано</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if scripts %}
+                    {% for script in scripts %}
+                        <tr class="idea-row">
+                            <!-- 1. НОМЕР -->
+                            <td class="text-center">{{ forloop.counter }}</td>
+                            
+                            <!-- 2. ЧЕКБОКС -->
+                            <td class="text-center">
+                                <input type="checkbox" name="selected_scripts" value="{{ script.id }}" class="idea-checkbox form-control checkbox-fix">
+                            </td>
+                            
+                            <!-- 3. ID -->
+                            <td class="text-center text-small">{{ script.id }}</td>
+                            
+                            <!-- 4. НАЗВАНИЕ -->
+                            <td class="text-bold">
+                                <a href="{% url 'article:script_detail' script.pk %}" class="link-blue">
+                                    {{ script.title|truncatechars:50 }}
+                                </a>
+                            </td>
+
+                            <!-- 5. ИССЛЕДОВАНИЕ -->
+                            <td class="text-muted text-small">
+                                {{ script.research_project.topic|truncatechars:40 }}
+                            </td>
+
+                            <!-- 6. СЛОВА -->
+                            <td class="text-center">
+                                <span class="badge bg-light text-dark">{{ script.word_count }}</span>
+                            </td>
+
+                            <!-- 7. ДЛИТЕЛЬНОСТЬ -->
+                            <td class="text-center">
+                                <span class="badge bg-light text-dark">{{ script.estimated_duration }}с</span>
+                            </td>
+
+                            <!-- 8. ВЕРСИЯ -->
+                            <td class="text-center">
+                                v{{ script.version }}
+                            </td>
+
+                            <!-- 9. СТАТУС -->
+                            <td>
+                                {% if script.status == 'approved' %}
+                                    <span class="badge badge-done">Утверждено</span>
+                                {% elif script.status == 'draft' %}
+                                    <span class="badge badge-work">Черновик</span>
+                                {% elif script.status == 'rejected' %}
+                                    <span class="badge bg-danger">Отклонено</span>
+                                {% else %}
+                                    <span class="badge bg-light">{{ script.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- 10. ДАТА -->
+                            <td class="text-muted text-small">{{ script.created_at|date:"d.m.Y H:i" }}</td>
+
+                            <!-- 11. ДЕЙСТВИЕ -->
+                            <td>
+                                <a href="{% url 'article:script_detail' script.pk %}" class="text-bold link-blue">👁️ Открыть</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="11" class="text-muted text-center">Пока нет ни одного текста. Создайте первый!</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</form>
+
+{% endblock %}

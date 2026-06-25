@@ -2,140 +2,68 @@ import json
 import re
 from ai_inspector.services import generate_text
 from prompts.models import ScriptPrompt
+from planner.models import StoryPlan
 
 
 class ShortScriptValidationError(ValueError):
     pass
 
 
-# Дефолтный промпт (fallback)
-FALLBACK_PROMPT = """
-Ты - режиссёр TikTok исторических видео.
-Твоя задача:
-1. Определи лучший стиль: DOCUMENTARY / SHOCK / THEORY
-2. Создай сценарий для ролика
-
-СТИЛИ:
-- DOCUMENTARY: факты, нейтрально, как Netflix
-- SHOCK: вирусный, интригующий, сильный хук
-- THEORY: гипотезы, загадки, альтернативные версии
-
-ЛОГИКА ВЫБОРА СТИЛЯ:
-- SHOCK выбирай, если есть загадка, древние артефакты, необъяснимое, тайна, скрытые факты
-- DOCUMENTARY выбирай, если тема про исторические события, войны, личности, и нужна точность
-- THEORY выбирай, если нет точного ответа, тема про археологию, космос, древние цивилизации или альтернативные версии
-
-ФОРМАТ ОТВЕТА (строго JSON, без markdown, без пояснений):
-{
- "style": "",
- "hook": "",
- "voiceover": "",
- "scenes": [
-  {
-   "text": "",
-   "image_prompt": "",
-   "duration": 3
-  }
- ]
-}
-
-ПРАВИЛА:
-- hook: максимум 2 предложения
-- voiceover: единый текст для озвучки
-- scenes: 4-7 сцен
-- каждый image_prompt должен быть кинематографичным и на английском языке
-- стиль должен влиять на текст и визуал
-- НИКАКИХ объяснений, только валидный JSON
-
-ТЕМА:
-{TOPIC}
-""".strip()
-
-
-def get_script_prompt(style_hint: str = None) -> tuple[str, dict]:
-    """Загружает промпт из БД. Если нет → возвращает fallback."""
+def get_shorts_director_prompt() -> tuple[str, dict]:
+    """Загружает промпт для режиссера сценария. Если нет — останавливает процесс."""
     try:
-        qs = ScriptPrompt.objects.filter(is_active=True)
-        if style_hint:
-            qs = qs.filter(code=style_hint.upper())
+        # Строго ищем промпт с code="shorts_base"
+        prompt_obj = ScriptPrompt.objects.filter(code="shorts_base", is_active=True).first()
 
-        prompt_obj = qs.first()
-        if prompt_obj and prompt_obj.prompt_text.strip():
-            return prompt_obj.prompt_text.strip(), prompt_obj.config or {}
+        if prompt_obj:
+            text = prompt_obj.prompt_text.strip()
+            if text:
+                return text, prompt_obj.config or {}
     except Exception as e:
-        print(f"⚠️ Ошибка загрузки промпта из БД: {e}")
+        print(f"⚠️ Ошибка загрузки промпта shorts из БД: {e}")
 
-    return FALLBACK_PROMPT, {"min_scenes": 4, "max_scenes": 7, "lang": "en"}
+    # ДЕФОЛТНЫЙ ПРОМПТ УБРАН. Процесс останавливается с четкой ошибкой до запроса к AI.
+    raise ShortScriptValidationError(
+        "Критическая остановка: Промпт 'shorts_base' не найден в базе данных или пуст. "
+        "Добавьте его в админ-панель перед запуском генерации."
+    )
 
 
-def build_short_script_prompt(topic: str, style_hint: str = None) -> tuple[str, dict]:
-    prompt_text, config = get_script_prompt(style_hint)
-    return prompt_text.replace("{TOPIC}", topic.strip()), config
+def generate_short_script_from_plan(story_plan: StoryPlan, provider_name: str):
+    """Генерирует финальный сценарий на основе готового StoryPlan."""
 
+    prompt_text, config = get_shorts_director_prompt()
 
-def validate_short_script_data(data: dict, config: dict):
-    """Валидация с учётом настроек из БД."""
-    if not isinstance(data, dict):
-        raise ShortScriptValidationError("JSON должен быть объектом.")
-
-    style = str(data.get("style", "")).upper().strip()
-    if style not in {"DOCUMENTARY", "SHOCK", "THEORY"}:
-        raise ShortScriptValidationError("Поле style должно быть DOCUMENTARY, SHOCK или THEORY.")
-
-    hook = str(data.get("hook", "")).strip()
-    voiceover = str(data.get("voiceover", "")).strip()
-    scenes = data.get("scenes")
-
-    if not hook:
-        raise ShortScriptValidationError("Поле hook пустое.")
-    if not voiceover:
-        raise ShortScriptValidationError("Поле voiceover пустое.")
-
-    # ✅ Используем конфиг из БД вместо хардкода
-    min_scenes = config.get("min_scenes", 4)
-    max_scenes = config.get("max_scenes", 7)
-
-    if not isinstance(scenes, list) or not (min_scenes <= len(scenes) <= max_scenes):
-        raise ShortScriptValidationError(
-            f"Поле scenes должно содержать {min_scenes}-{max_scenes} сцен."
-        )
-
-    normalized_scenes = []
-    for index, scene in enumerate(scenes, start=1):
-        if not isinstance(scene, dict):
-            raise ShortScriptValidationError(f"Сцена {index} должна быть объектом.")
-
-        text = str(scene.get("text", "")).strip()
-        image_prompt = str(scene.get("image_prompt", "")).strip()
-        duration = scene.get("duration", 3)
-
-        try:
-            duration = int(duration)
-        except (TypeError, ValueError):
-            raise ShortScriptValidationError(f"duration в сцене {index} должен быть числом.")
-
-        if not text:
-            raise ShortScriptValidationError(f"Поле text пустое в сцене {index}.")
-        if not image_prompt:
-            raise ShortScriptValidationError(f"Поле image_prompt пустое в сцене {index}.")
-
-        normalized_scenes.append(
-            {
-                "text": text,
-                "image_prompt": image_prompt,
-                "duration": max(1, min(duration, 15)),
-            }
-        )
-
-    return {
-        "style": style,
-        "hook": hook,
-        "voiceover": voiceover,
-        "scenes": normalized_scenes,
+    # Передаем в промпт только релевантную часть story_data, чтобы не перегружать контекст
+    plan_context = {
+        "title": story_plan.title,
+        "narrative_style": story_plan.narrative_style,
+        "hook_fact": story_plan.story_data.get("hook_fact", {}),
+        "central_mystery": story_plan.story_data.get("central_mystery", ""),
+        "story_structure": story_plan.story_data.get("story_structure", {}),
+        "selected_facts": story_plan.story_data.get("selected_facts", []),
     }
 
+    story_planner_json = json.dumps(plan_context, ensure_ascii=False, indent=2)
+    final_prompt = prompt_text.replace("{story_planner_json}", story_planner_json)
 
-def parse_short_script_json(raw_text: str, config: dict):
+    max_attempts = 2
+    for attempt in range(1, max_attempts + 1):
+        try:
+            temp = 0.7 if attempt == 1 else 0.2
+            raw_response = generate_text(
+                provider_name=provider_name, prompt=final_prompt, max_tokens=3000, temperature=temp
+            )
+            return parse_and_validate_short_script(raw_response, config)
+        except ShortScriptValidationError as e:
+            if attempt == 1:
+                print(f"⚠️ Попытка 1 провалилась: {e}. Пробуем строгий режим...")
+                final_prompt = f"КРИТИЧЕСКАЯ ОШИБКА: Ты нарушил формат. Верни СТРОГО валидный JSON по схеме. Данные плана: {story_planner_json}"
+                continue
+            raise e
+
+
+def parse_and_validate_short_script(raw_text: str, config: dict):
     if not raw_text:
         raise ShortScriptValidationError("AI вернул пустой ответ.")
 
@@ -147,27 +75,101 @@ def parse_short_script_json(raw_text: str, config: dict):
     try:
         data = json.loads(match.group(0))
     except json.JSONDecodeError as exc:
-        raise ShortScriptValidationError(f"AI вернул невалидный JSON: {exc}") from exc
+        raise ShortScriptValidationError(f"AI вернул невалидный JSON: {exc}")
 
-    return validate_short_script_data(data, config)
+    if not isinstance(data, dict):
+        raise ShortScriptValidationError("JSON должен быть объектом.")
 
+    # --- ВАЛИДАЦИЯ НОВЫХ МЕТАДАННЫХ ---
+    short_title = str(data.get("short_title", "")).strip()
+    if not short_title or len(short_title) > 80:
+        raise ShortScriptValidationError(
+            "Поле 'short_title' обязательно и должно быть коротким (до 80 символов)."
+        )
 
-def generate_short_script(topic: str, provider_name: str, style_hint: str = None):
-    """Генерация с retry-логикой и поддержкой конфига из БД."""
-    prompt, config = build_short_script_prompt(topic, style_hint)
-    max_attempts = 2
+    hashtags = data.get("hashtags", [])
+    if not isinstance(hashtags, list) or len(hashtags) != 5:
+        raise ShortScriptValidationError(
+            "Поле 'hashtags' должно быть списком ровно из 5 элементов."
+        )
+    hashtags = [str(tag).strip() for tag in hashtags]
 
-    for attempt in range(1, max_attempts + 1):
+    description = str(data.get("description", "")).strip()
+    if not description:
+        raise ShortScriptValidationError("Поле 'description' обязательно.")
+
+    # --- ВАЛИДАЦИЯ ОСНОВНЫХ ПОЛЕЙ ---
+    style = str(data.get("style", "SHOCK")).upper().strip()
+    if style not in {"DOCUMENTARY", "SHOCK", "THEORY"}:
+        style = "SHOCK"
+
+    hook = str(data.get("hook", "")).strip()
+    voiceover = str(data.get("voiceover", "")).strip()
+    scenes = data.get("scenes")
+
+    if not hook or not voiceover:
+        raise ShortScriptValidationError("Поля hook или voiceover пусты.")
+
+    # Используем конфиг из БД, fallback на 7-10 сцен согласно твоему промпту
+    min_scenes = config.get("min_scenes", 7)
+    max_scenes = config.get("max_scenes", 10)
+
+    if not isinstance(scenes, list) or not (min_scenes <= len(scenes) <= max_scenes):
+        raise ShortScriptValidationError(
+            f"Поле scenes должно содержать {min_scenes}-{max_scenes} сцен."
+        )
+
+    normalized_scenes = []
+    total_duration = 0
+    for index, scene in enumerate(scenes, start=1):
+        if not isinstance(scene, dict):
+            continue
+
+        text = str(scene.get("text", "")).strip()
+        image_prompt = str(scene.get("image_prompt", "")).strip()
+
+        # Новые поля из твоего промпта
+        scene_number = int(scene.get("scene_number", index))
+        role = str(scene.get("role", "development")).strip()
+        camera_motion = str(scene.get("camera_motion", "static")).strip()
+        transition = str(scene.get("transition", "fade")).strip()
+        emotion = str(scene.get("emotion", "mystery")).strip()
+
         try:
-            # На первой попытке temperature=0.8 (креатив), на второй=0.2 (строгость)
-            temp = 0.8 if attempt == 1 else 0.2
-            raw_response = generate_text(provider_name, prompt, max_tokens=2200, temperature=temp)
-            return parse_short_script_json(raw_response, config)
+            duration = int(float(scene.get("duration", 8) or 8))
+            visual_priority = int(float(scene.get("visual_priority", 5) or 5))
+        except (TypeError, ValueError):
+            duration = 8
+            visual_priority = 5
 
-        except ShortScriptValidationError as e:
-            if attempt == 1:
-                print(f"⚠️ Попытка 1 провалилась: {e}. Пробуем строгий режим...")
-                # Меняем промпт на жёсткий retry
-                prompt = f"Ты сломал формат JSON. Верни СТРОГО валидный JSON по схеме. Тема: {topic}. Никакого текста кроме JSON."
-                continue
-            raise e  # Если и вторая упала → пробрасываем ошибку в view
+        # Ограничители из промпта (8-12 секунд, приоритет 1-10)
+        duration = max(8, min(duration, 12))
+        visual_priority = max(1, min(visual_priority, 10))
+        total_duration += duration
+
+        if not text or not image_prompt:
+            raise ShortScriptValidationError(f"Сцена {index} пустая (нет text или image_prompt).")
+
+        normalized_scenes.append(
+            {
+                "scene_number": scene_number,
+                "role": role,
+                "text": text,
+                "image_prompt": image_prompt,
+                "duration": duration,
+                "camera_motion": camera_motion,
+                "transition": transition,
+                "emotion": emotion,
+                "visual_priority": visual_priority,
+            }
+        )
+
+    return {
+        "short_title": short_title,
+        "hashtags": hashtags,
+        "description": description,
+        "style": style,
+        "hook": hook,
+        "voiceover": voiceover,
+        "scenes": normalized_scenes,
+    }

@@ -5,8 +5,10 @@ from datetime import timedelta
 from django.utils import timezone
 
 from prompts.models import IdeaPrompt
+from topics.helpers.blacklist import get_banned_domains
+from topics.helpers.search_templates import generate_search_queries
 from .models import VideoProject
-from ai_inspector.services import generate_text
+from ai_inspector.services import generate_text, search_with_tavily
 from prompts.services import get_random_idea_prompt
 
 # ПРОВЕРКА ИМПОРТА НА УРОВНЕ МОДУЛЯ
@@ -333,103 +335,250 @@ Language for summary/facts/questions: Russian. Titles must be clean."""
 
 
 def generate_research_data(
-    topic: str, provider_name: str, style: str, focus_notes: str = ""
+    topic: str,
+    provider_name: str,
+    style: str,
+    focus_notes: str = "",
+    use_web_search: bool = True,
+    search_provider: str = "tavily_search",
+    include_domains: list = None,
+    exclude_domains: list = None,
+    search_category: str = "general",
 ) -> dict:
-    """
-    Генерирует исследовательские данные в формате JSON через LLM.
-    Сохраняет все неизвестные поля от ИИ, но жестко гарантирует наличие
-    и корректный тип обязательных полей, чтобы избежать падений.
-    """
-    # 1. Получаем промпт из БД
+    """Acts strictly as a raw research engine collector for the downstream Planner."""
+    import json
+    import re
+
+    search_context = ""
+
+    # ==========================================
+    # ЭТАП 1: ПОИСК В ИНТЕРНЕТЕ (Tavily)
+    # ==========================================
+    if use_web_search:
+        try:
+            print(
+                f"\n{'=' * 80}\n🔍 [RESEARCH] Smart search for topic: '{topic}' | Category: {search_category}\n{'=' * 80}"
+            )
+
+            search_queries = generate_search_queries(
+                topic=topic,
+                category=search_category,
+                focus_notes=focus_notes,
+                count=6,
+                randomize=True,
+            )
+
+            all_results = []
+            all_images = []
+            seen_urls = set()
+            seen_img_urls = set()
+            summaries = []
+
+            for i, query_template in enumerate(search_queries, 1):
+                try:
+                    search_query = str(query_template)
+                    if focus_notes:
+                        search_query += f". {focus_notes.strip()}"
+
+                    if len(search_query) > 400:
+                        search_query = search_query[:400].rsplit(" ", 1)[0]
+
+                    print(f"🔎 [{i}/{len(search_queries)}] Tavily: '{search_query}'")
+
+                    search_data = search_with_tavily(
+                        query=search_query,
+                        provider_name=search_provider,
+                        max_results=20,
+                        include_images=True,
+                        include_domains=include_domains,
+                        exclude_domains=get_banned_domains(),
+                    )
+
+                    for r in search_data.get("results", []):
+                        url = r.get("url", "")
+                        if url and url not in seen_urls:
+                            seen_urls.add(url)
+                            all_results.append(r)
+
+                    if search_data.get("answer"):
+                        summaries.append(search_data["answer"].strip())
+
+                    for img in search_data.get("images", []):
+                        img_url = img.get("url", "") if isinstance(img, dict) else str(img)
+                        if img_url and img_url not in seen_img_urls:
+                            seen_img_urls.add(img_url)
+                            all_images.append(img)
+
+                except Exception as e:
+                    print(f"   ⚠️ Request error #{i}: {e}")
+                    continue
+
+            # Формирование и обрезка контекста ПОСЛЕ завершения всех запросов
+            if not all_results:
+                search_context = "Web search returned no results. Use internal knowledge."
+            else:
+                MAX_SOURCE_LENGTH = 800
+                MAX_TOTAL_SOURCES = 15
+                MAX_CONTEXT_LENGTH = 15000
+
+                sorted_results = sorted(all_results, key=lambda x: x.get("score", 0), reverse=True)
+                top_results = sorted_results[:MAX_TOTAL_SOURCES]
+
+                print(
+                    f"📊 [RESEARCH] Формируем контекст: ТОП-{len(top_results)} из {len(all_results)} источников"
+                )
+
+                ctx_blocks = []
+
+                if summaries:
+                    # Берем самое релевантное саммари
+                    ctx_blocks.append(f"=== TAVILY SUMMARY ===\n{summaries[0][:1000]}\n")
+
+                ctx_blocks.append("=== COMBINED RESEARCH RESULTS ===")
+                for idx, r in enumerate(top_results, 1):
+                    title = str(r.get("title", ""))[:200]
+                    content = str(r.get("content", ""))[:MAX_SOURCE_LENGTH]
+                    ctx_blocks.append(
+                        f"--- SOURCE {idx} (score: {r.get('score', 0)}) ---\n"
+                        f"Title: {title}\n"
+                        f"URL: {r.get('url', '')}\n"
+                        f"Content: {content}\n"
+                    )
+
+                if all_images:
+                    ctx_blocks.append(f"\n=== COLLECTED IMAGES ({len(all_images)} found) ===")
+                    for idx, img in enumerate(
+                        all_images[:20], 1
+                    ):  # Лимитируем список картинок для LLM
+                        if isinstance(img, dict):
+                            ctx_blocks.append(
+                                f"[{idx}] URL: {img.get('url', '')}\nDescription: {img.get('description', '')}\n"
+                            )
+                        else:
+                            ctx_blocks.append(f"[{idx}] URL: {str(img)}\n")
+                    ctx_blocks.append("=== END OF COLLECTED IMAGES ===")
+
+                search_context = "\n".join(ctx_blocks)
+
+                if len(search_context) > MAX_CONTEXT_LENGTH:
+                    print(
+                        f"⚠️ [RESEARCH] Контекст превышает лимит ({len(search_context)} символов). Обрезка до {MAX_CONTEXT_LENGTH}..."
+                    )
+                    search_context = (
+                        search_context[:MAX_CONTEXT_LENGTH]
+                        + "\n\n[...context truncated due to length...]"
+                    )
+
+                print(f"✅ Context packed: {len(search_context)} characters.")
+
+        except Exception as e:
+            print(f"⚠️ Search failed: {e}. Going internal.")
+            search_context = "Web search unavailable. Use internal knowledge."
+
+    # ==========================================
+    # ЭТАП 2: ГЕНЕРАЦИЯ ИССЛЕДОВАНИЯ ЧЕРЕЗ LLM
+    # ==========================================
     try:
+        prompt_filter = {"is_active": True}
         if style == "random":
-            prompt_obj = IdeaPrompt.objects.filter(is_active=True).order_by("?").first()
+            prompt_obj = IdeaPrompt.objects.filter(**prompt_filter).order_by("?").first()
         else:
-            prompt_obj = IdeaPrompt.objects.filter(code_name=style, is_active=True).first()
+            prompt_obj = IdeaPrompt.objects.filter(code_name=style, **prompt_filter).first()
 
         if not prompt_obj:
-            raise ResearchValidationError("Активный промпт для исследования не найден в БД.")
+            raise ResearchValidationError("Active prompt template not found in DB.")
 
         prompt_text = prompt_obj.template_content.replace("{topic}", topic.strip())
+        notes = focus_notes.strip() if focus_notes else "None."
+        prompt_text = prompt_text.replace("{focus_notes}", notes)
 
-        if "{focus_notes}" in prompt_text:
-            notes = focus_notes.strip() if focus_notes else "Дополнительных указаний нет."
-            prompt_text = prompt_text.replace("{focus_notes}", notes)
+        if "{search_results}" in prompt_text:
+            prompt_text = prompt_text.replace("{search_results}", search_context)
+        else:
+            prompt_text += f"\n\n=== WEB SEARCH RESULTS ===\n{search_context}"
 
     except Exception as e:
-        raise ResearchValidationError(f"Ошибка подготовки промпта: {e}")
+        raise ResearchValidationError(f"Prompt build error: {e}")
 
-    # 2. Вызов LLM
     raw_response = generate_text(
-        provider_name=provider_name, prompt=prompt_text, max_tokens=2500, temperature=0.7
+        provider_name=provider_name,
+        prompt=prompt_text,
+        max_tokens=4000,
+        temperature=0.3,
+        response_format={"type": "json_object"},
     )
 
-    # 3. Очистка и парсинг JSON
     cleaned = raw_response.replace("```json", "").replace("```", "").strip()
     match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
-
     if not match:
-        raise ResearchValidationError("AI не вернул JSON объект. Проверьте промпт.")
+        raise ResearchValidationError("LLM failed to return a valid JSON object.")
 
     try:
         data = json.loads(match.group(0))
     except json.JSONDecodeError as e:
-        raise ResearchValidationError(f"AI вернул невалидный JSON: {e}")
+        raise ResearchValidationError(f"JSON Syntax Error: {e}")
 
-    # 4. БЕЗОПАСНАЯ НОРМАЛИЗАЦИЯ (ГЛАВНОЕ ИЗМЕНЕНИЕ)
-    if not isinstance(data, dict):
-        raise ResearchValidationError("Корневой элемент ответа должен быть объектом (dict).")
+    if data.get("status") == "INSUFFICIENT_RESEARCH":
+        reason = (
+            data.get("reason")
+            or data.get("message")
+            or "LLM filtered out all facts as common knowledge/low virality."
+        )
+        raise ResearchValidationError(f"Insufficient historical friction metrics. Reason: {reason}")
 
-    # Гарантируем наличие обязательных строковых полей верхнего уровня.
-    # Если ИИ их забыл, мы добавим пустые строки, чтобы код не упал с KeyError.
-    # Все остальные поля, которые добавил ИИ, останутся в словаре нетронутыми!
-    data.setdefault("topic_type", "Unknown")
-    data.setdefault("central_mystery", "")
-    data.setdefault("best_hook_candidate", "")
-    data.setdefault("best_climax_candidate", "")
-    data.setdefault("strongest_visual_moment", "")
-    data.setdefault("most_surprising_discovery", "")
-
-    # Валидация списка фактов
     if "facts" not in data or not isinstance(data["facts"], list):
-        raise ResearchValidationError("В ответе AI отсутствует обязательный список 'facts'.")
+        raise ResearchValidationError("Root key 'facts' must be a valid array.")
 
     normalized_facts = []
     for index, fact in enumerate(data["facts"], start=1):
         if not isinstance(fact, dict):
-            raise ResearchValidationError(f"Элемент факта #{index} должен быть объектом (dict).")
+            raise ResearchValidationError(f"Fact block #{index} must be an object.")
 
-        # Нормализуем строки (гарантируем, что это строки, даже если ИИ вернул null)
-        fact["fact"] = str(fact.get("fact", "")).strip()
-        fact["why_it_matters"] = str(fact.get("why_it_matters", "")).strip()
-        fact["scene_idea"] = str(fact.get("scene_idea", "")).strip()
+        fact_text = str(fact.get("fact", "")).strip()
+        if not fact_text:
+            raise ResearchValidationError(f"Fact text missing in block #{index}.")
 
-        # Безопасное приведение оценок к int.
-        # Используем int(float(...)), чтобы обработать случаи, когда ИИ возвращает "8.5" или "8" вместо 8
-        try:
-            fact["curiosity_score"] = int(float(fact.get("curiosity_score", 0) or 0))
-        except (ValueError, TypeError):
-            fact["curiosity_score"] = 0
+        normalized_facts.append(
+            {
+                "fact": fact_text,
+                "detailed_intel": str(fact.get("detailed_intel", "")).strip(),
+                "primary_emotional_trigger": str(fact.get("primary_emotional_trigger", ""))
+                .split("|")[0]
+                .strip(),
+                "why_it_matters": str(fact.get("why_it_matters", "")).strip(),
+                "visual_description": str(fact.get("visual_description", "")).strip(),
+                "metrics": {
+                    "surprise": int(float(fact.get("metrics", {}).get("surprise", 0) or 0)),
+                    "conflict": int(float(fact.get("metrics", {}).get("conflict", 0) or 0)),
+                    "reinterpretation": int(
+                        float(fact.get("metrics", {}).get("reinterpretation", 0) or 0)
+                    ),
+                },
+                "virality_score": int(float(fact.get("virality_score", 0) or 0)),
+                "evidence_level": str(fact.get("evidence_level", "confirmed")).strip(),
+                "source_url": str(fact.get("source_url", "")).strip(),
+            }
+        )
 
-        try:
-            fact["visual_score"] = int(float(fact.get("visual_score", 0) or 0))
-        except (ValueError, TypeError):
-            fact["visual_score"] = 0
-
-        try:
-            fact["mystery_score"] = int(float(fact.get("mystery_score", 0) or 0))
-        except (ValueError, TypeError):
-            fact["mystery_score"] = 0
-
-        # Критическая проверка: факт не может быть полностью пустым
-        if not fact["fact"]:
-            raise ResearchValidationError(f"В факте #{index} отсутствует основной текст ('fact').")
-
-        normalized_facts.append(fact)
-
-    # Перезаписываем список фактов нормализованной версией
     data["facts"] = normalized_facts
 
-    # Возвращаем итоговый словарь. Он содержит все обязательные поля в правильном формате
-    # + любые дополнительные поля, которые сгенерировал ИИ.
+    scores = [f["virality_score"] for f in normalized_facts]
+    data["overall_emotional_score"] = round(sum(scores) / len(scores)) if scores else 0
+
+    data.setdefault("status", "SUCCESS")
+    data.setdefault("topic", topic.strip())
+    data.setdefault("discarded_facts", [])
+
+    valid_images = []
+    for img in data.get("selected_images", []):
+        if isinstance(img, dict) and img.get("image_url"):
+            valid_images.append(
+                {
+                    "image_url": str(img.get("image_url", "")).strip(),
+                    "image_reason": str(img.get("image_reason", "")).strip(),
+                    "associated_fact": str(img.get("associated_fact", "")).strip(),
+                }
+            )
+    data["selected_images"] = valid_images
+
     return data

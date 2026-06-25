@@ -1,0 +1,12 @@
+{
+    "banned_domains": [
+        "wikipedia.org",
+        "en.wikipedia.org",
+        "ru.wikipedia.org",
+        "britannica.com",
+        "history.com",
+        "biography.com",
+        "worldhistory.org",
+        "ancient.eu"
+    ]
+}

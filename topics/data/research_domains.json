@@ -1,0 +1,85 @@
+{
+    "presets": {
+        "alternative_history_ru": {
+            "label": "🇷🇺 Альтернативная история (RU)",
+            "domains": [
+                "alternathistory.com",
+                "chronologia.org",
+                "newchronology.ru",
+                "kramola.info",
+                "pereformat.ru",
+                "russian7.ru",
+                "starina.ru",
+                "hrono.ru",
+                "historic.ru",
+                "taiy.ru"
+            ]
+        },
+        "alternative_history_en": {
+            "label": "🇬🇧 Alternative History (EN)",
+            "domains": [
+                "ancient-origins.net",
+                "grahamhancock.com",
+                "historicmysteries.com",
+                "forbiddenknowledge.tv",
+                "unexplained-mysteries.com",
+                "atlantisrising.com",
+                "dailygrail.com",
+                "mysteriousuniverse.org",
+                "coasttocoastam.com"
+            ]
+        },
+        "archaeology": {
+            "label": "🏛️ Археология и артефакты",
+            "domains": [
+                "archaeology.org",
+                "archaeologymag.com",
+                "heritagedaily.com",
+                "archaeolog.ru",
+                "ancient.eu"
+            ]
+        },
+        "youtube_history": {
+            "label": "📺 YouTube (История)",
+            "domains": [
+                "youtube.com"
+            ]
+        },
+        "russian_blogs": {
+            "label": "📝 Русские блоги и форумы",
+            "domains": [
+                "livejournal.com",
+                "pikabu.ru",
+                "vc.ru",
+                "habr.com"
+            ]
+        },
+        "german_history": {
+            "label": "🇩🇪 Немецкие исторические ресурсы",
+            "domains": [
+                "ghil.ac.uk",
+                "germanhistorysociety.org",
+                "zeitgeschichte-online.de"
+            ]
+        },
+        "academic": {
+            "label": "🎓 Академические источники",
+            "domains": [
+                "jstor.org",
+                "academia.edu",
+                "arxiv.org",
+                "researchgate.net"
+            ]
+        },
+        "russian_popular": {
+            "label": "📰 Научпоп (RU)",
+            "domains": [
+                "diletant.media",
+                "postnauka.ru",
+                "elementy.ru",
+                "nplus1.ru",
+                "indicator.ru"
+            ]
+        }
+    }
+}

@@ -8,7 +8,12 @@
         <h1>Панель статей</h1>
         <p class="text-muted">Написание и редактирование контента.</p>
     </div>
-    <a href="{% url 'article:generate_page' %}" class="btn btn-primary">✨ Генерация статей</a>
+    <div class="button-block">
+        <a href="{% url 'article:generate_page' %}" class="btn btn-primary">✨ Генерация статей</a>
+        <a href="{% url 'article:article_create' %}" class="btn btn-success">
+        ✏️ Создать статью
+    </a>
+    </div>
 </div>
 
 <!-- Статистика (без изменений) -->
