@@ -1,3 +1,4 @@
+import base64
 import re
 import json
 import logging
@@ -76,11 +77,11 @@ def split_text_by_words_and_dots(text: str, target_word_count: int = 50) -> list
 def generate_voiceover_inworld(
     text: str,
     provider_instance,
-    voice_id: str,  # Имя спикера, например 'Nikolay'
-    language: str,  # Локаль, например 'ru'
-    project_title: str,  # Название статьи
-    article_id: int,  # ID проекта/статьи для get_or_create_project_dir
-    track_order: int = 1,  # 🔥 НАШ ОРДНУНГ: Порядковый номер фрагмента текста!
+    voice_id: str,
+    language: str,
+    project_title: str,
+    article_id: int,
+    track_order: int = 1,
     speaking_rate: float = 1.0,
     task_id: str = None,
 ) -> str:
@@ -100,77 +101,120 @@ def generate_voiceover_inworld(
         if not text or not text.strip():
             raise ValueError("Текст пуст")
 
-        log_to_modal("🛠 Сбор конфигурации провайдера из БД...", percent=25)
+        log_to_modal(" Сбор конфигурации провайдера из БД...", percent=25)
 
         api_key = provider_instance.api_key
         config = getattr(provider_instance, "config", {}) or {}
+
         if not api_key:
             raise ValueError("Ключ API в базе не найден")
-        clean_key = api_key.strip()
 
-        model_id = config.get("modelId", "inworld-tts-2")
+        # 🔥 1. ПОЛУЧАЕМ URL ИЗ МОДЕЛИ AIProvider
+        # Если поле base_url пусто, используем стандартный эндпоинт Inworld
+        api_url = provider_instance.base_url or "https://api.inworld.ai/tts/v1/voice"
 
-        short_text = " ".join(text.split())
-        print(f"📤 Payload для теста: {short_text}")
+        # 🔥 2. ГИБКОЕ ЧТЕНИЕ ПАРАМЕТРОВ ИЗ JSON CONFIG (поддержка camelCase и snake_case)
+        model_id = config.get("modelId") or config.get("model_id", "inworld-tts-2")
+        delivery_mode = config.get("deliveryMode") or config.get("delivery_mode", "BALANCED")
+        timestamp_type = config.get("timestampType") or config.get("timestamp_type", "WORD")
 
-        async def _async_stream_generate():
-            log_to_modal(
-                f"📡 Инициализация Inworld SDK ({model_id}). Подключение к стриму...",
-                percent=57,
-            )
-            tts = InworldTTS(api_key=clean_key)
-            chunks = []
+        audio_config = config.get("audioConfig", {}) or {}
+        rate_local = float(
+            audio_config.get("speakingRate")
+            or audio_config.get("speaking_rate")
+            or config.get("speakingRate")
+            or config.get("speaking_rate")
+            or speaking_rate
+        )
+        encoding = audio_config.get("audioEncoding") or audio_config.get("audio_encoding", "WAV")
 
-            async for chunk in tts.stream(
-                text=short_text,
-                voice=voice_id,
-                encoding="WAV",
-                sample_rate=48000,
-            ):
-                chunks.append(chunk)
-                log_to_modal(f"📥 Получен аудио-пакет: {len(chunk)} байт")
+        # Формируем локаль ru-RU если пришел просто 'ru'
+        lang_code = language.upper() if len(language) == 2 else language
+        locale = f"{language}-{lang_code}" if "-" not in language else language
 
-            if not chunks:
-                raise ValueError("Сервер Inworld вернул пустой аудио-поток.")
+        # 🔥 ОТЛАДОЧНЫЙ ВЫВОД РЕАЛЬНЫХ ПАРАМЕТРОВ В КОНСОЛЬ
+        print("\n" + "=" * 80)
+        print(f"🔍 [INWORLD DEBUG] Параметры для REST API:")
+        print(f"    URL      : {api_url}")
+        print(f"   🤖 Model ID : {model_id}")
+        print(f"   🎙️ Voice ID : {voice_id}")
+        print(f"   🎛️ Delivery : {delivery_mode}")
+        print(f"   ⚡ Rate     : {rate_local}")
+        print(f"   💾 Encoding : {encoding}")
+        print(f"   📝 Text len : {len(text)} символов")
+        print("=" * 80 + "\n")
 
-            return b"".join(chunks)
+        log_to_modal(f"📡 Отправка запроса в Inworld REST API ({model_id})...", percent=57)
 
-        print("🔥 [INWORLD SDK] Запуск асинхронного генератора", flush=True)
-        audio_content = async_to_sync(_async_stream_generate)()
+        # 🔥 3. ФОРМИРУЕМ PAYLOAD В ФОРМАТЕ REST API (camelCase)
+        # Важно: text.strip() сохраняет пунктуацию, что критично для интонаций
+        payload = {
+            "text": text.strip(),
+            "voiceId": voice_id,
+            "modelId": model_id,
+            "language": locale,
+            "deliveryMode": delivery_mode,
+            "timestampType": timestamp_type,
+            "audioConfig": {"speakingRate": rate_local, "audioEncoding": encoding},
+        }
+
+        # 🔥 4. ОБРАБОТКА АВТОРИЗАЦИИ
+        # Проверяем формат ключа. Если это client:secret, кодируем в Base64.
+        # Если уже Base64 или начинается с Basic, используем как есть.
+        auth_header = api_key.strip()
+        if ":" in auth_header and not auth_header.startswith("Basic "):
+            encoded = base64.b64encode(auth_header.encode()).decode()
+            auth_header = f"Basic {encoded}"
+        elif not auth_header.startswith("Basic "):
+            # Предполагаем, что это уже готовый токен или ключ, который нужно обернуть
+            # Для Inworld обычно требуется Basic Auth из ClientID:ClientSecret
+            auth_header = f"Basic {auth_header}"
+
+        response = requests.post(
+            api_url,  # 🔥 ИСПОЛЬЗУЕМ URL ИЗ БД
+            json=payload,
+            headers={"Authorization": auth_header, "Content-Type": "application/json"},
+            timeout=120,
+        )
+        response.raise_for_status()
+
+        result = response.json()
+        if "audioContent" not in result:
+            raise ValueError("API вернул ответ без аудио-контента")
+
+        audio_content = base64.b64decode(result["audioContent"])
+        ext = ".mp3" if encoding == "MP3" else ".wav"
 
         log_to_modal("💾 Сохранение файлов в структуру проекта...", percent=69)
 
-        # 1. Находим/создаем главную папку проекта
+        # 5. СОХРАНЕНИЕ ФАЙЛОВ И МЕТАДАННЫХ
         project_dir, folder_name = get_or_create_project_dir(project_title, article_id)
 
-        # 2. Формируем имя подпапки: voice_ru
         voice_folder_name = f"voice_{language}" if language else "voice"
         voice_dir = Path(project_dir) / voice_folder_name
         voice_dir.mkdir(parents=True, exist_ok=True)
-        # default - mwx - w5dvmldahfby4uvang__marihuanakox
-        # 3. Имя файла по твоему стандарту
+
         clean_voice = clean_voice_name(voice_id)
         file_base_name = f"{clean_voice}_{track_order}_{language}"
-        filename = f"{file_base_name}.wav"
+        filename = f"{file_base_name}{ext}"
         json_filename = f"voices_meta_{language}.json"
 
         file_path = voice_dir / filename
         json_path = voice_dir / json_filename
 
-        # Записываем аудиофайл
         with open(file_path, "wb") as f:
             f.write(audio_content)
 
-        # 🔥 ВЫЧИСЛЯЕМ ДЛИТЕЛЬНОСТЬ КЛИПА ДЛЯ ТАЙМЛАЙНА
+        # Вычисляем длительность
         duration = 0.0
         try:
             audio_info = mutagen.File(file_path)
             if audio_info is not None and audio_info.info is not None:
                 duration = round(audio_info.info.length, 2)
         except Exception as audio_err:
-            print(f"⚠️ Ошибка подсчета длины при генерации: {audio_err}")
+            logger.warning(f"⚠️ Ошибка подсчета длины при генерации: {audio_err}")
 
-        # Читаем существующий JSON
+        # Работа с JSON метаданными
         if json_path.exists():
             try:
                 with open(json_path, "r", encoding="utf-8") as jf:
@@ -183,7 +227,6 @@ def generate_voiceover_inworld(
         if "paragraphs" not in meta_data:
             meta_data["paragraphs"] = {}
 
-        # 4. Записываем метаданные СТРОГО по орднунгу + добавляем duration
         meta_data["paragraphs"][str(track_order)] = {
             "article_title": project_title,
             "article_id": article_id,
@@ -192,16 +235,16 @@ def generate_voiceover_inworld(
             "speaker_clean": clean_voice,
             "language": language,
             "model": model_id,
-            "speed": speaking_rate,
+            "speed": rate_local,
             "full_text": text,
-            "duration": duration,  # 🔥 Добавлено для таймлайна клипа!
+            "duration": duration,
         }
 
         with open(json_path, "w", encoding="utf-8") as jf:
             json.dump(meta_data, jf, ensure_ascii=False, indent=4, sort_keys=True)
 
-        logger.info(f"✅ Аудио и конфиг успешно сохранены в: {voice_dir}", percent=89)
-        log_to_modal(f"🎉 Озвучка сохранена в проект: {voice_folder_name}/{filename}", percent=95)
+        logger.info(f"✅ Аудио успешно сохранено в: {voice_dir}")
+        log_to_modal(f"🎉 Озвучка сохранена: {voice_folder_name}/{filename}", percent=95)
 
         return f"projects/{folder_name}/{voice_folder_name}/{filename}"
 

@@ -20,7 +20,7 @@ from tiktok_web import settings
 from .models import AudioProject, AudioTrack
 from article.models import ArticleCluster, ArticleTranslation
 from ai_inspector.models import AIProvider
-from .services import generate_voiceover_inworld, split_text_by_words_and_dots
+from .services import clean_voice_name, generate_voiceover_inworld, split_text_by_words_and_dots
 
 
 def get_project_audio_progress(project):
@@ -434,7 +434,8 @@ def audio_edit(request, pk):
                 voices_list = voices_dict.get(target_key, [])
 
     # Собираем контекст, подмешивая туда данные из нашей функции
-    print(f"Audio link: {tracks.values}")
+    track_info = list(tracks.values_list("id", "order", "status"))
+    print(f"🎵 Треки проекта: {track_info}")
     context = {
         "page_title": f"Озвучка: {project.title}",
         "project": project,
@@ -797,6 +798,7 @@ def upload_manual_audio(request):
         if not voice_id or voice_id in ["Manual", "success", ""]:
             voice_id = "noname"
 
+        clean_voice = clean_voice_name(voice_id)
         track_order = track.order
 
         # 1. Папка проекта
@@ -809,7 +811,7 @@ def upload_manual_audio(request):
         voice_dir.mkdir(parents=True, exist_ok=True)
 
         # 3. Имя файла строго по Орднунгу и имя JSON метаданных
-        filename = f"{voice_id}_{track_order}_{project_lang}{ext}"
+        filename = f"{clean_voice}_{track_order}_{project_lang}{ext}"
         json_filename = f"voices_meta_{project_lang}.json"
 
         file_path = voice_dir / filename

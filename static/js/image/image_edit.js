@@ -37,6 +37,9 @@ window.openConfirmModal = function(e, singleIdOrArray = null) {
     
     startGeneration();
 };
+/////////////////------------------------////////////////////
+// 🔥 ГЛОБАЛЬНЫЙ ФЛАГ: если true, отправляем force_regenerate
+let forceRegenerateFlag = false;
 
 function startGeneration() {
     const provider = document.getElementById('image-provider-select')?.value;
@@ -48,6 +51,12 @@ function startGeneration() {
     formData.append('selected_prompts', selectedPromptIds.join(','));
     formData.append('aspect_ratio', size);
     formData.append('style_preset', style);
+    
+    // 🔥 КЛЮЧЕВОЕ: Передаём флаг принудительной перегенерации
+    if (forceRegenerateFlag) {
+        formData.append('force_regenerate', 'true');
+        console.log(`🔄 Принудительная перегенерация для ID: ${selectedPromptIds.join(', ')}`);
+    }
 
     fetch(window.location.href, {
         method: 'POST',
@@ -59,7 +68,22 @@ function startGeneration() {
     })
     .then(r => r.json())
     .then(data => {
-        // 🔥 ИСПРАВЛЕНО: Если бэкенд вернул сообщение, что всё уже сгенерировано, просто закрываем модалку
+        console.log('📡 Ответ сервера:', data);
+        
+        // 🔥 НОВОЕ: Обработка запроса подтверждения перегенерации
+        if (data.requires_confirmation) {
+            if (confirm(data.message + '\n\nНажмите OK, чтобы перегенерировать все выбранные кадры.')) {
+                // Устанавливаем флаг и перезапускаем генерацию
+                forceRegenerateFlag = true;
+                startGeneration();
+            } else {
+                // Пользователь отменил — закрываем модалку
+                if (typeof closeModal === 'function') closeModal('progress-modal');
+            }
+            return;
+        }
+        
+        // Если бэкенд вернул сообщение без task_id
         if (data.success && data.message && !data.task_id) {
             alert(data.message);
             if (typeof closeModal === 'function') closeModal('progress-modal');
@@ -73,33 +97,12 @@ function startGeneration() {
                 'progress-modal',
                 function(result) {
                     if (result.success) {
-                        console.log('🔄 Генерация завершена. Обновляем блоки без перезагрузки...');
+                        console.log('🎉 Генерация завершена!');
                         
-                        fetch(window.location.href)
-                            .then(res => res.text())
-                            .then(html => {
-                                const parser = new DOMParser();
-                                const doc = parser.parseFromString(html, 'text/html');
-                                
-                                const newBlocks = doc.querySelectorAll('.thumbnail-empty');
-                                const currentBlocks = document.querySelectorAll('.thumbnail-empty');
-                                
-                                if (newBlocks.length > 0 && currentBlocks.length === newBlocks.length) {
-                                    currentBlocks.forEach((block, i) => {
-                                        block.innerHTML = newBlocks[i].innerHTML;
-                                    });
-                                    
-                                    document.querySelectorAll('.thumbnail-empty img, .thumbnail-empty a[data-lightbox]').forEach(el => {
-                                        el.addEventListener('click', function(e) {
-                                            e.preventDefault();
-                                            openLightbox(this.src || this.getAttribute('href'), this.alt || '');
-                                        });
-                                    });
-                                } else {
-                                    window.location.reload();
-                                }
-                            })
-                            .catch(() => window.location.reload());
+                        // 🔥 ПРИНУДИТЕЛЬНАЯ ПЕРЕЗАГРУЗКА СТРАНИЦЫ
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
                     }
                 }
             );
@@ -110,10 +113,131 @@ function startGeneration() {
         }
     })
     .catch(err => {
-        console.error('Fetch error:', err);
+        console.error('❌ Fetch error:', err);
+        alert('Критическая ошибка соединения');
         if (typeof closeModal === 'function') closeModal('progress-modal');
     });
 }
+// 🔥 ИСПРАВЛЕНО: Кнопка точечного перезапуска конкретного кадра
+function generateSingleImage(promptId) {
+    if (!promptId) {
+        console.error('❌ promptId не передан!');
+        alert('Ошибка: ID кадра не определён');
+        return;
+    }
+    
+    console.log(`🔄 Запрос перегенерации кадра #${promptId}`);
+    
+    if (confirm(`Вы уверены, что хотите перегенерировать кадр #${promptId}?\n\nСтарая картинка будет перезаписана.`)) {
+        // 🔥 Устанавливаем ID
+        selectedPromptIds = [String(promptId)];
+        
+        // 🔥 УСТАНАВЛИВАЕМ ФЛАГ ПРИНУДИТЕЛЬНОЙ ПЕРЕГЕНЕРАЦИИ
+        forceRegenerateFlag = true;
+        
+        // Открываем модалку
+        if (typeof openModal === 'function') {
+            openModal('progress-modal');
+        }
+        
+        // ЗАПУСКАЕМ ГЕНЕРАЦИЮ
+        startGeneration();
+        
+        // 🔥 СБРАСЫВАЕМ ФЛАГ ПОСЛЕ ЗАПУСКА (чтобы не влиял на следующие запуски)
+        setTimeout(() => {
+            forceRegenerateFlag = false;
+        }, 1000);
+    }
+}
+
+// 🔥 ВАЖНО: Сбрасываем флаг при обычной генерации через кнопку
+document.addEventListener('DOMContentLoaded', function() {
+    const generateBtn = document.getElementById('generate-images-btn');
+    if (generateBtn) {
+        generateBtn.addEventListener('click', function(e) {
+            // Сбрасываем флаг перед обычной генерацией
+            forceRegenerateFlag = false;
+            window.openConfirmModal(e);
+        });
+    }
+});
+/////////////////------------------------////////////////////
+// function startGeneration() {
+//     const provider = document.getElementById('image-provider-select')?.value;
+//     const size = document.getElementById('image-size-select')?.value;
+//     const style = document.getElementById('style-preset-select')?.value;
+    
+//     const formData = new FormData();
+//     formData.append('provider', provider);
+//     formData.append('selected_prompts', selectedPromptIds.join(','));
+//     formData.append('aspect_ratio', size);
+//     formData.append('style_preset', style);
+
+//     fetch(window.location.href, {
+//         method: 'POST',
+//         headers: {
+//             'X-Requested-With': 'XMLHttpRequest',
+//             'X-CSRFToken': getCookie('csrftoken')
+//         },
+//         body: formData
+//     })
+//     .then(r => r.json())
+//     .then(data => {
+//         // 🔥 ИСПРАВЛЕНО: Если бэкенд вернул сообщение, что всё уже сгенерировано, просто закрываем модалку
+//         if (data.success && data.message && !data.task_id) {
+//             alert(data.message);
+//             if (typeof closeModal === 'function') closeModal('progress-modal');
+//             return;
+//         }
+
+//         if (typeof window.startProgressTracking === 'function' && data.task_id) {
+//             window.startProgressTracking(
+//                 '/images/api/generation-stream/', 
+//                 data.task_id, 
+//                 'progress-modal',
+//                 function(result) {
+//                     if (result.success) {
+//                         console.log('🔄 Генерация завершена. Обновляем блоки без перезагрузки...');
+                        
+//                         fetch(window.location.href)
+//                             .then(res => res.text())
+//                             .then(html => {
+//                                 const parser = new DOMParser();
+//                                 const doc = parser.parseFromString(html, 'text/html');
+                                
+//                                 const newBlocks = doc.querySelectorAll('.thumbnail-empty');
+//                                 const currentBlocks = document.querySelectorAll('.thumbnail-empty');
+                                
+//                                 if (newBlocks.length > 0 && currentBlocks.length === newBlocks.length) {
+//                                     currentBlocks.forEach((block, i) => {
+//                                         block.innerHTML = newBlocks[i].innerHTML;
+//                                     });
+                                    
+//                                     document.querySelectorAll('.thumbnail-empty img, .thumbnail-empty a[data-lightbox]').forEach(el => {
+//                                         el.addEventListener('click', function(e) {
+//                                             e.preventDefault();
+//                                             openLightbox(this.src || this.getAttribute('href'), this.alt || '');
+//                                         });
+//                                     });
+//                                 } else {
+//                                     window.location.reload();
+//                                 }
+//                             })
+//                             .catch(() => window.location.reload());
+//                     }
+//                 }
+//             );
+//         } else {
+//             console.error('❌ Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+//             alert('Ошибка: ' + (data.error || 'Не удалось запустить генерацию'));
+//             if (typeof closeModal === 'function') closeModal('progress-modal');
+//         }
+//     })
+//     .catch(err => {
+//         console.error('Fetch error:', err);
+//         if (typeof closeModal === 'function') closeModal('progress-modal');
+//     });
+// }
 
 // Инициализация (DOMContentLoaded)
 document.addEventListener('DOMContentLoaded', function() {
@@ -192,13 +316,13 @@ function closeLightbox() {
 }
 
 // 🔥 ИСПРАВЛЕНО: Кнопка точечного перезапуска конкретного кадра
-function generateSingleImage(promptId) {
-    if (confirm("Вы уверены, что хотите перегенерировать этот кадр? Старая картинка перезапишется.")) {
-        // Вызываем модалку и передаем ID конкретного кадра напрямую в обход стандартных чекбоксов
-        window.openConfirmModal(null, promptId); 
-    }
-}/**
- * Функция-триггер для открытия окна выбора файла при клике на контейнер
+// function generateSingleImage(promptId) {
+//     if (confirm("Вы уверены, что хотите перегенерировать этот кадр? Старая картинка перезапишется.")) {
+//         // Вызываем модалку и передаем ID конкретного кадра напрямую в обход стандартных чекбоксов
+//         window.openConfirmModal(null, promptId); 
+//     }
+// }/**
+ /*/ Функция-триггер для открытия окна выбора файла при клике на контейнер
  */
 function triggerManualUpload(containerElement) {
     if (!containerElement) return;

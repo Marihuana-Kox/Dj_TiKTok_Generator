@@ -416,16 +416,279 @@ def _handle_form_create(request):
         return redirect("image:project_create")
 
 
+# @login_required
+# def project_edit(request, pk):
+#     """
+#     Страница редактирования промптов + генерация изображений с фоновым прогрессом.
+#     """
+#     project = get_object_or_404(ImageProject, id=pk)
+#     prompts = project.prompts.all().order_by("order")
+#     image_providers = AIProvider.objects.filter(is_active=True, provider_type="image")
+
+#     progress_data = get_project_image_progress(project)
+#     # AJAX: Обработка генерации или проверки статуса
+#     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+#         # 1. Проверка прогресса (GET)
+#         if request.method == "GET":
+#             task_id = request.GET.get("task_id")
+#             progress = cache.get(f"progress_{task_id}") or cache.get(f"gen_progress_{task_id}")
+#             if progress:
+#                 return JsonResponse(progress)
+#             return JsonResponse({"completed": True, "percent": 100})
+
+#         # 2. Запуск генерации (POST)
+#         if request.method == "POST":
+#             action = request.POST.get("action")  # новая строка для определения действия
+#             if action == "autosave_single":
+#                 p_id = request.POST.get("prompt_id")
+#                 new_text = request.POST.get("prompt_text")
+#                 try:
+#                     prompt_obj = ImagePrompt.objects.get(id=p_id)
+#                     prompt_obj.prompt_text = new_text
+#                     prompt_obj.save()
+#                     return JsonResponse({"success": True})
+#                 except Exception as e:
+#                     return JsonResponse({"success": False, "error": str(e)}, status=400)
+#             elif action == "manual_upload":
+#                 p_id = request.POST.get("prompt_id")
+#                 uploaded_file = request.FILES.get("image_file")
+
+#                 if not p_id:
+#                     return JsonResponse(
+#                         {"success": False, "error": "ID кадра не передан"}, status=400
+#                     )
+#                 if not uploaded_file:
+#                     return JsonResponse({"success": False, "error": "Файл не выбран"}, status=400)
+
+#                 # Просто отдаем ID и файл в сервис. Всё!
+#                 return handle_manual_image_upload(p_id, uploaded_file)
+
+#             provider_name = request.POST.get("provider")
+#             selected_ids_str = request.POST.get("selected_prompts", "")
+#             aspect_ratio = request.POST.get("aspect_ratio", project.aspect_ratio)
+#             style_preset = request.POST.get("style_preset", "current")
+
+#             if not provider_name or not selected_ids_str:
+#                 return JsonResponse(
+#                     {"success": False, "error": "Не выбраны промпты или провайдер"},
+#                     status=400,
+#                 )
+
+#             try:
+#                 selected_ids = [int(x) for x in selected_ids_str.split(",") if x.isdigit()]
+
+#                 # Находим кадры из выбранных, у которых ЕЩЕ НЕТ картинок (пустые слоты)
+#                 empty_prompts_qs = (
+#                     prompts.filter(id__in=selected_ids).filter(image__isnull=True)
+#                     | prompts.filter(id__in=selected_ids).filter(image="")
+#                 ).distinct()
+
+#                 # Если передан специальный флаг принудительной перезаписи от пользователя
+#                 force_regenerate = request.POST.get("force_regenerate") == "true"
+
+#                 if force_regenerate:
+#                     # Если пользователь согласился на перегенерацию, берем ВСЕ выбранные ID
+#                     selected_prompts = list(prompts.filter(id__in=selected_ids))
+#                 else:
+#                     # Иначе отправляем на генерацию только пустые слоты
+#                     selected_prompts = list(empty_prompts_qs)
+
+#                 # Если пустых слотов нет и принудительный флаг не пришел, отправляем фронтенду статус для вызова Confirm
+#                 if not selected_prompts and not force_regenerate:
+#                     return JsonResponse(
+#                         {
+#                             "success": False,
+#                             "requires_confirmation": True,
+#                             "message": "Некоторые или все выбранные кадры уже имеют готовые изображения. Перегенерировать их?",
+#                         }
+#                     )
+
+#             except Exception as val_err:
+#                 return JsonResponse(
+#                     {"success": False, "error": f"Ошибка валидации ID: {str(val_err)}"}, status=400
+#                 )
+#             task_id = str(uuid.uuid4())
+
+#             # Инициализируем прогресс в кэше
+#             cache.set(
+#                 f"progress_{task_id}",
+#                 {
+#                     "percent": 1,
+#                     "message": f"Подготовка очереди из {len(selected_prompts)} кадров...",
+#                     "status": "running",
+#                     "logs": ["🚀 Запуск процесса генерации..."],
+#                     "task_id": task_id,
+#                     "total_count": len(selected_prompts),
+#                     "completed_count": 0,
+#                 },
+#                 timeout=3600,
+#             )
+
+#             # Переводим объекты в список ID, чтобы безопасно читать их внутри изолированного потока потока
+#             selected_prompt_ids = [p.id for p in selected_prompts]
+
+#             # ФОНОВАЯ ЗАДАЧА
+#             def run_generation_task(prompt_ids):
+#                 # 🔥 ИМПОРТИРУЕМ МОДУЛЬ ДЛЯ СБРОСА СОЕДИНЕНИЙ БД
+#                 db.close_old_connections()  # <-- ЗАКРЫВАЕМ СТАРЫЕ ХВОСТЫ ТУТ
+#                 try:
+#                     total = len(prompt_ids)
+
+#                     # --- ИНИЦИАЛИЗАЦИЯ ПАПКИ ПРОЕКТА ---
+#                     project_dir, folder_name = get_or_create_project_dir(
+#                         project.title, project.article.id
+#                     )
+#                     # relative_subfolder = f"projects/{folder_name}"
+
+#                     for i, p_id in enumerate(prompt_ids):
+#                         current_num = i + 1
+
+#                         # Ещё раз принудительно чистим коннекты перед каждым кадром на всякий случай
+#                         db.close_old_connections()
+
+#                         # Теперь этот запрос выполнится на 100% успешно и без падения потока!
+#                         prompt = ImagePrompt.objects.get(id=p_id)
+
+#                         scene_index = prompt.order if prompt.order > 0 else current_num
+#                         filename_base = f"pic_{scene_index}"
+
+#                         # Обновляем статус в кэше
+#                         data = cache.get(f"progress_{task_id}", {})
+#                         if data:
+#                             data["percent"] = int((i / total) * 100)
+#                             data["message"] = (
+#                                 f"Обработка кадра {current_num} из {total} ({filename_base})"
+#                             )
+#                             data["completed_count"] = i
+#                             cache.set(f"progress_{task_id}", data, timeout=3600)
+
+#                         # --- ВЫЗОВ СЕРВИСА ГЕНЕРАЦИИ КАРТИНКИ ---
+#                         generate_image_from_prompt(
+#                             prompt=prompt,
+#                             provider_name=provider_name,
+#                             aspect_ratio=aspect_ratio,
+#                             style_preset=style_preset,
+#                             task_id=task_id,
+#                             step_info=f"[{current_num}/{total}]",
+#                             custom_filename=filename_base,
+#                         )
+
+#                         if current_num < total:
+#                             time.sleep(15)
+
+#                         # --- СОЗДАНИЕ МЕТАФАЙЛА ДЛЯ КАРТИНКИ ---
+#                         # 🔥 ОПРЕДЕЛЯЕМ РЕАЛЬНОЕ РАСШИРЕНИЕ ПОСЛЕ ГЕНЕРАЦИИ
+#                         actual_ext = ".jpeg"  # Дефолт
+#                         for ext in [".png", ".jpg", ".jpeg", ".webp"]:
+#                             if (project_dir / f"{filename_base}{ext}").exists():
+#                                 actual_ext = ext
+#                                 break
+
+#                         # Если сервис сохранил под другим именем, попробуем найти любой файл с этим базовым именем
+#                         if not (project_dir / f"{filename_base}{actual_ext}").exists():
+#                             for file in project_dir.iterdir():
+#                                 if file.stem == filename_base and file.suffix.lower() in [
+#                                     ".png",
+#                                     ".jpg",
+#                                     ".jpeg",
+#                                     ".webp",
+#                                 ]:
+#                                     actual_ext = file.suffix
+#                                     break
+
+#                         # --- СОЗДАНИЕ МЕТАФАЙЛА ДЛЯ КАРТИНКИ (ТЕПЕРЬ С ПРАВИЛЬНЫМ РАСШИРЕНИЕМ) ---
+#                         pic_metadata = {
+#                             "prompt": getattr(prompt, "prompt_text", "")
+#                             or getattr(prompt, "prompt", ""),
+#                             "filename": f"{filename_base}{actual_ext}",  # ✅ ДИНАМИЧЕСКОЕ РАСШИРЕНИЕ
+#                             "order": scene_index,
+#                             "description": getattr(prompt, "scene_description", "") or "",
+#                             "aspect_ratio": aspect_ratio,
+#                             "provider": provider_name,
+#                             "is_manual": False,
+#                         }
+
+#                         pic_json_path = project_dir / f"{filename_base}.json"
+#                         with open(pic_json_path, "w", encoding="utf-8") as f:
+#                             json.dump(pic_metadata, f, ensure_ascii=False, indent=4)
+
+#                     # Финализация
+#                     cache.set(
+#                         f"progress_{task_id}",
+#                         {
+#                             "percent": 100,
+#                             "message": "✅ Все изображения успешно сгенерированы!",
+#                             "status": "done",
+#                             "task_id": task_id,
+#                             "completed": True,
+#                         },
+#                         timeout=3600,
+#                     )
+
+#                 except Exception as e:
+#                     cache.set(
+#                         f"progress_{task_id}",
+#                         {
+#                             "status": "error",
+#                             "message": f"Ошибка генерации кадров: {str(e)}",
+#                             "percent": 0,
+#                         },
+#                         timeout=3600,
+#                     )
+#                 finally:
+#                     connection.close()
+
+#             # Запускаем поток, передавая список ID
+#             threading.Thread(
+#                 target=run_generation_task, args=(selected_prompt_ids,), daemon=True
+#             ).start()
+#             return JsonResponse({"success": True, "task_id": task_id})
+
+#     # ОБЫЧНАЯ ФОРМА: Сохранение текста (кнопка "Сохранить")
+#     if request.method == "POST":
+#         action = request.POST.get("action")
+#         if action == "save":
+#             for prompt in prompts:
+#                 prompt.scene_description = request.POST.get(
+#                     f"desc_{prompt.id}", prompt.scene_description
+#                 )
+#                 prompt.prompt_text = request.POST.get(f"prompt_{prompt.id}", prompt.prompt_text)
+#                 prompt.save()
+#             messages.success(request, "✅ Промпты сохранены!")
+#             return redirect("image:project_edit", pk=project.id)
+#     cluster = project.article
+#     audio_project = None
+#     audio_project = AudioProject.objects.filter(article=cluster).first()
+
+
+#     # GET: Отображение страницы
+#     return render(
+#         request,
+#         "image/project_edit.html",
+#         {
+#             "project": project,
+#             "prompts": prompts,
+#             "image_providers": image_providers,
+#             "audio_project": audio_project if audio_project else None,
+#             # 🔥 Новые переменные для твоей простой шкалы прогресса в HTML
+#             "total_tracks": progress_data["total_tracks"],
+#             "success_tracks": progress_data["success_tracks"],
+#             "progress_percent": progress_data["progress_percent"],
+#             "project_ready": progress_data["project_ready"],
+#         },
+#     )
 @login_required
 def project_edit(request, pk):
     """
     Страница редактирования промптов + генерация изображений с фоновым прогрессом.
+    Исправлено: динамическое определение расширения файла после генерации/загрузки.
     """
     project = get_object_or_404(ImageProject, id=pk)
     prompts = project.prompts.all().order_by("order")
     image_providers = AIProvider.objects.filter(is_active=True, provider_type="image")
 
     progress_data = get_project_image_progress(project)
+
     # AJAX: Обработка генерации или проверки статуса
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         # 1. Проверка прогресса (GET)
@@ -438,7 +701,8 @@ def project_edit(request, pk):
 
         # 2. Запуск генерации (POST)
         if request.method == "POST":
-            action = request.POST.get("action")  # новая строка для определения действия
+            action = request.POST.get("action")
+
             if action == "autosave_single":
                 p_id = request.POST.get("prompt_id")
                 new_text = request.POST.get("prompt_text")
@@ -449,6 +713,7 @@ def project_edit(request, pk):
                     return JsonResponse({"success": True})
                 except Exception as e:
                     return JsonResponse({"success": False, "error": str(e)}, status=400)
+
             elif action == "manual_upload":
                 p_id = request.POST.get("prompt_id")
                 uploaded_file = request.FILES.get("image_file")
@@ -507,6 +772,7 @@ def project_edit(request, pk):
                 return JsonResponse(
                     {"success": False, "error": f"Ошибка валидации ID: {str(val_err)}"}, status=400
                 )
+
             task_id = str(uuid.uuid4())
 
             # Инициализируем прогресс в кэше
@@ -524,13 +790,13 @@ def project_edit(request, pk):
                 timeout=3600,
             )
 
-            # Переводим объекты в список ID, чтобы безопасно читать их внутри изолированного потока потока
+            # Переводим объекты в список ID, чтобы безопасно читать их внутри изолированного потока
             selected_prompt_ids = [p.id for p in selected_prompts]
 
             # ФОНОВАЯ ЗАДАЧА
             def run_generation_task(prompt_ids):
                 # 🔥 ИМПОРТИРУЕМ МОДУЛЬ ДЛЯ СБРОСА СОЕДИНЕНИЙ БД
-                db.close_old_connections()  # <-- ЗАКРЫВАЕМ СТАРЫЕ ХВОСТЫ ТУТ
+                db.close_old_connections()
                 try:
                     total = len(prompt_ids)
 
@@ -538,17 +804,14 @@ def project_edit(request, pk):
                     project_dir, folder_name = get_or_create_project_dir(
                         project.title, project.article.id
                     )
-                    # relative_subfolder = f"projects/{folder_name}"
 
                     for i, p_id in enumerate(prompt_ids):
                         current_num = i + 1
 
-                        # Ещё раз принудительно чистим коннекты перед каждым кадром на всякий случай
+                        # Ещё раз принудительно чистим коннекты перед каждым кадром
                         db.close_old_connections()
 
-                        # Теперь этот запрос выполнится на 100% успешно и без падения потока!
                         prompt = ImagePrompt.objects.get(id=p_id)
-
                         scene_index = prompt.order if prompt.order > 0 else current_num
                         filename_base = f"pic_{scene_index}"
 
@@ -562,24 +825,8 @@ def project_edit(request, pk):
                             data["completed_count"] = i
                             cache.set(f"progress_{task_id}", data, timeout=3600)
 
-                        # --- СОЗДАНИЕ МЕТАФАЙЛА ДЛЯ КАРТИНКИ ---
-                        # Синхронизируем имена полей ("prompt") с нашей ручной загрузкой!
-                        pic_metadata = {
-                            "prompt": getattr(prompt, "prompt_text", "")
-                            or getattr(prompt, "prompt", ""),
-                            "filename": f"{filename_base}.jpeg",  # Будет обновлено сервисом, если запишется png
-                            "order": scene_index,
-                            "description": getattr(prompt, "scene_description", "") or "",
-                            "aspect_ratio": aspect_ratio,
-                            "provider": provider_name,
-                            "is_manual": False,
-                        }
-
-                        pic_json_path = project_dir / f"{filename_base}.json"
-                        with open(pic_json_path, "w", encoding="utf-8") as f:
-                            json.dump(pic_metadata, f, ensure_ascii=False, indent=4)
-
                         # --- ВЫЗОВ СЕРВИСА ГЕНЕРАЦИИ КАРТИНКИ ---
+                        # Сначала генерируем, чтобы файл физически появился на диске
                         generate_image_from_prompt(
                             prompt=prompt,
                             provider_name=provider_name,
@@ -592,6 +839,43 @@ def project_edit(request, pk):
 
                         if current_num < total:
                             time.sleep(15)
+
+                        # --- ОПРЕДЕЛЕНИЕ РЕАЛЬНОГО РАСШИРЕНИЯ ПОСЛЕ ГЕНЕРАЦИИ ---
+                        actual_ext = ".jpeg"  # Дефолт на случай ошибки
+
+                        # 1. Прямой поиск по известным расширениям
+                        for ext in [".png", ".jpg", ".jpeg", ".webp"]:
+                            if (project_dir / f"{filename_base}{ext}").exists():
+                                actual_ext = ext
+                                break
+
+                        # 2. Фолбэк: поиск любого файла с этим базовым именем
+                        if not (project_dir / f"{filename_base}{actual_ext}").exists():
+                            for file in project_dir.iterdir():
+                                if file.stem == filename_base and file.suffix.lower() in [
+                                    ".png",
+                                    ".jpg",
+                                    ".jpeg",
+                                    ".webp",
+                                ]:
+                                    actual_ext = file.suffix
+                                    break
+
+                        # --- СОЗДАНИЕ МЕТАФАЙЛА ДЛЯ КАРТИНКИ (ТЕПЕРЬ С ПРАВИЛЬНЫМ РАСШИРЕНИЕМ) ---
+                        pic_metadata = {
+                            "prompt": getattr(prompt, "prompt_text", "")
+                            or getattr(prompt, "prompt", ""),
+                            "filename": f"{filename_base}{actual_ext}",  # ✅ ДИНАМИЧЕСКОЕ РАСШИРЕНИЕ
+                            "order": scene_index,
+                            "description": getattr(prompt, "scene_description", "") or "",
+                            "aspect_ratio": aspect_ratio,
+                            "provider": provider_name,
+                            "is_manual": False,
+                        }
+
+                        pic_json_path = project_dir / f"{filename_base}.json"
+                        with open(pic_json_path, "w", encoding="utf-8") as f:
+                            json.dump(pic_metadata, f, ensure_ascii=False, indent=4)
 
                     # Финализация
                     cache.set(
@@ -637,8 +921,8 @@ def project_edit(request, pk):
                 prompt.save()
             messages.success(request, "✅ Промпты сохранены!")
             return redirect("image:project_edit", pk=project.id)
+
     cluster = project.article
-    audio_project = None
     audio_project = AudioProject.objects.filter(article=cluster).first()
 
     # GET: Отображение страницы

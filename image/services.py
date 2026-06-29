@@ -444,6 +444,130 @@ def generate_storyboard(
     return total_scenes
 
 
+# def generate_image_from_prompt(
+#     prompt,
+#     provider_name: str,
+#     aspect_ratio: str = None,
+#     style_preset: str = "current",
+#     task_id=None,
+#     step_info="",
+#     custom_filename: str = None,
+# ):
+#     """
+#     Генерирует изображение для одного промпта.
+#     """
+
+#     def log_image_step(message):
+#         if task_id:
+#             data = cache.get(f"progress_{task_id}", {})
+#             logs = data.get("logs", [])
+#             logs.append(f"{step_info} {message}")
+#             data["logs"] = logs[-15:]
+#             cache.set(f"progress_{task_id}", data, timeout=3600)
+
+#     # Обновляем статус
+#     prompt.generation_status = "generating"
+#     prompt.save()
+#     log_image_step("🔄 Запуск нейросети...")
+
+#     try:
+#         # Получаем провайдера
+#         provider = AIProvider.objects.get(name=provider_name, is_active=True)
+#         api_key = provider.get_api_key()
+#         config = provider.config
+#         model_id = config.get("model_id")
+
+#         # Получаем клиент
+#         client, model, provider_type = _get_image_client(provider, api_key, config)
+
+#         # Размер: из параметра или из проекта
+#         size = _aspect_ratio_to_size(aspect_ratio or prompt.project.aspect_ratio)
+
+#         # Стиль: модифицируем промпт
+#         final_prompt = _apply_style_preset(prompt.prompt_text, style_preset, prompt.project)
+
+#         if custom_filename:
+#             _, folder_name = get_or_create_project_dir(
+#                 prompt.project.title, prompt.project.article.id
+#             )
+
+#             actual_ext = ".png"
+
+#             # Если провайдер вернул URL, проверяем его расширение
+#             if provider_type == "replicate" and isinstance(output, list) and output:
+#                 url_ext = os.path.splitext(output[0])[1].lower()
+#                 if url_ext in [".jpg", ".jpeg", ".webp"]:
+#                     actual_ext = url_ext
+
+#             filename = f"{custom_filename}{actual_ext}"
+
+#             # Относительный путь для сохранения в БД (projects/Tayny_kosmosa/pic_3.png)
+#             rel_path = os.path.join("projects", folder_name, filename)
+#             # Полный физический путь на сервере для записи файла
+#             abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+#         else:
+#             # Фолбэк на случай, если функцию вызвали по-старому без параметров
+#             filename = f"prompt_{prompt.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+#             rel_path = os.path.join("image_projects", str(prompt.project.id), filename)
+#             abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+
+#         # ОДИН РАЗ гарантируем, что папка физически создана на диске перед записью любого файла
+#         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+#         # =====================================================================
+
+#         # 4. ГЕНЕРАЦИЯ И СОХРАНЕНИЕ КОНТЕНТА
+#         if provider_type == "huggingface":
+#             # HuggingFace возвращает PIL Image
+#             image = client.text_to_image(
+#                 final_prompt,
+#                 width=size["width"],
+#                 height=size["height"],
+#                 num_inference_steps=config.get("default_params", {}).get("num_inference_steps", 28),
+#             )
+#             # Провайдер просто сохраняет PIL Image по нашему готовому abs_path
+#             image.save(abs_path)
+
+#         elif provider_type == "replicate":
+#             # Replicate возвращает URL
+#             output = client.run(
+#                 "black-forest-labs/flux-schnell",
+#                 input={
+#                     "prompt": final_prompt,
+#                     "aspect_ratio": aspect_ratio or "9:16",
+#                     "num_inference_steps": config.get("default_params", {}).get(
+#                         "num_inference_steps", 4
+#                     ),
+#                     "guidance_scale": config.get("default_params", {}).get("guidance_scale", 3.5),
+#                 },
+#             )
+
+#             response = requests.get(output[0])
+#             response.raise_for_status()
+
+#             # Провайдер просто записывает скачанные байты по нашему готовому abs_path
+#             with open(abs_path, "wb") as f:
+#                 f.write(response.content)
+
+#         else:
+#             raise ValueError(f"Неподдерживаемый провайдер: {provider_name}")
+
+#         # Обновляем промпт (ОБЩЕЕ для всех провайдеров)
+#         prompt.image = rel_path
+#         prompt.generation_status = "success"
+#         prompt.save()
+
+#         print(f"✅ Изображение сохранено: {rel_path}")
+#         return rel_path
+
+#     except Exception as e:
+#         prompt.generation_status = "failed"
+#         prompt.error_message = str(e)
+#         prompt.save()
+#         print(f"❌ Ошибка генерации: {e}")
+#         raise
+# Добавь этот код в КОНЕЦ файла image/services.py
+
+
 def generate_image_from_prompt(
     prompt,
     provider_name: str,
@@ -453,9 +577,7 @@ def generate_image_from_prompt(
     step_info="",
     custom_filename: str = None,
 ):
-    """
-    Генерирует изображение для одного промпта.
-    """
+    """Генерирует изображение для одного промпта."""
 
     def log_image_step(message):
         if task_id:
@@ -465,25 +587,17 @@ def generate_image_from_prompt(
             data["logs"] = logs[-15:]
             cache.set(f"progress_{task_id}", data, timeout=3600)
 
-    # Обновляем статус
     prompt.generation_status = "generating"
     prompt.save()
     log_image_step("🔄 Запуск нейросети...")
 
     try:
-        # Получаем провайдера
         provider = AIProvider.objects.get(name=provider_name, is_active=True)
         api_key = provider.get_api_key()
         config = provider.config
-        model_id = config.get("model_id")
 
-        # Получаем клиент
         client, model, provider_type = _get_image_client(provider, api_key, config)
-
-        # Размер: из параметра или из проекта
         size = _aspect_ratio_to_size(aspect_ratio or prompt.project.aspect_ratio)
-
-        # Стиль: модифицируем промпт
         final_prompt = _apply_style_preset(prompt.prompt_text, style_preset, prompt.project)
 
         if custom_filename:
@@ -491,36 +605,32 @@ def generate_image_from_prompt(
                 prompt.project.title, prompt.project.article.id
             )
 
-            filename = f"{custom_filename}.png"  # Строго pic_3.png
+            # 🔥 ОПРЕДЕЛЯЕМ РАСШИРЕНИЕ ДО ГЕНЕРАЦИИ (для Replicate/HF)
+            actual_ext = ".png"
+            # Для Replicate можно попробовать определить по URL модели, но безопаснее дефолт
+            # Если используешь HF, PIL Image.save() сам определит формат по расширению
 
-            # Относительный путь для сохранения в БД (projects/Tayny_kosmosa/pic_3.png)
+            filename = f"{custom_filename}{actual_ext}"
             rel_path = os.path.join("projects", folder_name, filename)
-            # Полный физический путь на сервере для записи файла
             abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
         else:
-            # Фолбэк на случай, если функцию вызвали по-старому без параметров
             filename = f"prompt_{prompt.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             rel_path = os.path.join("image_projects", str(prompt.project.id), filename)
             abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
 
-        # ОДИН РАЗ гарантируем, что папка физически создана на диске перед записью любого файла
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        # =====================================================================
 
-        # 4. ГЕНЕРАЦИЯ И СОХРАНЕНИЕ КОНТЕНТА
+        # ГЕНЕРАЦИЯ
         if provider_type == "huggingface":
-            # HuggingFace возвращает PIL Image
             image = client.text_to_image(
                 final_prompt,
                 width=size["width"],
                 height=size["height"],
                 num_inference_steps=config.get("default_params", {}).get("num_inference_steps", 28),
             )
-            # Провайдер просто сохраняет PIL Image по нашему готовому abs_path
             image.save(abs_path)
 
         elif provider_type == "replicate":
-            # Replicate возвращает URL
             output = client.run(
                 "black-forest-labs/flux-schnell",
                 input={
@@ -532,18 +642,13 @@ def generate_image_from_prompt(
                     "guidance_scale": config.get("default_params", {}).get("guidance_scale", 3.5),
                 },
             )
-
             response = requests.get(output[0])
             response.raise_for_status()
-
-            # Провайдер просто записывает скачанные байты по нашему готовому abs_path
             with open(abs_path, "wb") as f:
                 f.write(response.content)
-
         else:
             raise ValueError(f"Неподдерживаемый провайдер: {provider_name}")
 
-        # Обновляем промпт (ОБЩЕЕ для всех провайдеров)
         prompt.image = rel_path
         prompt.generation_status = "success"
         prompt.save()

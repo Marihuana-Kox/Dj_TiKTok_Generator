@@ -202,7 +202,8 @@ class ImagePrompt(models.Model):
         project_title = self.project.title
         # 1. Добавили транслитерацию, чтобы дашборд искал латинскую папку
         safe_title = transliterate(project_title)
-
+        # 🔥 ИСПОЛЬЗУЕМ РЕАЛЬНОЕ РАСШИРЕНИЕ ИЗ ПОЛЯ IMAGE, А НЕ ХАРДКОД
+        actual_ext = os.path.splitext(self.image.name)[1] or ".png"
         # 2. Очищаем его точно так же, как при создании папки
         clean_title = re.sub(r'[\\/*?:"<>| ]', "_", safe_title)
         clean_title = re.sub(r"_+", "_", clean_title).strip("_")
@@ -210,7 +211,7 @@ class ImagePrompt(models.Model):
 
         # 3. Формируем номер сцены и имя файла
         scene_index = self.order
-        filename = f"pic_{scene_index}.png"
+        filename = f"pic_{scene_index}{actual_ext}"
 
         # 4. Возвращаем правильный URL для фронтенда
         return f"{settings.MEDIA_URL}projects/{folder_name}/{filename}"
